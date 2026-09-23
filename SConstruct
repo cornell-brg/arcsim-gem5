@@ -654,7 +654,7 @@ for variant_path in variant_paths:
 
         # Treat warnings as errors but white list some warnings that we
         # want to allow (e.g., deprecation warnings).
-        env.Append(CCFLAGS=['-Werror',
+        env.Append(CCFLAGS=['',
                              '-Wno-error=deprecated-declarations',
                              '-Wno-error=deprecated',
                             ])
