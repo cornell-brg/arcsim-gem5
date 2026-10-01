@@ -365,6 +365,15 @@ Fetch2::decodeInstructions(BranchData &prediction_out)
                     " lineBaseAddr: 0x%x lineWidth: 0x%x\n",
                     *line_in->pc, fetch_info.inputIndex, line_in->lineBaseAddr,
                     line_in->lineWidth);
+                /* The line must contain the PC.  inputIndex is unsigned,
+                 * so a PC below lineBaseAddr wraps to a huge offset and
+                 * the copy below would read far outside the line. */
+                panic_if(!line_in->isFault() &&
+                    fetch_info.inputIndex >= line_in->lineWidth,
+                    "Line %s does not contain its PC %s (lineBaseAddr: 0x%x"
+                    " lineWidth: 0x%x inputIndex: 0x%x)\n",
+                    line_in->id, *line_in->pc, line_in->lineBaseAddr,
+                    line_in->lineWidth, fetch_info.inputIndex);
                 set(fetch_info.pc, line_in->pc);
                 fetch_info.havePC = true;
                 decoder->reset();
@@ -768,10 +777,16 @@ SingleStageFetch2::reactToExecuteBranch(const BranchData &executeBranch)
             executeBranch.newPredictionSeqNum;
         fetchInfo[executeBranch.threadId].expectedStreamSeqNum =
             executeBranch.newStreamSeqNum;
-    } else if (latched_branch.isStreamChange()) {
+    } else if (latched_branch.isStreamChange() &&
+               latched_branch.newStreamSeqNum !=
+               fetchInfo[latched_branch.threadId].expectedStreamSeqNum) {
         /* Fallback: if no same-cycle branch but latched branch has a
          * stream change (shouldn't happen normally in single-stage mode
-         * since we use same-cycle bypass), handle it the old way. */
+         * since we use same-cycle bypass), handle it the old way.  The
+         * latched copy of a branch already applied through the bypass
+         * last cycle is ignored: its stream is the expected one, and
+         * dumping the input again would discard that stream's first
+         * line if it has arrived. */
         dumpAllInput(latched_branch.threadId);
         fetchInfo[latched_branch.threadId].havePC = false;
         fetchInfo[latched_branch.threadId].predictionSeqNum =
