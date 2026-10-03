@@ -124,7 +124,26 @@ from gem5.prebuilt.cortexm.cpu.cortex_m4 import CortexM4CPU
 from gem5.prebuilt.cortexm.platforms import STM32G474REPlatform
 
 
-def _make_flash_bus():
+def _make_bus_clock_domain():
+    """The clock every bus of this board runs on.
+
+    All the board's buses are zero-latency routers: the cycles they
+    stand for (flash wait states, the AHB address phase, the ART hit
+    latency) are modeled in the memories and the ART, not in the bus.
+    gem5 still aligns each queued transfer to the bus's next clock
+    edge, one tick after it was scheduled (PacketQueue), so a bus
+    clocked at the core frequency would add a core cycle per hop and
+    per direction.  A period of one tick reduces that to the tick
+    itself, and keeps every transfer's timing independent of where the
+    bus clock's edges fall between the core's.
+    """
+    return SrcClockDomain(
+        clock="1ps",
+        voltage_domain=VoltageDomain(voltage="1.0V"),
+    )
+
+
+def _make_flash_bus(clk_domain):
     """Zero-latency crossbar modelling the direct ART-to-flash interface.
 
     On real STM32, the ART accelerator connects directly to the flash
@@ -132,14 +151,6 @@ def _make_flash_bus():
     wait states (4 WS at 170MHz = 5 CPU cycles = 29ns) are modeled in
     SimpleMemory latency, not here.  Width = 8 bytes (64-bit flash
     read interface) [RM0440 §4.2].
-
-    The bus uses a very fast clock (10 GHz) so that the gem5 XBar
-    clock-edge alignment penalty (from PacketQueue's curTick()+1
-    scheduling minimum) is negligible (~100 ps instead of ~5882 ps
-    at 170 MHz).  Without this, every ART prefetch request arrives
-    1 tick past the bus clock edge, and calcPacketTiming() rounds up
-    to the next edge — adding ~1 CPU cycle of artificial latency
-    that makes the prefetcher unable to keep up with the CPU.
     """
     bus = NoncoherentXBar(
         frontend_latency=0,
@@ -147,17 +158,14 @@ def _make_flash_bus():
         response_latency=0,
         width=4,
         header_latency=0,
-        clk_domain=SrcClockDomain(
-            clock="10GHz",
-            voltage_domain=VoltageDomain(voltage="1.0V"),
-        ),
+        clk_domain=clk_domain,
     )
     bus.badaddr_responder = BadAddr()
     bus.default = bus.badaddr_responder.pio
     return bus
 
 
-def _make_system_bus():
+def _make_system_bus(clk_domain):
     """AHB bus matrix for SRAM and peripheral access.
 
     Models the Cortex-M4 System bus (AHB-Lite).  32-bit data path.
@@ -173,13 +181,14 @@ def _make_system_bus():
         forward_latency=0,
         response_latency=0,
         width=4,
+        clk_domain=clk_domain,
     )
     bus.badaddr_responder = BadAddr()
     bus.default = bus.badaddr_responder.pio
     return bus
 
 
-def _make_addr_router():
+def _make_addr_router(clk_domain):
     """Zero-latency NoncoherentXBar for address-based routing.
 
     Models the ART accelerator's address decode: flash addresses are
@@ -209,6 +218,7 @@ def _make_addr_router():
         response_latency=0,
         width=8,
         header_latency=0,
+        clk_domain=clk_domain,
     )
 
 
@@ -284,10 +294,12 @@ class STM32G474RETimingBoard(ArmMSystem):
         #   Without separate buses, DCode literal pool loads serialize
         #   with ICode instruction fetches, causing +382% error on
         #   bench_ldr_literal.
-        # system_bus: AHB bus matrix (1-cy arbitration) for SRAM + SCS.
-        self.flash_bus = _make_flash_bus()
-        self.dcode_flash_bus = _make_flash_bus()
-        self.system_bus = _make_system_bus()
+        # system_bus: AHB bus matrix for SRAM + SCS; its address phase is
+        #   modeled in the memories.
+        self.bus_clk_domain = _make_bus_clock_domain()
+        self.flash_bus = _make_flash_bus(self.bus_clk_domain)
+        self.dcode_flash_bus = _make_flash_bus(self.bus_clk_domain)
+        self.system_bus = _make_system_bus(self.bus_clk_domain)
 
         # -- Memories: split flash vs SRAM onto separate buses --
         flash_starts = {int(r.start) for r in platform.code_ranges}
@@ -357,10 +369,10 @@ class STM32G474RETimingBoard(ArmMSystem):
         # -- Address routers: zero-latency XBars for ICode/DCode decode --
         flash_ranges = platform.code_ranges
 
-        self.icode_bus = _make_addr_router()
+        self.icode_bus = _make_addr_router(self.bus_clk_domain)
         self.icode_bus.default = self.system_bus.cpu_side_ports
 
-        self.dcode_bus = _make_addr_router()
+        self.dcode_bus = _make_addr_router(self.bus_clk_domain)
         self.dcode_bus.default = self.system_bus.cpu_side_ports
 
         if enable_art:
@@ -386,7 +398,9 @@ class STM32G474RETimingBoard(ArmMSystem):
                 buffer_hit_latency="0ns",  # real HW = 0 WS
                 flash_start_addr=flash_ranges[0].start,
                 flash_end_addr=flash_ranges[-1].end,
-                address_phase_latency="500ps",
+                # The address phase is within the fetch cycle: a buffer
+                # hit answers by the next core clock edge (0 WS).
+                address_phase_latency="0ns",
                 arrive_buffer_size=0,
                 # direct_memory_mode=True
             )

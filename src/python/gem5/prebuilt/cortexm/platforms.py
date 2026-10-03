@@ -311,19 +311,21 @@ class STM32G474REPlatform(ArmMPlatform):
         else:
             # No ART: CPU accesses Flash via AHB directly.
             #   address_phase_latency="500ps": AHB address phase
-            #   latency="23000ps": data phase
+            #   latency="26000ps": data phase; with the address phase
+            #     the data arrives half way through the fifth core cycle
+            #     (4 WS + 1 at 170 MHz), clear of the clock edges
             #   read_buffer_size=8: 64-bit Flash read serves 2 fetches
             flash_memories = [
                 PipelinedSimpleMemory(
                     range=AddrRange(0x08000000, size="256KiB"),
-                    latency="23000ps",
+                    latency="26000ps",
                     address_phase_latency="500ps",
                     port_priority=[0, 1],
                     port_read_buffer_size=[8, 8],
                 ),
                 PipelinedSimpleMemory(
                     range=AddrRange(0x08040000, size="256KiB"),
-                    latency="23000ps",
+                    latency="26000ps",
                     address_phase_latency="500ps",
                     port_priority=[0, 1],
                     port_read_buffer_size=[8, 8],

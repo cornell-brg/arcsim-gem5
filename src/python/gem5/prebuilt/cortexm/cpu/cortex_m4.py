@@ -145,13 +145,24 @@ class M4FloatMacFU(MinorFU):
 
 class M4FloatDivFU(MinorFU):
     """VDIV.F32 = 14 cy, VSQRT.F32 = 14 cy — non-pipelined.
-    [DDI0439D Table 7-1, pages 7-4/7-5]."""
+    [DDI0439D Table 7-1, pages 7-4/7-5].
+
+    The divider works beside the pipeline: the instruction leaves the
+    execute stage after one cycle, later instructions that do not read
+    its result go ahead, and its result is ready 14 cycles after issue.
+    A second divide waits for the first (issueLat)."""
 
     opClasses = minorMakeOpClassSet(
         ["FloatDiv", "FloatSqrt", "SimdFloatDiv", "SimdFloatSqrt"]
     )
-    opLat = 14
+    opLat = 1
     issueLat = 14
+    resultAfterCommit = True
+    timings = [
+        MinorFUTiming(
+            description="M4FDiv", srcRegsRelativeLats=[0], extraAssumedLat=14
+        )
+    ]
 
 
 class M4MemFU(MinorFU):
@@ -163,9 +174,12 @@ class M4MemFU(MinorFU):
     )
     opLat = 1
     issueLat = 1
+    # A load's result is ready after its data phase, so a load whose
+    # address depends on it waits for that [DDI0439D §3.3.2: LDRs pipeline
+    # only when the first's destination is not the next one's base].
     timings = [
         MinorFUTiming(
-            description="M4Mem", srcRegsRelativeLats=[1], extraAssumedLat=1
+            description="M4Mem", srcRegsRelativeLats=[1], extraAssumedLat=2
         )
     ]
 
@@ -248,6 +262,12 @@ class CortexM4CPU(ArmMMinorCPU):
     # (cachePktEntry is a single slot).
     singleFetchStage = True
     fetch1FetchLimit = 2
+    # Direct branch targets are computed in Decode and fetched from there:
+    # B/BL cost 1 + P with P = 1, and a conditional branch's target is
+    # fetched while the condition resolves, so a taken one also costs
+    # 2 cycles and a not-taken one 1 [DDI0439D Table 3-1, P "whether the
+    # processor manages to speculate the address early"].
+    fetchBranchTargetAtDecode = True
     fetch1LineSnapWidth = 4  # 32-bit ICode bus [DDI0439D §2.2.1]
     fetch1LineWidth = 4  # 32-bit ICode bus [DDI0439D §2.2.1]
     fetch1ToFetch2ForwardDelay = 0  # bypassed in single-stage mode
@@ -290,6 +310,16 @@ class CortexM4CPU(ArmMMinorCPU):
     executeLSQTransfersQueueSize = 2
     executeLSQStoreBufferSize = 3
     executeBranchDelay = 1
+    # A branch drives its target address in its execute cycle, so the
+    # refill starts there rather than a cycle later at commit
+    # [DDI0439D Table 3-1: B/BX/BL/BLX 1 + P, ISB 1 + B].
+    executeBranchAtIssue = True
+    # One execute stage: a multi-cycle instruction (LDR's data phase,
+    # SDIV, VMLA, LDM) holds up the next one, except that loads and
+    # stores pipeline behind each other [DDI0439D §3.3.2: LDR 2 cycles,
+    # neighbouring loads and stores 1 each] and VDIV/VSQRT complete
+    # beside the pipeline (M4FloatDivFU).
+    executeInOrderCompletion = True
     executeMemoryWidth = 8  # max LSQ transfer width (LDRD/STRD = 8 bytes)
     executeSetTraceTimeOnCommit = True
     executeSetTraceTimeOnIssue = False
