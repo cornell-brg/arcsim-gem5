@@ -334,6 +334,12 @@ class STM32G474RETimingBoard(ArmMSystem):
         # -- SCS (NVIC + SysTick) --
         self.platform.scs.pio = self.system_bus.mem_side_ports
 
+        # -- DWT (CYCCNT) --
+        # Counts core clock cycles, so it takes the core clock domain
+        # rather than inheriting the platform's.
+        self.platform.dwt.pio = self.system_bus.mem_side_ports
+        self.platform.dwt.clk_domain = self.clk_domain
+
         # NOTE on attaching extra peripherals (e.g., MProfileBridgeIO):
         # both `self.platform.scs` and `self.system_bus.mem_side_ports`
         # are public and remain valid after __init__ returns.  Callers

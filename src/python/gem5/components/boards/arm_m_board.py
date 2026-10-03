@@ -324,6 +324,11 @@ class ArmMBoard(ArmMSystem):
         # cpubus → membus.
         self.platform.scs.pio = self.membus.mem_side_ports
 
+        # ---- Wire the DWT (CYCCNT) to the membus ----
+        # Counts core clock cycles, so it takes the core clock domain.
+        self.platform.dwt.pio = self.membus.mem_side_ports
+        self.platform.dwt.clk_domain = self.clk_domain
+
         # ---- Wire CPU to bus (through optional cache hierarchy) ----
         self._connect_cpu()
 

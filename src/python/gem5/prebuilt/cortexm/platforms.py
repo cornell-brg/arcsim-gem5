@@ -56,6 +56,7 @@ That's it — no C++ needed.  The ArmMBoard (or your own config script)
 will create SimpleMemory objects for each range and wire them to the bus.
 """
 
+from m5.objects.MProfileDWT import MProfileDWT
 from m5.objects.MProfilePlatform import ArmMPlatform
 from m5.objects.MProfileSCS import MProfileSCS
 from m5.objects.PipelinedSimpleMemory import PipelinedSimpleMemory
@@ -137,6 +138,10 @@ class STM32F405Platform(ArmMPlatform):
         # (10ms at 168MHz HCLK)
         pio_latency="1ns",
     )
+
+    # -- DWT --
+    # Same zero wait-state PPB access as the SCS.
+    dwt = MProfileDWT(pio_latency="1ns")
 
     def cpuid(self):
         """CPUID for Cortex-M4 r0p1 (DDI0403E B3.2.3)."""
@@ -266,6 +271,10 @@ class STM32G474REPlatform(ArmMPlatform):
         # (10ms at 170MHz HCLK)
         pio_latency="1ns",
     )
+
+    # -- DWT --
+    # Same zero wait-state PPB access as the SCS.
+    dwt = MProfileDWT(pio_latency="1ns")
 
     def cpuid(self):
         """CPUID for Cortex-M4 r0p1 (DDI0403E B3.2.3)."""

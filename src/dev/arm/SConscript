@@ -120,6 +120,12 @@ SimObject(
     sim_objects=['MProfileBridgeIO'],
     tags=['arm isa'],
 )
+# Arm-M DWT: the CYCCNT cycle counter at 0xE0001000.
+SimObject(
+    'MProfileDWT.py',
+    sim_objects=['MProfileDWT'],
+    tags=['arm isa'],
+)
 SimObject(
     'VirtIOMMIO.py',
     sim_objects=['MmioVirtIO'],
@@ -135,6 +141,7 @@ if env['CONF']['USE_ARM_FASTMODEL']:
 Source('m_profile_platform.cc', tags=['arm isa'])
 Source('m_profile_scs.cc', tags=['arm isa'])
 Source('m_profile_bridge_io.cc', tags=['arm isa'])
+Source('m_profile_dwt.cc', tags=['arm isa'])
 Source('a9scu.cc', tags=['arm isa'])
 Source('amba_device.cc', tags=['arm isa'])
 Source('amba_fake.cc', tags=['arm isa'])
@@ -181,6 +188,7 @@ Source('fvp_base_pwr_ctrl.cc', tags=['arm isa'])
 
 DebugFlag('MProfileSCS', tags=['arm isa'])
 DebugFlag('MProfileBridgeIO', tags=['arm isa'])
+DebugFlag('MProfileDWT', tags=['arm isa'])
 DebugFlag('AMBA', tags=['arm isa'])
 DebugFlag('FlashDevice', tags=['arm isa'])
 DebugFlag('HDLcd', tags=['arm isa'])

@@ -46,12 +46,18 @@ namespace gem5
 {
 
 class ArmMSystem;
+class MProfileDWT;
 class ThreadContext;
 
 class MProfileSCS : public BasicPioDevice
 {
   public:
     static constexpr uint32_t MAX_NUM_IRQS = 496;
+
+    // DEMCR bits (DDI0403E C1.6.5).  The writable mask covers TRCENA,
+    // MON_REQ..MON_EN, VC_HARDERR..VC_MMERR and VC_CORERESET.
+    static constexpr uint32_t DEMCR_TRCENA = 1u << 24;
+    static constexpr uint32_t DEMCR_WRITE_MASK = 0x010F07F1;
     static constexpr uint8_t MAX_PRIR_BITS = 8;
     // TODO: capping at 1 for now.
     static constexpr uint8_t MAX_NUM_SYSTICKS = 1;
@@ -192,13 +198,24 @@ class MProfileSCS : public BasicPioDevice
     uint32_t dfsr = 0;       // 0xD30: debug fault status (W1C)
     uint32_t mmfar = 0;      // 0xD34: memmanage fault address
     uint32_t bfar = 0;       // 0xD38: busfault address
+    // DEMCR (0xDFC): debug exception and monitor control.  Only
+    // TRCENA (bit 24) has an effect: it gates the DWT cycle counter.
+    uint32_t demcr = 0;
 
     ThreadContext *tc = nullptr;
     ArmMSystem *mSystem = nullptr;
 
+    // The DWT, if one is attached; told when DEMCR.TRCENA changes.
+    MProfileDWT *dwt = nullptr;
+
   public:
     PARAMS(MProfileSCS);
     MProfileSCS(const Params &p);
+
+    // -- DEMCR.TRCENA interface (used by MProfileDWT) --
+
+    void attachDWT(MProfileDWT *d) { dwt = d; }
+    bool traceEnabled() const { return demcr & DEMCR_TRCENA; }
 
     // -- Exception mask interface (called by m_insts.cc on MSR) --
 
@@ -358,6 +375,8 @@ class MProfileSCS : public BasicPioDevice
 
     /** Write an SCB register by offset from 0xD00. */
     void writeScb(Addr offset, uint32_t data);
+
+    void writeDemcr(uint32_t data);
 
     /** Read an FP extension register (FPCCR/FPCAR/FPDSCR) by SCS offset. */
     uint32_t readFpExt(Addr alignedAddr);

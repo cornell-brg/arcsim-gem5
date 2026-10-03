@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from m5.objects.MProfileDWT import MProfileDWT
 from m5.objects.MProfileSCS import MProfileSCS
 from m5.objects.Platform import Platform
 from m5.params import *
@@ -183,6 +184,14 @@ class ArmMPlatform(Platform):
         MProfileSCS(),
         "System Control Space device (NVIC + SysTick + SCB). "
         "Configure num_irqs and priority_bits per variant.",
+    )
+
+    # Data Watchpoint and Trace unit (CYCCNT cycle counter) at the
+    # architecturally fixed address 0xE0001000.  Counts cycles of its
+    # clock domain; boards attach it to the core clock.
+    dwt = Param.MProfileDWT(
+        MProfileDWT(),
+        "DWT device (CYCCNT cycle counter).",
     )
 
     # Future: pluggable device list for vendor peripherals.

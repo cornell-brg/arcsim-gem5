@@ -156,6 +156,7 @@ m_profile_test("xpsr_nzcv_sync", "test_xpsr_nzcv_sync.elf")
 m_profile_test("control_spsel", "test_control_spsel.elf")
 # BUG-7: SCB sub-word (byte/halfword) access
 m_profile_test("scb_byte_access", "test_scb_byte_access.elf")
+m_profile_test("dwt_cyccnt", "test_dwt_cyccnt.elf")
 # MISSING-1: Invalid EXC_RETURN validation
 m_profile_test("exc_return_validate", "test_exc_return_validate.elf")
 # C-1: FAULTMASK priority — executionPriority() returns uint8_t, thread-mode

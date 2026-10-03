@@ -1,0 +1,515 @@
+
+test_dwt_cyccnt.elf:     file format elf32-littlearm
+
+SYMBOL TABLE:
+08000000 l    d  .isr_vector	00000000 .isr_vector
+08000008 l    d  .text	00000000 .text
+080003e4 l    d  .rodata	00000000 .rodata
+20000000 l    d  .data	00000000 .data
+20000000 l    d  .bss	00000000 .bss
+00000000 l    d  .ARM.attributes	00000000 .ARM.attributes
+00000000 l    df *ABS*	00000000 test_dwt_cyccnt.o
+20000100 l       *ABS*	00000000 TEST_RESULT
+20000104 l       *ABS*	00000000 TEST_SUBTEST
+20000108 l       *ABS*	00000000 TEST_DATA
+cafecafe l       *ABS*	00000000 PASS_VAL
+deaddead l       *ABS*	00000000 FAIL_VAL
+e0001000 l       *ABS*	00000000 DWT_BASE
+00000000 l       *ABS*	00000000 DWT_CTRL
+00000004 l       *ABS*	00000000 DWT_CYCCNT
+00000008 l       *ABS*	00000000 DWT_CPICNT
+00000018 l       *ABS*	00000000 DWT_FOLDCNT
+00000020 l       *ABS*	00000000 DWT_COMP0
+e000edfc l       *ABS*	00000000 DEMCR_ADDR
+01000000 l       *ABS*	00000000 TRCENA
+00000001 l       *ABS*	00000000 CYCCNTENA
+080003b2 l       .text	00000000 test_exit
+080003ac l       .text	00000000 test_pass
+08000000 g       .isr_vector	00000000 _vector_table
+08000008 g     F .text	00000000 Reset_Handler
+20020000 g       *ABS*	00000000 _estack
+
+
+
+Disassembly of section .text:
+
+08000008 <Reset_Handler>:
+ 8000008:	48ec      	ldr	r0, [pc, #944]	@ (80003bc <test_exit+0xa>)
+ 800000a:	49ed      	ldr	r1, [pc, #948]	@ (80003c0 <test_exit+0xe>)
+ 800000c:	6802      	ldr	r2, [r0, #0]
+ 800000e:	0f13      	lsrs	r3, r2, #28
+ 8000010:	2b04      	cmp	r3, #4
+ 8000012:	d008      	beq.n	8000026 <Reset_Handler+0x1e>
+ 8000014:	4eeb      	ldr	r6, [pc, #940]	@ (80003c4 <test_exit+0x12>)
+ 8000016:	2701      	movs	r7, #1
+ 8000018:	6037      	str	r7, [r6, #0]
+ 800001a:	4eeb      	ldr	r6, [pc, #940]	@ (80003c8 <test_exit+0x16>)
+ 800001c:	6032      	str	r2, [r6, #0]
+ 800001e:	4eeb      	ldr	r6, [pc, #940]	@ (80003cc <test_exit+0x1a>)
+ 8000020:	4feb      	ldr	r7, [pc, #940]	@ (80003d0 <test_exit+0x1e>)
+ 8000022:	6037      	str	r7, [r6, #0]
+ 8000024:	e1c5      	b.n	80003b2 <test_exit>
+ 8000026:	2200      	movs	r2, #0
+ 8000028:	600a      	str	r2, [r1, #0]
+ 800002a:	6042      	str	r2, [r0, #4]
+ 800002c:	2201      	movs	r2, #1
+ 800002e:	6002      	str	r2, [r0, #0]
+ 8000030:	bf00      	nop
+ 8000032:	bf00      	nop
+ 8000034:	bf00      	nop
+ 8000036:	bf00      	nop
+ 8000038:	bf00      	nop
+ 800003a:	bf00      	nop
+ 800003c:	bf00      	nop
+ 800003e:	bf00      	nop
+ 8000040:	bf00      	nop
+ 8000042:	bf00      	nop
+ 8000044:	bf00      	nop
+ 8000046:	bf00      	nop
+ 8000048:	bf00      	nop
+ 800004a:	bf00      	nop
+ 800004c:	bf00      	nop
+ 800004e:	bf00      	nop
+ 8000050:	bf00      	nop
+ 8000052:	bf00      	nop
+ 8000054:	bf00      	nop
+ 8000056:	bf00      	nop
+ 8000058:	6842      	ldr	r2, [r0, #4]
+ 800005a:	2a00      	cmp	r2, #0
+ 800005c:	d008      	beq.n	8000070 <Reset_Handler+0x68>
+ 800005e:	4ed9      	ldr	r6, [pc, #868]	@ (80003c4 <test_exit+0x12>)
+ 8000060:	2702      	movs	r7, #2
+ 8000062:	6037      	str	r7, [r6, #0]
+ 8000064:	4ed8      	ldr	r6, [pc, #864]	@ (80003c8 <test_exit+0x16>)
+ 8000066:	6032      	str	r2, [r6, #0]
+ 8000068:	4ed8      	ldr	r6, [pc, #864]	@ (80003cc <test_exit+0x1a>)
+ 800006a:	4fd9      	ldr	r7, [pc, #868]	@ (80003d0 <test_exit+0x1e>)
+ 800006c:	6037      	str	r7, [r6, #0]
+ 800006e:	e1a0      	b.n	80003b2 <test_exit>
+ 8000070:	f04f 7280 	mov.w	r2, #16777216	@ 0x1000000
+ 8000074:	600a      	str	r2, [r1, #0]
+ 8000076:	680a      	ldr	r2, [r1, #0]
+ 8000078:	f04f 7380 	mov.w	r3, #16777216	@ 0x1000000
+ 800007c:	421a      	tst	r2, r3
+ 800007e:	d108      	bne.n	8000092 <Reset_Handler+0x8a>
+ 8000080:	4ed0      	ldr	r6, [pc, #832]	@ (80003c4 <test_exit+0x12>)
+ 8000082:	2703      	movs	r7, #3
+ 8000084:	6037      	str	r7, [r6, #0]
+ 8000086:	4ed0      	ldr	r6, [pc, #832]	@ (80003c8 <test_exit+0x16>)
+ 8000088:	6032      	str	r2, [r6, #0]
+ 800008a:	4ed0      	ldr	r6, [pc, #832]	@ (80003cc <test_exit+0x1a>)
+ 800008c:	4fd0      	ldr	r7, [pc, #832]	@ (80003d0 <test_exit+0x1e>)
+ 800008e:	6037      	str	r7, [r6, #0]
+ 8000090:	e18f      	b.n	80003b2 <test_exit>
+ 8000092:	2200      	movs	r2, #0
+ 8000094:	6042      	str	r2, [r0, #4]
+ 8000096:	bf00      	nop
+ 8000098:	bf00      	nop
+ 800009a:	bf00      	nop
+ 800009c:	bf00      	nop
+ 800009e:	bf00      	nop
+ 80000a0:	bf00      	nop
+ 80000a2:	bf00      	nop
+ 80000a4:	bf00      	nop
+ 80000a6:	bf00      	nop
+ 80000a8:	bf00      	nop
+ 80000aa:	bf00      	nop
+ 80000ac:	bf00      	nop
+ 80000ae:	bf00      	nop
+ 80000b0:	bf00      	nop
+ 80000b2:	bf00      	nop
+ 80000b4:	bf00      	nop
+ 80000b6:	bf00      	nop
+ 80000b8:	bf00      	nop
+ 80000ba:	bf00      	nop
+ 80000bc:	bf00      	nop
+ 80000be:	bf00      	nop
+ 80000c0:	bf00      	nop
+ 80000c2:	bf00      	nop
+ 80000c4:	bf00      	nop
+ 80000c6:	bf00      	nop
+ 80000c8:	bf00      	nop
+ 80000ca:	bf00      	nop
+ 80000cc:	bf00      	nop
+ 80000ce:	bf00      	nop
+ 80000d0:	bf00      	nop
+ 80000d2:	bf00      	nop
+ 80000d4:	bf00      	nop
+ 80000d6:	bf00      	nop
+ 80000d8:	bf00      	nop
+ 80000da:	bf00      	nop
+ 80000dc:	bf00      	nop
+ 80000de:	bf00      	nop
+ 80000e0:	bf00      	nop
+ 80000e2:	bf00      	nop
+ 80000e4:	bf00      	nop
+ 80000e6:	bf00      	nop
+ 80000e8:	bf00      	nop
+ 80000ea:	bf00      	nop
+ 80000ec:	bf00      	nop
+ 80000ee:	bf00      	nop
+ 80000f0:	bf00      	nop
+ 80000f2:	bf00      	nop
+ 80000f4:	bf00      	nop
+ 80000f6:	bf00      	nop
+ 80000f8:	bf00      	nop
+ 80000fa:	bf00      	nop
+ 80000fc:	bf00      	nop
+ 80000fe:	bf00      	nop
+ 8000100:	bf00      	nop
+ 8000102:	bf00      	nop
+ 8000104:	bf00      	nop
+ 8000106:	bf00      	nop
+ 8000108:	bf00      	nop
+ 800010a:	bf00      	nop
+ 800010c:	bf00      	nop
+ 800010e:	bf00      	nop
+ 8000110:	bf00      	nop
+ 8000112:	bf00      	nop
+ 8000114:	bf00      	nop
+ 8000116:	bf00      	nop
+ 8000118:	bf00      	nop
+ 800011a:	bf00      	nop
+ 800011c:	bf00      	nop
+ 800011e:	bf00      	nop
+ 8000120:	bf00      	nop
+ 8000122:	bf00      	nop
+ 8000124:	bf00      	nop
+ 8000126:	bf00      	nop
+ 8000128:	bf00      	nop
+ 800012a:	bf00      	nop
+ 800012c:	bf00      	nop
+ 800012e:	bf00      	nop
+ 8000130:	bf00      	nop
+ 8000132:	bf00      	nop
+ 8000134:	bf00      	nop
+ 8000136:	bf00      	nop
+ 8000138:	bf00      	nop
+ 800013a:	bf00      	nop
+ 800013c:	bf00      	nop
+ 800013e:	bf00      	nop
+ 8000140:	bf00      	nop
+ 8000142:	bf00      	nop
+ 8000144:	bf00      	nop
+ 8000146:	bf00      	nop
+ 8000148:	bf00      	nop
+ 800014a:	bf00      	nop
+ 800014c:	bf00      	nop
+ 800014e:	bf00      	nop
+ 8000150:	bf00      	nop
+ 8000152:	bf00      	nop
+ 8000154:	bf00      	nop
+ 8000156:	bf00      	nop
+ 8000158:	bf00      	nop
+ 800015a:	bf00      	nop
+ 800015c:	bf00      	nop
+ 800015e:	6844      	ldr	r4, [r0, #4]
+ 8000160:	2c19      	cmp	r4, #25
+ 8000162:	d208      	bcs.n	8000176 <Reset_Handler+0x16e>
+ 8000164:	4e97      	ldr	r6, [pc, #604]	@ (80003c4 <test_exit+0x12>)
+ 8000166:	2704      	movs	r7, #4
+ 8000168:	6037      	str	r7, [r6, #0]
+ 800016a:	4e97      	ldr	r6, [pc, #604]	@ (80003c8 <test_exit+0x16>)
+ 800016c:	6034      	str	r4, [r6, #0]
+ 800016e:	4e97      	ldr	r6, [pc, #604]	@ (80003cc <test_exit+0x1a>)
+ 8000170:	4f97      	ldr	r7, [pc, #604]	@ (80003d0 <test_exit+0x1e>)
+ 8000172:	6037      	str	r7, [r6, #0]
+ 8000174:	e11d      	b.n	80003b2 <test_exit>
+ 8000176:	f241 3388 	movw	r3, #5000	@ 0x1388
+ 800017a:	429c      	cmp	r4, r3
+ 800017c:	d908      	bls.n	8000190 <Reset_Handler+0x188>
+ 800017e:	4e91      	ldr	r6, [pc, #580]	@ (80003c4 <test_exit+0x12>)
+ 8000180:	2705      	movs	r7, #5
+ 8000182:	6037      	str	r7, [r6, #0]
+ 8000184:	4e90      	ldr	r6, [pc, #576]	@ (80003c8 <test_exit+0x16>)
+ 8000186:	6034      	str	r4, [r6, #0]
+ 8000188:	4e90      	ldr	r6, [pc, #576]	@ (80003cc <test_exit+0x1a>)
+ 800018a:	4f91      	ldr	r7, [pc, #580]	@ (80003d0 <test_exit+0x1e>)
+ 800018c:	6037      	str	r7, [r6, #0]
+ 800018e:	e110      	b.n	80003b2 <test_exit>
+ 8000190:	2200      	movs	r2, #0
+ 8000192:	6002      	str	r2, [r0, #0]
+ 8000194:	6845      	ldr	r5, [r0, #4]
+ 8000196:	bf00      	nop
+ 8000198:	bf00      	nop
+ 800019a:	bf00      	nop
+ 800019c:	bf00      	nop
+ 800019e:	bf00      	nop
+ 80001a0:	bf00      	nop
+ 80001a2:	bf00      	nop
+ 80001a4:	bf00      	nop
+ 80001a6:	bf00      	nop
+ 80001a8:	bf00      	nop
+ 80001aa:	bf00      	nop
+ 80001ac:	bf00      	nop
+ 80001ae:	bf00      	nop
+ 80001b0:	bf00      	nop
+ 80001b2:	bf00      	nop
+ 80001b4:	bf00      	nop
+ 80001b6:	bf00      	nop
+ 80001b8:	bf00      	nop
+ 80001ba:	bf00      	nop
+ 80001bc:	bf00      	nop
+ 80001be:	6846      	ldr	r6, [r0, #4]
+ 80001c0:	42b5      	cmp	r5, r6
+ 80001c2:	d008      	beq.n	80001d6 <Reset_Handler+0x1ce>
+ 80001c4:	4e7f      	ldr	r6, [pc, #508]	@ (80003c4 <test_exit+0x12>)
+ 80001c6:	2706      	movs	r7, #6
+ 80001c8:	6037      	str	r7, [r6, #0]
+ 80001ca:	4e7f      	ldr	r6, [pc, #508]	@ (80003c8 <test_exit+0x16>)
+ 80001cc:	6036      	str	r6, [r6, #0]
+ 80001ce:	4e7f      	ldr	r6, [pc, #508]	@ (80003cc <test_exit+0x1a>)
+ 80001d0:	4f7f      	ldr	r7, [pc, #508]	@ (80003d0 <test_exit+0x1e>)
+ 80001d2:	6037      	str	r7, [r6, #0]
+ 80001d4:	e0ed      	b.n	80003b2 <test_exit>
+ 80001d6:	6802      	ldr	r2, [r0, #0]
+ 80001d8:	f04f 4380 	mov.w	r3, #1073741824	@ 0x40000000
+ 80001dc:	429a      	cmp	r2, r3
+ 80001de:	d008      	beq.n	80001f2 <Reset_Handler+0x1ea>
+ 80001e0:	4e78      	ldr	r6, [pc, #480]	@ (80003c4 <test_exit+0x12>)
+ 80001e2:	2707      	movs	r7, #7
+ 80001e4:	6037      	str	r7, [r6, #0]
+ 80001e6:	4e78      	ldr	r6, [pc, #480]	@ (80003c8 <test_exit+0x16>)
+ 80001e8:	6032      	str	r2, [r6, #0]
+ 80001ea:	4e78      	ldr	r6, [pc, #480]	@ (80003cc <test_exit+0x1a>)
+ 80001ec:	4f78      	ldr	r7, [pc, #480]	@ (80003d0 <test_exit+0x1e>)
+ 80001ee:	6037      	str	r7, [r6, #0]
+ 80001f0:	e0df      	b.n	80003b2 <test_exit>
+ 80001f2:	2201      	movs	r2, #1
+ 80001f4:	6002      	str	r2, [r0, #0]
+ 80001f6:	bf00      	nop
+ 80001f8:	bf00      	nop
+ 80001fa:	bf00      	nop
+ 80001fc:	bf00      	nop
+ 80001fe:	bf00      	nop
+ 8000200:	bf00      	nop
+ 8000202:	bf00      	nop
+ 8000204:	bf00      	nop
+ 8000206:	bf00      	nop
+ 8000208:	bf00      	nop
+ 800020a:	bf00      	nop
+ 800020c:	bf00      	nop
+ 800020e:	bf00      	nop
+ 8000210:	bf00      	nop
+ 8000212:	bf00      	nop
+ 8000214:	bf00      	nop
+ 8000216:	bf00      	nop
+ 8000218:	bf00      	nop
+ 800021a:	bf00      	nop
+ 800021c:	bf00      	nop
+ 800021e:	6847      	ldr	r7, [r0, #4]
+ 8000220:	42b7      	cmp	r7, r6
+ 8000222:	d808      	bhi.n	8000236 <Reset_Handler+0x22e>
+ 8000224:	4e67      	ldr	r6, [pc, #412]	@ (80003c4 <test_exit+0x12>)
+ 8000226:	2708      	movs	r7, #8
+ 8000228:	6037      	str	r7, [r6, #0]
+ 800022a:	4e67      	ldr	r6, [pc, #412]	@ (80003c8 <test_exit+0x16>)
+ 800022c:	6037      	str	r7, [r6, #0]
+ 800022e:	4e67      	ldr	r6, [pc, #412]	@ (80003cc <test_exit+0x1a>)
+ 8000230:	4f67      	ldr	r7, [pc, #412]	@ (80003d0 <test_exit+0x1e>)
+ 8000232:	6037      	str	r7, [r6, #0]
+ 8000234:	e0bd      	b.n	80003b2 <test_exit>
+ 8000236:	2200      	movs	r2, #0
+ 8000238:	600a      	str	r2, [r1, #0]
+ 800023a:	6845      	ldr	r5, [r0, #4]
+ 800023c:	bf00      	nop
+ 800023e:	bf00      	nop
+ 8000240:	bf00      	nop
+ 8000242:	bf00      	nop
+ 8000244:	bf00      	nop
+ 8000246:	bf00      	nop
+ 8000248:	bf00      	nop
+ 800024a:	bf00      	nop
+ 800024c:	bf00      	nop
+ 800024e:	bf00      	nop
+ 8000250:	bf00      	nop
+ 8000252:	bf00      	nop
+ 8000254:	bf00      	nop
+ 8000256:	bf00      	nop
+ 8000258:	bf00      	nop
+ 800025a:	bf00      	nop
+ 800025c:	bf00      	nop
+ 800025e:	bf00      	nop
+ 8000260:	bf00      	nop
+ 8000262:	bf00      	nop
+ 8000264:	6846      	ldr	r6, [r0, #4]
+ 8000266:	42b5      	cmp	r5, r6
+ 8000268:	d008      	beq.n	800027c <Reset_Handler+0x274>
+ 800026a:	4e56      	ldr	r6, [pc, #344]	@ (80003c4 <test_exit+0x12>)
+ 800026c:	2709      	movs	r7, #9
+ 800026e:	6037      	str	r7, [r6, #0]
+ 8000270:	4e55      	ldr	r6, [pc, #340]	@ (80003c8 <test_exit+0x16>)
+ 8000272:	6036      	str	r6, [r6, #0]
+ 8000274:	4e55      	ldr	r6, [pc, #340]	@ (80003cc <test_exit+0x1a>)
+ 8000276:	4f56      	ldr	r7, [pc, #344]	@ (80003d0 <test_exit+0x1e>)
+ 8000278:	6037      	str	r7, [r6, #0]
+ 800027a:	e09a      	b.n	80003b2 <test_exit>
+ 800027c:	f04f 7280 	mov.w	r2, #16777216	@ 0x1000000
+ 8000280:	600a      	str	r2, [r1, #0]
+ 8000282:	bf00      	nop
+ 8000284:	bf00      	nop
+ 8000286:	bf00      	nop
+ 8000288:	bf00      	nop
+ 800028a:	bf00      	nop
+ 800028c:	bf00      	nop
+ 800028e:	bf00      	nop
+ 8000290:	bf00      	nop
+ 8000292:	bf00      	nop
+ 8000294:	bf00      	nop
+ 8000296:	bf00      	nop
+ 8000298:	bf00      	nop
+ 800029a:	bf00      	nop
+ 800029c:	bf00      	nop
+ 800029e:	bf00      	nop
+ 80002a0:	bf00      	nop
+ 80002a2:	bf00      	nop
+ 80002a4:	bf00      	nop
+ 80002a6:	bf00      	nop
+ 80002a8:	bf00      	nop
+ 80002aa:	6847      	ldr	r7, [r0, #4]
+ 80002ac:	42b7      	cmp	r7, r6
+ 80002ae:	d808      	bhi.n	80002c2 <Reset_Handler+0x2ba>
+ 80002b0:	4e44      	ldr	r6, [pc, #272]	@ (80003c4 <test_exit+0x12>)
+ 80002b2:	270a      	movs	r7, #10
+ 80002b4:	6037      	str	r7, [r6, #0]
+ 80002b6:	4e44      	ldr	r6, [pc, #272]	@ (80003c8 <test_exit+0x16>)
+ 80002b8:	6037      	str	r7, [r6, #0]
+ 80002ba:	4e44      	ldr	r6, [pc, #272]	@ (80003cc <test_exit+0x1a>)
+ 80002bc:	4f44      	ldr	r7, [pc, #272]	@ (80003d0 <test_exit+0x1e>)
+ 80002be:	6037      	str	r7, [r6, #0]
+ 80002c0:	e077      	b.n	80003b2 <test_exit>
+ 80002c2:	2200      	movs	r2, #0
+ 80002c4:	6002      	str	r2, [r0, #0]
+ 80002c6:	4b43      	ldr	r3, [pc, #268]	@ (80003d4 <test_exit+0x22>)
+ 80002c8:	6043      	str	r3, [r0, #4]
+ 80002ca:	6842      	ldr	r2, [r0, #4]
+ 80002cc:	429a      	cmp	r2, r3
+ 80002ce:	d008      	beq.n	80002e2 <Reset_Handler+0x2da>
+ 80002d0:	4e3c      	ldr	r6, [pc, #240]	@ (80003c4 <test_exit+0x12>)
+ 80002d2:	270b      	movs	r7, #11
+ 80002d4:	6037      	str	r7, [r6, #0]
+ 80002d6:	4e3c      	ldr	r6, [pc, #240]	@ (80003c8 <test_exit+0x16>)
+ 80002d8:	6032      	str	r2, [r6, #0]
+ 80002da:	4e3c      	ldr	r6, [pc, #240]	@ (80003cc <test_exit+0x1a>)
+ 80002dc:	4f3c      	ldr	r7, [pc, #240]	@ (80003d0 <test_exit+0x1e>)
+ 80002de:	6037      	str	r7, [r6, #0]
+ 80002e0:	e067      	b.n	80003b2 <test_exit>
+ 80002e2:	2201      	movs	r2, #1
+ 80002e4:	6002      	str	r2, [r0, #0]
+ 80002e6:	f04f 4300 	mov.w	r3, #2147483648	@ 0x80000000
+ 80002ea:	6043      	str	r3, [r0, #4]
+ 80002ec:	bf00      	nop
+ 80002ee:	bf00      	nop
+ 80002f0:	bf00      	nop
+ 80002f2:	bf00      	nop
+ 80002f4:	bf00      	nop
+ 80002f6:	bf00      	nop
+ 80002f8:	bf00      	nop
+ 80002fa:	bf00      	nop
+ 80002fc:	bf00      	nop
+ 80002fe:	bf00      	nop
+ 8000300:	bf00      	nop
+ 8000302:	bf00      	nop
+ 8000304:	bf00      	nop
+ 8000306:	bf00      	nop
+ 8000308:	bf00      	nop
+ 800030a:	bf00      	nop
+ 800030c:	bf00      	nop
+ 800030e:	bf00      	nop
+ 8000310:	bf00      	nop
+ 8000312:	bf00      	nop
+ 8000314:	6842      	ldr	r2, [r0, #4]
+ 8000316:	429a      	cmp	r2, r3
+ 8000318:	d808      	bhi.n	800032c <Reset_Handler+0x324>
+ 800031a:	4e2a      	ldr	r6, [pc, #168]	@ (80003c4 <test_exit+0x12>)
+ 800031c:	270c      	movs	r7, #12
+ 800031e:	6037      	str	r7, [r6, #0]
+ 8000320:	4e29      	ldr	r6, [pc, #164]	@ (80003c8 <test_exit+0x16>)
+ 8000322:	6032      	str	r2, [r6, #0]
+ 8000324:	4e29      	ldr	r6, [pc, #164]	@ (80003cc <test_exit+0x1a>)
+ 8000326:	4f2a      	ldr	r7, [pc, #168]	@ (80003d0 <test_exit+0x1e>)
+ 8000328:	6037      	str	r7, [r6, #0]
+ 800032a:	e042      	b.n	80003b2 <test_exit>
+ 800032c:	2200      	movs	r2, #0
+ 800032e:	6002      	str	r2, [r0, #0]
+ 8000330:	f04f 33ff 	mov.w	r3, #4294967295	@ 0xffffffff
+ 8000334:	2508      	movs	r5, #8
+ 8000336:	5143      	str	r3, [r0, r5]
+ 8000338:	5942      	ldr	r2, [r0, r5]
+ 800033a:	2a00      	cmp	r2, #0
+ 800033c:	d008      	beq.n	8000350 <Reset_Handler+0x348>
+ 800033e:	4e21      	ldr	r6, [pc, #132]	@ (80003c4 <test_exit+0x12>)
+ 8000340:	270d      	movs	r7, #13
+ 8000342:	6037      	str	r7, [r6, #0]
+ 8000344:	4e20      	ldr	r6, [pc, #128]	@ (80003c8 <test_exit+0x16>)
+ 8000346:	6035      	str	r5, [r6, #0]
+ 8000348:	4e20      	ldr	r6, [pc, #128]	@ (80003cc <test_exit+0x1a>)
+ 800034a:	4f21      	ldr	r7, [pc, #132]	@ (80003d0 <test_exit+0x1e>)
+ 800034c:	6037      	str	r7, [r6, #0]
+ 800034e:	e030      	b.n	80003b2 <test_exit>
+ 8000350:	3504      	adds	r5, #4
+ 8000352:	2d18      	cmp	r5, #24
+ 8000354:	d9ef      	bls.n	8000336 <Reset_Handler+0x32e>
+ 8000356:	6a02      	ldr	r2, [r0, #32]
+ 8000358:	2a00      	cmp	r2, #0
+ 800035a:	d008      	beq.n	800036e <Reset_Handler+0x366>
+ 800035c:	4e19      	ldr	r6, [pc, #100]	@ (80003c4 <test_exit+0x12>)
+ 800035e:	270e      	movs	r7, #14
+ 8000360:	6037      	str	r7, [r6, #0]
+ 8000362:	4e19      	ldr	r6, [pc, #100]	@ (80003c8 <test_exit+0x16>)
+ 8000364:	6032      	str	r2, [r6, #0]
+ 8000366:	4e19      	ldr	r6, [pc, #100]	@ (80003cc <test_exit+0x1a>)
+ 8000368:	4f19      	ldr	r7, [pc, #100]	@ (80003d0 <test_exit+0x1e>)
+ 800036a:	6037      	str	r7, [r6, #0]
+ 800036c:	e021      	b.n	80003b2 <test_exit>
+ 800036e:	2201      	movs	r2, #1
+ 8000370:	8002      	strh	r2, [r0, #0]
+ 8000372:	6802      	ldr	r2, [r0, #0]
+ 8000374:	4b18      	ldr	r3, [pc, #96]	@ (80003d8 <test_exit+0x26>)
+ 8000376:	429a      	cmp	r2, r3
+ 8000378:	d008      	beq.n	800038c <Reset_Handler+0x384>
+ 800037a:	4e12      	ldr	r6, [pc, #72]	@ (80003c4 <test_exit+0x12>)
+ 800037c:	270f      	movs	r7, #15
+ 800037e:	6037      	str	r7, [r6, #0]
+ 8000380:	4e11      	ldr	r6, [pc, #68]	@ (80003c8 <test_exit+0x16>)
+ 8000382:	6032      	str	r2, [r6, #0]
+ 8000384:	4e11      	ldr	r6, [pc, #68]	@ (80003cc <test_exit+0x1a>)
+ 8000386:	4f12      	ldr	r7, [pc, #72]	@ (80003d0 <test_exit+0x1e>)
+ 8000388:	6037      	str	r7, [r6, #0]
+ 800038a:	e012      	b.n	80003b2 <test_exit>
+ 800038c:	2200      	movs	r2, #0
+ 800038e:	7002      	strb	r2, [r0, #0]
+ 8000390:	6802      	ldr	r2, [r0, #0]
+ 8000392:	f04f 4380 	mov.w	r3, #1073741824	@ 0x40000000
+ 8000396:	429a      	cmp	r2, r3
+ 8000398:	d008      	beq.n	80003ac <test_pass>
+ 800039a:	4e0a      	ldr	r6, [pc, #40]	@ (80003c4 <test_exit+0x12>)
+ 800039c:	2710      	movs	r7, #16
+ 800039e:	6037      	str	r7, [r6, #0]
+ 80003a0:	4e09      	ldr	r6, [pc, #36]	@ (80003c8 <test_exit+0x16>)
+ 80003a2:	6032      	str	r2, [r6, #0]
+ 80003a4:	4e09      	ldr	r6, [pc, #36]	@ (80003cc <test_exit+0x1a>)
+ 80003a6:	4f0a      	ldr	r7, [pc, #40]	@ (80003d0 <test_exit+0x1e>)
+ 80003a8:	6037      	str	r7, [r6, #0]
+ 80003aa:	e002      	b.n	80003b2 <test_exit>
+
+080003ac <test_pass>:
+ 80003ac:	4807      	ldr	r0, [pc, #28]	@ (80003cc <test_exit+0x1a>)
+ 80003ae:	490b      	ldr	r1, [pc, #44]	@ (80003dc <test_exit+0x2a>)
+ 80003b0:	6001      	str	r1, [r0, #0]
+
+080003b2 <test_exit>:
+ 80003b2:	f04f 0018 	mov.w	r0, #24
+ 80003b6:	490a      	ldr	r1, [pc, #40]	@ (80003e0 <test_exit+0x2e>)
+ 80003b8:	beab      	bkpt	0x00ab
+ 80003ba:	e7fe      	b.n	80003ba <test_exit+0x8>
+ 80003bc:	e0001000 	.word	0xe0001000
+ 80003c0:	e000edfc 	.word	0xe000edfc
+ 80003c4:	20000104 	.word	0x20000104
+ 80003c8:	20000108 	.word	0x20000108
+ 80003cc:	20000100 	.word	0x20000100
+ 80003d0:	deaddead 	.word	0xdeaddead
+ 80003d4:	12345678 	.word	0x12345678
+ 80003d8:	40000001 	.word	0x40000001
+ 80003dc:	cafecafe 	.word	0xcafecafe
+ 80003e0:	00020026 	.word	0x00020026

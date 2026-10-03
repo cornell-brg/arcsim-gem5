@@ -29,6 +29,7 @@
 #include "dev/arm/m_profile_scs.hh"
 
 #include "cpu/base.hh"
+#include "dev/arm/m_profile_dwt.hh"
 #include "mem/packet_access.hh"
 
 namespace gem5
@@ -345,6 +346,9 @@ MProfileSCS::readRegByAddr(Addr alignedAddr)
     } else if (alignedAddr == 0xD88) {
         // CPACR — Coprocessor Access Control [DDI0403E B3.2.20]
         return tc->readMiscRegNoEffect(ArmISA::MISCREG_M_CPACR);
+    } else if (alignedAddr == 0xDFC) {
+        // DEMCR [DDI0403E C1.6.5]
+        return demcr;
     } else if (alignedAddr >= 0xF34 && alignedAddr <= 0xF3C) {
         // FP extension registers [DDI0403E B3.2.22-24]
         return readFpExt(alignedAddr);
@@ -619,6 +623,10 @@ MProfileSCS::write(PacketPtr pkt)
         // CP10 and CP11 must be set identically; other CP fields are RAZ/WI.
         tc->setMiscRegNoEffect(ArmISA::MISCREG_M_CPACR, data);
 
+    } else if (daddr == 0xDFC) {
+        // -- DEMCR [DDI0403E C1.6.5] --
+        writeDemcr(data);
+
     } else if (daddr >= 0xF00 && daddr <= 0xF3C) {
         if (daddr == 0xF00) {
             // -- STIR: software trigger --
@@ -771,6 +779,19 @@ MProfileSCS::writeScb(Addr offset, uint32_t data)
       default:
         warn("MProfileSCS: SCB write at unknown offset %#x", offset);
     }
+}
+
+// DEMCR: stores the writable bits.  Only TRCENA acts, as the gate
+// on the DWT cycle counter; the monitor and vector-catch bits are
+// kept for read-back and nothing else.
+void
+MProfileSCS::writeDemcr(uint32_t data)
+{
+    bool wasEnabled = traceEnabled();
+    demcr = data & DEMCR_WRITE_MASK;
+    bool nowEnabled = traceEnabled();
+    if (dwt && nowEnabled != wasEnabled)
+        dwt->traceEnableChanged(nowEnabled);
 }
 
 // -- FP extension register helpers --
@@ -1145,6 +1166,7 @@ MProfileSCS::serialize(CheckpointOut &cp) const
         SERIALIZE_SCALAR(dfsr);
         SERIALIZE_SCALAR(mmfar);
         SERIALIZE_SCALAR(bfar);
+        SERIALIZE_SCALAR(demcr);
     }
 
     // -- SysTick state --
@@ -1201,6 +1223,7 @@ MProfileSCS::unserialize(CheckpointIn &cp)
         UNSERIALIZE_SCALAR(dfsr);
         UNSERIALIZE_SCALAR(mmfar);
         UNSERIALIZE_SCALAR(bfar);
+        UNSERIALIZE_SCALAR(demcr);
     }
 
     // -- SysTick state --
