@@ -40,6 +40,7 @@
 #include "arch/generic/decoder.hh"
 #include "base/logging.hh"
 #include "base/trace.hh"
+#include "cpu/minor/execute.hh"
 #include "cpu/minor/pipeline.hh"
 #include "debug/Decode.hh"
 
@@ -51,12 +52,14 @@ namespace minor
 
 Decode::Decode(const std::string &name,
     MinorCPU &cpu_,
+    Execute &execute_,
     const BaseMinorCPUParams &params,
     Latch<ForwardInstData>::Output inp_,
     Latch<ForwardInstData>::Input out_,
     std::vector<InputBuffer<ForwardInstData>> &next_stage_input_buffer) :
     Named(name),
     cpu(cpu_),
+    execute(execute_),
     inp(inp_),
     out(out_),
     nextStageReserve(next_stage_input_buffer),
@@ -105,6 +108,19 @@ Decode::popInput(ThreadID tid)
     decodeInfo[tid].inMacroop = false;
 }
 
+bool
+Decode::inputIsStale(const ForwardInstData &insts, unsigned int from)
+{
+    for (unsigned int i = from; i < insts.width(); i++) {
+        MinorDynInstPtr inst = insts.insts[i];
+
+        if (!inst->isBubble() && execute.instIsRightStream(inst))
+            return false;
+    }
+
+    return true;
+}
+
 #if TRACING_ON
 /** Add the tracing data to an instruction.  This originates in
  *  decode because this is the first place that execSeqNums are known
@@ -135,6 +151,22 @@ Decode::evaluate()
 
     assert(insts_out.isBubble());
 
+    /* Drop input from a stream Execute has left, even when blocked.  Execute
+     *  would only discard it, and a superseded macro-op would otherwise hold
+     *  this stage's input buffer until its last micro-op has been emitted */
+    for (ThreadID tid = 0; tid < cpu.numThreads; tid++) {
+        const ForwardInstData *insts_in = getInput(tid);
+
+        while (insts_in && inputIsStale(*insts_in, decodeInfo[tid].inputIndex))
+        {
+            DPRINTF(Decode, "Dropping input from a superseded stream: %s\n",
+                insts_in->insts[decodeInfo[tid].inputIndex]->id);
+
+            popInput(tid);
+            insts_in = getInput(tid);
+        }
+    }
+
     for (ThreadID tid = 0; tid < cpu.numThreads; tid++)
         decodeInfo[tid].blocked = !nextStageReserve[tid].canReserve();
 
@@ -156,6 +188,13 @@ Decode::evaluate()
 
             if (inst->isBubble()) {
                 /* Skip */
+                decode_info.inputIndex++;
+                decode_info.inMacroop = false;
+            } else if (!execute.instIsRightStream(inst)) {
+                /* Skip the superseded instruction and any of its micro-ops */
+                DPRINTF(Decode, "Dropping inst from a superseded stream:"
+                    " %s\n", *inst);
+
                 decode_info.inputIndex++;
                 decode_info.inMacroop = false;
             } else {

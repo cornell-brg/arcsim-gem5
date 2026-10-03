@@ -704,7 +704,9 @@ SingleStageFetch2::SingleStageFetch2(const std::string &name,
     Latch<ForwardInstData>::Input out_,
     std::vector<InputBuffer<ForwardInstData>> &next_stage_input_buffer) :
     Fetch2(name, cpu_, params, inp_, branchInp_, predictionOut_, out_,
-        next_stage_input_buffer)
+        next_stage_input_buffer),
+    branchTargetAtDecode(params.fetchBranchTargetAtDecode),
+    decodedBranchTid(InvalidThreadID)
 {
 }
 
@@ -718,6 +720,16 @@ SingleStageFetch2::evaluate()
 void
 SingleStageFetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
 {
+    if (branchTargetAtDecode) {
+        /* No dynamic prediction: a direct branch's target is fetched from
+         *  Decode, anything else waits for Execute */
+        if (inst->staticInst->isDirectCtrl()) {
+            decodedBranchTarget = inst->staticInst->branchTarget(*inst->pc);
+            decodedBranchTid = inst->id.threadId;
+        }
+        return;
+    }
+
     /* Call base class — creates BPredUnit history entry, updates stats,
      * does BTB lookup.  On first encounter BTB misses and BPredUnit
      * forces predTaken = false (NoTarget fallback, bpred_unit.cc:316). */
@@ -798,9 +810,17 @@ SingleStageFetch2::reactToExecuteBranch(const BranchData &executeBranch)
 
 void
 SingleStageFetch2::runDecodeCore(BranchData &prediction_out,
-                                 const BranchData &executeBranch)
+                                 const BranchData &executeBranch,
+                                 ForwardLineData *first_line)
 {
     reactToExecuteBranch(executeBranch);
+
+    /* The new stream's first line, already in hand */
+    if (first_line) {
+        inputBuffer[first_line->id.threadId].setTail(*first_line);
+        inputBuffer[first_line->id.threadId].pushTail();
+    }
+
     discardStaleLines();
     decodeInstructions(prediction_out);
     postDecode(Pipeline::Fetch1StageId);

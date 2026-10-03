@@ -114,6 +114,18 @@ class Execute : public Named
      *  of the in flight insts queue if their dependencies are met */
     bool allowEarlyMemIssue;
 
+    /** Let a single-cycle instruction that can change the stream
+     *  (branch, or squash-after such as an instruction barrier) take
+     *  effect in the cycle it issues when nothing older is in flight */
+    bool branchAtIssue;
+
+    /** See executeInOrderCompletion in BaseMinorCPU.py */
+    bool inOrderCompletion;
+
+    /** The last cycle at which a result from a resultAfterCommit FU
+     *  arrives; Execute keeps ticking until then */
+    Cycles lastBackgroundResult;
+
     /** The FU index of the non-existent costless FU for instructions
      *  which pass the MinorDynInst::isNoCostInst test */
     unsigned int noCostFUIndex;
@@ -158,7 +170,9 @@ class Execute : public Named
             instsBeingCommitted(insts_committed),
             streamSeqNum(InstId::firstStreamSeqNum),
             lastPredictionSeqNum(InstId::firstPredictionSeqNum),
-            drainState(NotDraining)
+            drainState(NotDraining),
+            memRefsInFlight(0),
+            othersInFlight(0)
         { }
 
         ExecuteThreadInfo(const ExecuteThreadInfo& other) :
@@ -167,7 +181,9 @@ class Execute : public Named
             instsBeingCommitted(other.instsBeingCommitted),
             streamSeqNum(other.streamSeqNum),
             lastPredictionSeqNum(other.lastPredictionSeqNum),
-            drainState(other.drainState)
+            drainState(other.drainState),
+            memRefsInFlight(other.memRefsInFlight),
+            othersInFlight(other.othersInFlight)
         { }
 
         /** In-order instructions either in FUs or the LSQ */
@@ -202,7 +218,26 @@ class Execute : public Named
 
         /** State progression for draining NotDraining -> ... -> DrainAllInsts */
         DrainState drainState;
+
+        /** inFlightInsts that are memory references, and the rest */
+        unsigned int memRefsInFlight;
+        unsigned int othersInFlight;
     };
+
+    /** Is inst counted in memRefsInFlight rather than othersInFlight */
+    static bool
+    countsAsMemRef(const MinorDynInstPtr &inst)
+    {
+        return !inst->isFault() && inst->staticInst->isMemRef();
+    }
+
+    /** Must inst wait under inOrderCompletion */
+    bool waitsForCompletion(const ExecuteThreadInfo &thread,
+        const MinorDynInstPtr &inst) const;
+
+    /** Account for an instruction entering or leaving inFlightInsts */
+    void countInFlight(ExecuteThreadInfo &thread,
+        const MinorDynInstPtr &inst, bool entering);
 
     std::vector<ExecuteThreadInfo> executeInfo;
 
@@ -309,7 +344,11 @@ class Execute : public Named
      *  committing.
      *  branch is set to any branch raised during commit. */
     void commit(ThreadID thread_id, bool only_commit_microops, bool discard,
-        BranchData &branch);
+        BranchData &branch, bool at_issue = false);
+
+    /** Can inst, issued this cycle, be committed in the same cycle
+     *  under branchAtIssue */
+    bool canCommitAtIssue(ThreadID thread_id, const MinorDynInstPtr &inst);
 
     /** Set the drain state (with useful debugging messages) */
     void setDrainState(ThreadID thread_id, DrainState state);

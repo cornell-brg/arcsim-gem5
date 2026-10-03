@@ -37,6 +37,8 @@
 
 #include "cpu/minor/fetch1.hh"
 
+#include <algorithm>
+
 #include <cstring>
 #include <iomanip>
 #include <sstream>
@@ -859,6 +861,27 @@ SingleStageFetch1::recvTimingResp(PacketPtr pkt)
     FetchRequestPtr fetch_request = safe_cast<FetchRequestPtr>
         (pkt->popSenderState());
 
+    auto abandoned = std::find(abandonedTargetRequests.begin(),
+        abandonedTargetRequests.end(), fetch_request);
+
+    if (fetch_request == targetRequest ||
+        abandoned != abandonedTargetRequests.end())
+    {
+        numFetchesInMemorySystem--;
+        fetch_request->packet = pkt;
+        fetch_request->state = FetchRequest::Complete;
+
+        if (abandoned != abandonedTargetRequests.end()) {
+            abandonedTargetRequests.erase(abandoned);
+            delete fetch_request;
+        } else {
+            DPRINTF(Fetch, "SF1: branch target line arrived addr=%#x\n",
+                pkt->getAddr());
+        }
+
+        return true;
+    }
+
     assert(!fetch_request->packet);
     fetch_request->packet = pkt;
 
@@ -887,6 +910,127 @@ SingleStageFetch1::recvTimingResp(PacketPtr pkt)
     return true;
 }
 
+void
+SingleStageFetch1::recvReqRetry()
+{
+    /* A refused branch target request is not resent, so a retry is
+     *  only for the line fetches */
+    if (icacheState == IcacheNeedsRetry)
+        Fetch1::recvReqRetry();
+}
+
+void
+SingleStageFetch1::fetchBranchTarget(ThreadID tid,
+    const PCStateBase &target)
+{
+    Fetch1ThreadInfo &thread = fetchInfo[tid];
+    Addr target_addr = target.instAddr();
+    Addr aligned = target_addr & ~((Addr) lineSnap - 1);
+    unsigned int request_size = maxLineWidth - (aligned % lineSnap);
+
+    abandonTargetRequest();
+
+    InstId request_id(tid, thread.streamSeqNum, thread.predictionSeqNum,
+        lineSeqNum);
+
+    FetchRequestPtr request = new FetchRequest(*this, request_id,
+        target_addr);
+
+    request->request->setContext(cpu.threads[tid]->getTC()->contextId());
+    request->request->setVirt(aligned, request_size, Request::INST_FETCH,
+        cpu.instRequestorId(), target_addr);
+    request->request->setStreamId(thread.streamSeqNum);
+
+    request->fault = cpu.threads[tid]->mmu->translateAtomic(
+        request->request, cpu.getContext(tid), BaseMMU::Execute);
+
+    if (request->fault != NoFault) {
+        delete request;
+        return;
+    }
+
+    DPRINTF(Fetch, "SF1: fetching branch target line addr=%#x\n", aligned);
+
+    request->state = FetchRequest::Translated;
+    request->makePacket();
+    targetRequest = request;
+
+    if (icachePort.sendTimingReq(request->packet)) {
+        request->packet = NULL;
+        request->state = FetchRequest::RequestIssuing;
+        numFetchesInMemorySystem++;
+    } else {
+        /* The port is busy: the target is fetched after the redirect */
+        DPRINTF(Fetch, "SF1: branch target line fetch refused\n");
+        delete request;
+        targetRequest = NULL;
+    }
+}
+
+void
+SingleStageFetch1::abandonTargetRequest()
+{
+    if (!targetRequest)
+        return;
+
+    if (targetRequest->state == FetchRequest::RequestIssuing) {
+        abandonedTargetRequests.push_back(targetRequest);
+    } else {
+        /* Its response has arrived */
+        delete targetRequest;
+    }
+
+    targetRequest = NULL;
+}
+
+bool
+SingleStageFetch1::takeTargetLine(const BranchData &execute_branch,
+    ForwardLineData &line_out)
+{
+    if (!targetRequest || !targetRequest->isComplete() ||
+        !execute_branch.isStreamChange() || !execute_branch.target ||
+        !execute_branch.inst || execute_branch.inst->isBubble() ||
+        execute_branch.inst->isFault() ||
+        !execute_branch.inst->staticInst->isDirectCtrl())
+    {
+        return false;
+    }
+
+    PacketPtr packet = targetRequest->packet;
+    Addr target_addr = execute_branch.target->instAddr();
+    Addr line_base = targetRequest->request->getVaddr();
+
+    if (!packet || packet->isError() || target_addr < line_base ||
+        target_addr >= line_base + targetRequest->request->getSize())
+    {
+        return false;
+    }
+
+    ThreadID tid = execute_branch.threadId;
+    Fetch1ThreadInfo &thread = fetchInfo[tid];
+
+    line_out.setFault(NoFault);
+    line_out.id = InstId(tid, thread.streamSeqNum, thread.predictionSeqNum,
+        lineSeqNum);
+    lineSeqNum++;
+    set(line_out.pc, thread.pc);
+    line_out.fetchAddr = target_addr;
+    line_out.lineBaseAddr = line_base;
+    line_out.adoptPacketData(packet);
+    targetRequest->packet = NULL;
+
+    /* Fetching carries on after this line */
+    thread.fetchAddr = line_base + targetRequest->request->getSize();
+
+    DPRINTF(Fetch, "SF1: taking branch target line addr=%#x as %s\n",
+        line_base, line_out.id);
+
+    delete targetRequest;
+    targetRequest = NULL;
+
+    return true;
+}
+
 SingleStageFetch1::SingleStageFetch1(const std::string &name_,
     MinorCPU &cpu_,
     const BaseMinorCPUParams &params,
@@ -899,7 +1043,8 @@ SingleStageFetch1::SingleStageFetch1(const std::string &name_,
     Fetch1(name_, cpu_, params, inp_, out_, prediction_,
         next_stage_input_buffer),
     fetch2(fetch2_),
-    eToF1Input(eToF1Input_)
+    eToF1Input(eToF1Input_),
+    targetRequest(NULL)
 {
 }
 
@@ -927,7 +1072,30 @@ SingleStageFetch1::evaluate()
                 execBranch.target->instAddr());
         }
     }
-    handleBranchRedirects(*eToF1Input.inputWire, lastPrediction);
+    const BranchData &exec_branch = *eToF1Input.inputWire;
+
+    handleBranchRedirects(exec_branch, lastPrediction);
+
+    /* A taken direct branch whose target line was fetched while the
+     *  branch was in Decode starts its stream from that line */
+    ForwardLineData target_line;
+    bool have_target_line = false;
+
+    if (exec_branch.isStreamChange()) {
+        have_target_line = takeTargetLine(exec_branch, target_line);
+        abandonTargetRequest();
+        fetch2->decodedBranchTarget.reset();
+    } else if (fetch2->decodedBranchTarget) {
+        /* The direct branch decoded last cycle is in Decode now */
+        ThreadID tid = fetch2->decodedBranchTid;
+
+        if (fetchInfo[tid].state == FetchRunning &&
+            icacheState == IcacheRunning)
+        {
+            fetchBranchTarget(tid, *fetch2->decodedBranchTarget);
+        }
+        fetch2->decodedBranchTarget.reset();
+    }
 
     /* Step I-cache queues */
     stepQueues();
@@ -945,7 +1113,8 @@ SingleStageFetch1::evaluate()
 
     /* --- Fetch2 phase: decode + branch prediction --- */
     BranchData prediction;
-    fetch2->runDecodeCore(prediction, *eToF1Input.inputWire);
+    fetch2->runDecodeCore(prediction, exec_branch,
+        have_target_line ? &target_line : nullptr);
 
     /* Apply predicted-taken redirect IMMEDIATELY in this cycle,
      * rather than waiting for next cycle via lastPrediction.

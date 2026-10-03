@@ -1345,8 +1345,9 @@ LSQ::recvTimingResp(PacketPtr response)
      * as it's the job of step to actually step us on to the next
      * transaction */
 
-    /* Let's try and wake up the processor for the next cycle */
-    cpu.wakeupOnEvent(Pipeline::ExecuteStageId);
+    /* Wake the processor at this clock edge rather than the next so the
+     *  response is seen in the cycle it arrives, as Fetch1 does for lines */
+    cpu.wakeupOnEventImmediate(Pipeline::ExecuteStageId);
 
     /* Never busy */
     return true;

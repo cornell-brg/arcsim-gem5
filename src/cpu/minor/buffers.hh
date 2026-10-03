@@ -342,6 +342,18 @@ class SelfStallingPipeline : public MinorBuffer<ElemType, ReportTraits>
     /** Peek at the end element of the pipe */
     ElemType &front() { return *popWire; }
 
+    /** Peek at the element pushed this cycle */
+    ElemType &back() { return *pushWire; }
+
+    /** Withdraw the element pushed this cycle */
+    void
+    unpush()
+    {
+        assert(alreadyPushed());
+        *pushWire = BubbleTraits::bubble();
+        occupancy--;
+    }
+
     const ElemType &front() const { return *popWire; }
 
     /** Have we already pushed onto this pipe without advancing */

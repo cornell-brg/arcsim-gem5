@@ -78,6 +78,9 @@ Execute::Execute(const std::string &name_, MinorCPU &cpu_,
       setTraceTimeOnCommit(params.executeSetTraceTimeOnCommit),
       setTraceTimeOnIssue(params.executeSetTraceTimeOnIssue),
       allowEarlyMemIssue(params.executeAllowEarlyMemoryIssue),
+      branchAtIssue(params.executeBranchAtIssue),
+      inOrderCompletion(params.executeInOrderCompletion),
+      lastBackgroundResult(0),
       noCostFUIndex(fuDescriptions.funcUnits.size() + 1),
       lsq(name_ + ".lsq", name_ + ".dcache_port", cpu_, *this,
           params.executeMaxAccessesInMemory, params.executeMemoryWidth,
@@ -595,6 +598,10 @@ Execute::issue(ThreadID thread_id)
             /* Try FU from 0 each instruction */
             fu_index = 0;
 
+            if (waitsForCompletion(thread, inst)) {
+                DPRINTF(MinorExecute, "Can't issue inst: %s until older"
+                    " insts complete\n", *inst);
+            } else
             /* Try and issue a single instruction stepping through the
              *  available FUs */
             do {
@@ -632,6 +639,7 @@ Execute::issue(ThreadID thread_id)
                      *  it can be committed in order */
                     QueuedInst fu_inst(inst);
                     thread.inFlightInsts->push(fu_inst);
+                    countInFlight(thread, inst, true);
 
                     issued = true;
 
@@ -774,9 +782,10 @@ Execute::issue(ThreadID thread_id)
                                 cpu.getContext(thread_id),
                                 inst->staticInst);
                         if (dynExtra != Cycles(0)) {
-                            fu->nextInsertCycle = cpu.curCycle() +
-                                fu->description.opLat + dynExtra;
+                            /* The instruction itself takes that long,
+                             *  holding its FU until it commits */
                             extra_dest_retire_lat += dynExtra;
+                            inst->extraCommitDelay += dynExtra;
                             DPRINTF(MinorExecute, "Dynamic extra latency"
                                 " for %s: %d cycles (total %d)\n",
                                 *inst, dynExtra,
@@ -785,16 +794,26 @@ Execute::issue(ThreadID thread_id)
 
                         /* Mark the destinations for this instruction as
                          *  busy */
-                        scoreboard[thread_id].markupInstDests(inst, cpu.curCycle() +
+                        Cycles result_cycle = cpu.curCycle() +
                             fu->description.opLat +
                             extra_dest_retire_lat +
-                            extra_assumed_lat,
+                            extra_assumed_lat;
+
+                        scoreboard[thread_id].markupInstDests(inst,
+                            result_cycle,
                             cpu.getContext(thread_id),
                             issued_mem_ref && extra_assumed_lat == Cycles(0));
+
+                        if (fu->description.resultAfterCommit &&
+                            result_cycle > lastBackgroundResult)
+                        {
+                            lastBackgroundResult = result_cycle;
+                        }
 
                         /* Push the instruction onto the inFlight queue so
                          *  it can be committed in order */
                         thread.inFlightInsts->push(fu_inst);
+                        countInFlight(thread, inst, true);
 
                         issued = true;
                     }
@@ -1111,9 +1130,87 @@ Execute::commitInst(MinorDynInstPtr inst, bool early_memory_issue,
     return completed_inst;
 }
 
+bool
+Execute::waitsForCompletion(const ExecuteThreadInfo &thread,
+    const MinorDynInstPtr &inst) const
+{
+    if (!inOrderCompletion || inst->isFault())
+        return false;
+
+    /* The macro-op was admitted with its first micro-op */
+    if (inst->staticInst->isMicroop() &&
+        !inst->staticInst->isFirstMicroop())
+    {
+        return false;
+    }
+
+    if (inst->staticInst->isMemRef())
+        return thread.othersInFlight != 0;
+    else
+        return thread.othersInFlight != 0 || thread.memRefsInFlight != 0;
+}
+
+void
+Execute::countInFlight(ExecuteThreadInfo &thread,
+    const MinorDynInstPtr &inst, bool entering)
+{
+    unsigned int &count = (countsAsMemRef(inst) ?
+        thread.memRefsInFlight : thread.othersInFlight);
+
+    if (entering) {
+        count++;
+    } else {
+        assert(count != 0);
+        count--;
+    }
+}
+
+bool
+Execute::canCommitAtIssue(ThreadID thread_id, const MinorDynInstPtr &inst)
+{
+    const ExecuteThreadInfo &ex_info = executeInfo[thread_id];
+
+    if (inst->isBubble() || inst->isFault() || !inst->isInst() ||
+        inst->isNoCostInst() || inst->inLSQ ||
+        inst->id.streamSeqNum != ex_info.streamSeqNum)
+    {
+        return false;
+    }
+
+    const StaticInstPtr &static_inst = inst->staticInst;
+
+    /* Some decoders mark a branch only by its kind, not IsControl */
+    bool can_redirect = static_inst->isControl() ||
+        static_inst->isDirectCtrl() || static_inst->isIndirectCtrl() ||
+        static_inst->isCondCtrl() || static_inst->isUncondCtrl() ||
+        static_inst->isSquashAfter();
+
+    if (static_inst->isMemRef() || static_inst->isQuiesce() ||
+        !can_redirect)
+    {
+        return false;
+    }
+
+    /* Only an instruction that is the oldest in flight and was pushed
+     *  into a single-cycle FU this cycle */
+    if (ex_info.inFlightInsts->empty() ||
+        ex_info.inFlightInsts->front().inst != inst ||
+        inst->fuIndex >= numFuncUnits)
+    {
+        return false;
+    }
+
+    FUPipeline *fu = funcUnits[inst->fuIndex];
+
+    return fu->description.opLat == Cycles(1) &&
+        fu->alreadyPushed() && fu->back().inst == inst &&
+        inst->extraCommitDelay == Cycles(0) &&
+        !inst->extraCommitDelayExpr;
+}
+
 void
 Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
-    BranchData &branch)
+    BranchData &branch, bool at_issue)
 {
     Fault fault = NoFault;
     Cycles now = cpu.curCycle();
@@ -1253,7 +1350,9 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
              *  For any other case, leave it to the normal instruction
              *  issue below to handle them.
              */
-            if (!ex_info.inFUMemInsts->empty() && lsq.canRequest()) {
+            if (!at_issue &&
+                !ex_info.inFUMemInsts->empty() && lsq.canRequest())
+            {
                 DPRINTF(MinorExecute, "Trying to commit from mem FUs\n");
 
                 const MinorDynInstPtr head_mem_ref_inst =
@@ -1288,9 +1387,20 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
                 completed_inst = true;
             }
 
+            /* An instruction issued this cycle, taken from the input
+             *  end of its FU */
+            if (at_issue && !completed_inst) {
+                if (canCommitAtIssue(thread_id, inst)) {
+                    DPRINTF(MinorExecute, "Committing inst at issue: %s\n",
+                        *inst);
+                    try_to_commit = true;
+                    completed_inst = true;
+                }
+            }
+
             /* Try to issue from the ends of FUs and the inFlightInsts
              *  queue */
-            if (!completed_inst && !inst->inLSQ) {
+            if (!at_issue && !completed_inst && !inst->inLSQ) {
                 DPRINTF(MinorExecute, "Trying to commit from FUs\n");
 
                 /* Try to commit from a functional unit */
@@ -1388,7 +1498,10 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
                     completed_inst = true;
                 }
 
-                if (completed_inst) {
+                if (completed_inst && at_issue) {
+                    /* It never travels down its FU */
+                    funcUnits[inst->fuIndex]->unpush();
+                } else if (completed_inst) {
                     /* Allow the pipeline to advance.  If the FU head
                      *  instruction wasn't the inFlightInsts head
                      *  but had already been committed, it would have
@@ -1452,6 +1565,7 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
             /* Finished with the inst, remove it from the inst queue and
              *  clear its dependencies */
             ex_info.inFlightInsts->pop();
+            countInFlight(ex_info, inst, false);
 
             /* Complete barriers in the LSQ/move to store buffer */
             if (inst->isInst() && inst->staticInst->isFullMemBarrier()) {
@@ -1460,8 +1574,21 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
                 lsq.completeMemBarrierInst(inst, committed_inst);
             }
 
-            scoreboard[thread_id].clearInstDests(inst, inst->isMemRef());
+            bool result_after_commit = !inst->isFault() &&
+                !inst->isMemRef() && inst->fuIndex < numFuncUnits &&
+                funcUnits[inst->fuIndex]->description.resultAfterCommit;
+
+            if (result_after_commit) {
+                scoreboard[thread_id].clearInstDests(inst, false,
+                    cpu.curCycle());
+            } else {
+                scoreboard[thread_id].clearInstDests(inst,
+                    inst->isMemRef());
+            }
         }
+
+        if (at_issue)
+            completed_inst = false;
 
         /* Handle per-cycle instruction counting */
         if (committed_inst) {
@@ -1586,6 +1713,18 @@ Execute::evaluate()
             DPRINTF(MinorExecute, "Attempting to issue [tid:%d]\n",
                     issue_tid);
             num_issued = issue(issue_tid);
+
+            ExecuteThreadInfo &issue_info = executeInfo[issue_tid];
+
+            if (branchAtIssue && num_issued != 0 && !interrupted &&
+                branch.isBubble() &&
+                issue_info.drainState == NotDraining &&
+                !issue_info.inFlightInsts->empty() &&
+                canCommitAtIssue(issue_tid,
+                    issue_info.inFlightInsts->front().inst))
+            {
+                commit(issue_tid, false, false, branch, true);
+            }
         }
 
     }
@@ -1673,6 +1812,7 @@ Execute::evaluate()
        can_issue_next || /* Can still issue a new inst */
        head_inst_might_commit || /* Could possible commit the next inst */
        lsq.needsToTick() || /* Must step the dcache port */
+       cpu.curCycle() < lastBackgroundResult || /* A result to wait for */
        interrupted; /* There are pending interrupts */
 
     if (!need_to_tick) {

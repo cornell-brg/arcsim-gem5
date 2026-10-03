@@ -37,6 +37,8 @@
 
 #include "cpu/minor/scoreboard.hh"
 
+#include <limits>
+
 #include "cpu/reg_class.hh"
 #include "debug/MinorScoreboard.hh"
 #include "debug/MinorTiming.hh"
@@ -172,6 +174,14 @@ Scoreboard::execSeqNumToWaitFor(MinorDynInstPtr inst,
 void
 Scoreboard::clearInstDests(MinorDynInstPtr inst, bool clear_unpredictable)
 {
+    clearInstDests(inst, clear_unpredictable,
+        Cycles(std::numeric_limits<uint64_t>::max()));
+}
+
+void
+Scoreboard::clearInstDests(MinorDynInstPtr inst, bool clear_unpredictable,
+    Cycles now)
+{
     if (inst->isFault())
         return;
 
@@ -191,7 +201,10 @@ Scoreboard::clearInstDests(MinorDynInstPtr inst, bool clear_unpredictable)
 
             numResults[index] --;
 
-            if (numResults[index] == 0) {
+            if (numResults[index] == 0 && returnCycle[index] > now) {
+                /* The result is still on its way: keep only its timing */
+                writingInst[index] = 0;
+            } else if (numResults[index] == 0) {
                 returnCycle[index] = Cycles(0);
                 writingInst[index] = 0;
                 fuIndices[index] = invalidFUIndex;

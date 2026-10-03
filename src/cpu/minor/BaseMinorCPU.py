@@ -142,6 +142,15 @@ class MinorFU(SimObject):
         " (forwarded) result",
     )
 
+    resultAfterCommit = Param.Bool(
+        False,
+        "Instructions on this FU commit after opLat cycles but their results"
+        " become available only opLat plus the timing's extraAssumedLat"
+        " cycles after issue, so later instructions that do not need the"
+        " result are not held up (out-of-order completion, such as an"
+        " iterative divider working beside the pipeline)",
+    )
+
 
 class DynamicLatencyIntDivFU(MinorFU):
     """MinorFU with data-dependent SDIV/UDIV latency.
@@ -332,6 +341,14 @@ class BaseMinorCPU(BaseCPU):
         "Model Fetch1+Fetch2 as a single logical fetch stage "
         "(3-stage pipeline mode)",
     )
+    fetchBranchTargetAtDecode = Param.Bool(
+        False,
+        "With singleFetchStage: no dynamic branch prediction.  A direct"
+        " branch's target line is fetched in the cycle after the fetch stage"
+        " decodes it (the branch's Decode cycle), beside the sequential"
+        " stream, and starts the new stream if Execute takes the branch, as"
+        " on cores that compute direct targets in decode",
+    )
     fetch1FetchLimit = Param.Unsigned(
         1, "Number of line fetches allowable in flight at once"
     )
@@ -447,6 +464,24 @@ class BaseMinorCPU(BaseCPU):
         True,
         "Allow mem refs to be issued to the LSQ before reaching the head of"
         " the in flight insts queue",
+    )
+
+    executeInOrderCompletion = Param.Bool(
+        False,
+        "An instruction issues only once every older instruction has"
+        " completed, as in a single execute stage that stalls for"
+        " multi-cycle operations, with two exceptions: a memory reference"
+        " may follow older memory references (pipelined address and data"
+        " phases), and FUs with resultAfterCommit complete beside the"
+        " pipeline.  Micro-ops after the first of a macro-op follow it",
+    )
+
+    executeBranchAtIssue = Param.Bool(
+        False,
+        "A single-cycle branch or squash-after instruction that issues with"
+        " nothing older in flight changes the stream in its issue cycle"
+        " rather than one cycle later, as on cores that redirect fetch from"
+        " the execute cycle",
     )
 
     enableIdling = Param.Bool(

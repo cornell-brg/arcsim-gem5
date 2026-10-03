@@ -115,7 +115,7 @@ Pipeline::Pipeline(MinorCPU &cpu_, const BaseMinorCPUParams &params) :
     execute = new Execute(cpu.name() + ".execute", cpu, params,
         dToE.output(), eToF1.input());
 
-    decode = new Decode(cpu.name() + ".decode", cpu, params,
+    decode = new Decode(cpu.name() + ".decode", cpu, *execute, params,
         f2ToD.output(), dToE.input(), execute->inputBuffer);
 
     if (params.singleFetchStage) {

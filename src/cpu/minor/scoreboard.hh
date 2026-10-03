@@ -146,6 +146,11 @@ class Scoreboard : public Named
      *  must match mark_unpredictable for the same inst. */
     void clearInstDests(MinorDynInstPtr inst, bool clear_unpredictable);
 
+    /** As clearInstDests, but a destination whose return cycle is later
+     *  than now stays busy until that cycle */
+    void clearInstDests(MinorDynInstPtr inst, bool clear_unpredictable,
+        Cycles now);
+
     /** Returns the exec sequence number of the most recent inst on
      *  which the given inst depends.  Useful for determining which
      *  inst must actually be committed before a dependent inst

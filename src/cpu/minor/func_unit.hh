@@ -176,6 +176,9 @@ class MinorFU : public SimObject
     /** Extra timing info to give timings to individual ops */
     std::vector<MinorFUTiming *> timings;
 
+    /** Results outlive commit: see BaseMinorCPU.py */
+    bool resultAfterCommit;
+
   public:
     MinorFU(const MinorFUParams &params) :
         SimObject(params),
@@ -183,7 +186,8 @@ class MinorFU : public SimObject
         opLat(params.opLat),
         issueLat(params.issueLat),
         cantForwardFromFUIndices(params.cantForwardFromFUIndices),
-        timings(params.timings)
+        timings(params.timings),
+        resultAfterCommit(params.resultAfterCommit)
     { }
 
     /** Compute data-dependent extra latency at commit time.

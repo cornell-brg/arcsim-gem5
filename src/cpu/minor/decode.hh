@@ -63,11 +63,17 @@ namespace minor
  * to feed to Execute.  It generates a new sequence number for each
  * instruction: execSeqNum.
  */
+class Execute;
+
 class Decode : public Named
 {
   protected:
     /** Pointer back to the containing CPU */
     MinorCPU &cpu;
+
+    /** The stage after this one, consulted for the stream sequence number
+     *  it is currently accepting */
+    Execute &execute;
 
     /** Input port carrying macro instructions from Fetch2 */
     Latch<ForwardInstData>::Output inp;
@@ -134,12 +140,17 @@ class Decode : public Named
     /** Pop an element off the input buffer, if there are any */
     void popInput(ThreadID tid);
 
+    /** True if Execute would discard every instruction of insts from
+     *  index from on, because its stream has been superseded */
+    bool inputIsStale(const ForwardInstData &insts, unsigned int from);
+
     /** Use the current threading policy to determine the next thread to
      *  decode from. */
     ThreadID getScheduledThread();
   public:
     Decode(const std::string &name,
         MinorCPU &cpu_,
+        Execute &execute_,
         const BaseMinorCPUParams &params,
         Latch<ForwardInstData>::Output inp_,
         Latch<ForwardInstData>::Input out_,

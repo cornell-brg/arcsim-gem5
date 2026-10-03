@@ -460,6 +460,24 @@ class SingleStageFetch1 : public Fetch1
      *  This bypasses the executeBranchDelay latch for 0-cycle redirect. */
     Latch<BranchData>::Input eToF1Input;
 
+    /** A direct branch's target line, fetched in the cycle the branch is
+     *  in Decode (fetchBranchTargetAtDecode); null if none */
+    FetchRequestPtr targetRequest;
+
+    /** Target requests given up while still in the memory system */
+    std::vector<FetchRequestPtr> abandonedTargetRequests;
+
+    /** Fetch the line holding target beside the sequential stream */
+    void fetchBranchTarget(ThreadID tid, const PCStateBase &target);
+
+    /** Give up targetRequest */
+    void abandonTargetRequest();
+
+    /** If execute_branch goes to the line targetRequest holds, make it
+     *  the new stream's first line in line_out and return true */
+    bool takeTargetLine(const BranchData &execute_branch,
+        ForwardLineData &line_out);
+
   public:
     SingleStageFetch1(const std::string &name_,
         MinorCPU &cpu_,
@@ -479,6 +497,8 @@ class SingleStageFetch1 : public Fetch1
     /** Override to use wakeupOnEventImmediate so the pipeline evaluates
      *  at the same tick as the I-cache response, not 1 cycle later. */
     bool recvTimingResp(PacketPtr pkt) override;
+
+    void recvReqRetry() override;
 };
 
 } // namespace minor

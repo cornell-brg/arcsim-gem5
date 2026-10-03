@@ -250,6 +250,18 @@ class Fetch2 : public Named
  *  logic is driven by SingleStageFetch1::evaluate() via runDecodeCore(). */
 class SingleStageFetch2 : public Fetch2
 {
+  protected:
+    /** See fetchBranchTargetAtDecode in BaseMinorCPU.py */
+    bool branchTargetAtDecode;
+
+  public:
+    /** Target of the direct branch decoded this cycle, to be fetched
+     *  next cycle */
+    std::unique_ptr<PCStateBase> decodedBranchTarget;
+    ThreadID decodedBranchTid;
+
+    bool targetAtDecode() const { return branchTargetAtDecode; }
+
   public:
     SingleStageFetch2(const std::string &name,
         MinorCPU &cpu_,
@@ -268,7 +280,8 @@ class SingleStageFetch2 : public Fetch2
      *  single-stage mode. Uses Fetch1StageId for activation.
      *  @param executeBranch same-cycle Execute branch (eToF1 input wire) */
     void runDecodeCore(BranchData &prediction_out,
-                       const BranchData &executeBranch);
+                       const BranchData &executeBranch,
+                       ForwardLineData *first_line = nullptr);
 
     /** Override: for direct branches, predict taken and supply target
      *  from branchTarget() — modeling Cortex-M4 early address speculation
