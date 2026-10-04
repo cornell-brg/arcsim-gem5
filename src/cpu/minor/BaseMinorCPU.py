@@ -146,12 +146,15 @@ class MinorFU(SimObject):
 class DynamicLatencyIntDivFU(MinorFU):
     """MinorFU with data-dependent SDIV/UDIV latency.
 
-    Overrides dynamicExtraLatency() to compute 2-12 cycle latency
-    based on the dividend's significant bits [DDI0439D Table 3-1]."""
+    The default keeps the existing M4 estimate. The optional RP2350
+    setting uses dividend/divisor magnitudes and the measured signed
+    divide fast-case throughput."""
 
     type = "DynamicLatencyIntDivFU"
     cxx_header = "cpu/minor/func_unit.hh"
     cxx_class = "gem5::DynamicLatencyIntDivFU"
+    rp2350_m33_timing = Param.Bool(
+        False, "Use RP2350 Cortex-M33 SDIV/UDIV operand-dependent timing")
 
 
 class MinorFUPool(SimObject):
