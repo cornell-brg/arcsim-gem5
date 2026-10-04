@@ -658,6 +658,10 @@ for variant_path in variant_paths:
                              '-Wno-error=deprecated-declarations',
                              '-Wno-error=deprecated',
                             ])
+        if env['CLANG'] and compareVersions(env['CXXVERSION'], "20.0.0") >= 0:
+            # Apple Clang 21 diagnoses legacy vendor C as errors by default.
+            env.Append(CCFLAGS=['-Wno-error=tautological-compare',
+                                '-Wno-error=uninitialized-const-pointer'])
     else:
         error('\n'.join((
               "Don't know what compiler options to use for your compiler.",
