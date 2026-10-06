@@ -96,6 +96,12 @@ parser.add_argument(
     help="Override NVIC priority bit width (0 = use platform default, "
     "valid range 2-8)",
 )
+parser.add_argument(
+    "--release",
+    choices=["m4", "m33"],
+    default="m4",
+    help="Architecture release: m4 (default) or m33 (adds FPv5)",
+)
 args = parser.parse_args()
 
 # ---------------------------------------------------------------------------
@@ -145,6 +151,11 @@ board = ArmMBoard(
 # ---------------------------------------------------------------------------
 # Semihosting — allows firmware to exit cleanly via BKPT #0xAB
 # ---------------------------------------------------------------------------
+if args.release == "m33":
+    from m5.objects.ArmMSystem import ArmMReleaseCortexM33
+
+    board.release = ArmMReleaseCortexM33()
+
 board.semihosting = ArmSemihosting()
 
 # ---------------------------------------------------------------------------

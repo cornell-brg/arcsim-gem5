@@ -167,6 +167,14 @@ m_profile_test(
     "test_faultmask_priority.elf",
     extra_args=["--priority-bits", "8"],
 )
+# FPv5 (Cortex-M33): every case's result and FPSCR match the RP2350's M33
+m_profile_test("fpv5", "test_fpv5.elf", extra_args=["--release", "m33"])
+# FPv5 instructions are UNDEFINED on the M4 release
+m_profile_test(
+    "fpv5_undefined",
+    "test_fpv5_undefined.elf",
+    extra_args=["--cpu-type", "timing"],
+)
 
 
 def m_profile_checkpoint_test(name, firmware_name):
