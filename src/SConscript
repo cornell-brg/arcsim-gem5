@@ -671,9 +671,12 @@ env['SHOBJSUFFIX'] = '${OBJSUFFIX}s'
 env.Append(LINKFLAGS='-rdynamic')
 
 envs = {
-    'debug': env.Clone(ENV_LABEL='debug', OBJSUFFIX='.do'),
-    'opt': env.Clone(ENV_LABEL='opt', OBJSUFFIX='.o'),
-    'fast': env.Clone(ENV_LABEL='fast', OBJSUFFIX='.fo'),
+    'debug': env.Clone(ENV_LABEL='debug', OBJSUFFIX='.do',
+        CPPDEFINES=list(env['CPPDEFINES'])),
+    'opt': env.Clone(ENV_LABEL='opt', OBJSUFFIX='.o',
+        CPPDEFINES=list(env['CPPDEFINES'])),
+    'fast': env.Clone(ENV_LABEL='fast', OBJSUFFIX='.fo',
+        CPPDEFINES=list(env['CPPDEFINES'])),
 }
 
 envs['debug'].Append(CPPDEFINES=['GEM5_DEBUG', 'TRACING_ON=1'])

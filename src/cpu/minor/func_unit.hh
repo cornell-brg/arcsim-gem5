@@ -201,14 +201,17 @@ class MinorFU : public SimObject
     }
 };
 
-/** SDIV/UDIV functional unit with data-dependent latency.
- *  Overrides dynamicExtraLatency() to compute 2-12 cycle latency
- *  based on the dividend's significant bits [DDI0439D Table 3-1]. */
+/** SDIV/UDIV functional unit with selectable data-dependent timing.
+ *  The default preserves the M4 estimate; the RP2350 option uses both
+ *  operands and the measured signed fast-case throughput. */
 class DynamicLatencyIntDivFU : public MinorFU
 {
+  private:
+    bool rp2350M33Timing;
+
   public:
     DynamicLatencyIntDivFU(const DynamicLatencyIntDivFUParams &params)
-        : MinorFU(params) {}
+        : MinorFU(params), rp2350M33Timing(params.rp2350_m33_timing) {}
 
     Cycles dynamicExtraLatency(
         ThreadContext *tc, const StaticInstPtr &inst) const override;

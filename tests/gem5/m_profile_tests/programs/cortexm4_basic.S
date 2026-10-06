@@ -169,9 +169,9 @@ Reset_Handler:
     mov     r0, #0
     str     r0, [r4, #4]        /* clear SysTick result */
 
-    /* Set reload value = 99 (counts 100 ticks: 99 down to 0) */
+    /* Set reload value = 199 (counts 200 ticks: 199 down to 0) */
     ldr     r0, =SYSTICK_RVR
-    mov     r1, #99
+    mov     r1, #199
     str     r1, [r0]
 
     /* Clear current value (write any value) */

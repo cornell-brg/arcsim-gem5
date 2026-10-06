@@ -82,7 +82,7 @@ Disassembly of section .text:
  80000ac:	f04f 0000 	mov.w	r0, #0
  80000b0:	6060      	str	r0, [r4, #4]
  80000b2:	481b      	ldr	r0, [pc, #108]	@ (8000120 <BusFault_Handler+0xc>)
- 80000b4:	f04f 0163 	mov.w	r1, #99	@ 0x63
+ 80000b4:	f04f 01c7 	mov.w	r1, #199	@ 0xc7
  80000b8:	6001      	str	r1, [r0, #0]
  80000ba:	481a      	ldr	r0, [pc, #104]	@ (8000124 <BusFault_Handler+0x10>)
  80000bc:	f04f 0100 	mov.w	r1, #0

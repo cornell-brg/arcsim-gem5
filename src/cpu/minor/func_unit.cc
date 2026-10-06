@@ -84,6 +84,39 @@ DynamicLatencyIntDivFU::dynamicExtraLatency(
     if (inst->opClass() != IntDivOp)
         return Cycles(0);
 
+    if (rp2350M33Timing) {
+        // ARM's generated Thumb divide decode registers Op2 (divisor)
+        // before Op1 (dividend), followed by condition-code sources.
+        // The RP2350 M33 divider's iteration count follows the distance
+        // between their most significant set bits, not the size of either
+        // operand in isolation.  The repeated SDIV fast-case benchmark
+        // measures four-cycle spacing, modeled here as a four-cycle floor.
+        if (inst->numSrcRegs() < 2)
+            return Cycles(0);
+        const bool isSigned = inst->getName() == "sdiv";
+        auto magnitude = [isSigned](uint32_t raw) {
+            if (!isSigned)
+                return raw;
+            const int64_t value = static_cast<int32_t>(raw);
+            return static_cast<uint32_t>(value < 0 ? -value : value);
+        };
+        const uint32_t divisor = magnitude(
+            tc->getReg(inst->srcRegIdx(0)));
+        const uint32_t dividend = magnitude(
+            tc->getReg(inst->srcRegIdx(1)));
+        unsigned latency = isSigned ? 4 : 2;
+        if (dividend && divisor) {
+            const int bitDifference =
+                __builtin_clz(divisor) - __builtin_clz(dividend);
+            if (bitDifference >= 0)
+                latency = 4 + bitDifference / 4;
+        }
+        DPRINTF(MinorExecute,
+                "RP2350 M33 %s dividend=%#x divisor=%#x latency=%u\n",
+                inst->getName(), dividend, divisor, latency);
+        return Cycles(latency > opLat ? latency - opLat : 0);
+    }
+
     // Read source registers to find the dividend.  The dividend
     // determines the divider's iteration count.  We read all integer
     // source registers and use the one with the most significant bits.
