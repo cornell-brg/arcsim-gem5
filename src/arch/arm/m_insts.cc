@@ -79,6 +79,8 @@ sysMToMiscReg(uint8_t sysM)
       case 0 ... 7:  return MISCREG_M_XPSR;  // PSR variants
       case 8:        return MISCREG_M_MSP;
       case 9:        return MISCREG_M_PSP;
+      case 10:       return MISCREG_M_MSPLIM;     // ARMv8-M only
+      case 11:       return MISCREG_M_PSPLIM;     // ARMv8-M only
       case 16:       return MISCREG_M_PRIMASK;
       case 17:       return MISCREG_M_BASEPRI;      // ARMv7-M only
       case 18:       return MISCREG_M_BASEPRI_MAX;  // ARMv7-M only
@@ -119,7 +121,7 @@ sysMName(uint8_t sysM)
     static const char *names[] = {
         "APSR", "IAPSR", "EAPSR", "XPSR",
         "?4", "IPSR", "EPSR", "IEPSR",
-        "MSP", "PSP", "?10", "?11",
+        "MSP", "PSP", "MSPLIM", "PSPLIM",
         "?12", "?13", "?14", "?15",
         "PRIMASK", "BASEPRI", "BASEPRI_MAX", "FAULTMASK",
         "CONTROL"
@@ -255,6 +257,11 @@ MsrMProfile::execute(ExecContext *xc,
             // Writing to the currently active SP → also update R13
             tc->setReg(int_reg::Sp, val);
         }
+    } else if (sysM == 10 || sysM == 11) {
+        // MSPLIM/PSPLIM: stored, bits [2:0] RES0 (the limit is 8-byte
+        // aligned).  The limit is not enforced: no stack-overflow
+        // UsageFault is raised.
+        tc->setMiscRegNoEffect(reg, val & ~RegVal(7));
     } else {
         // PRIMASK, BASEPRI, BASEPRI_MAX, FAULTMASK, CONTROL
         // Routes through MISA::setMiscReg which handles BASEPRI_MAX

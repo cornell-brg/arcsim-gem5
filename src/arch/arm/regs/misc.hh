@@ -1212,6 +1212,10 @@ namespace ArmISA
         // Architecturally write-only; reads return BASEPRI (see isa.cc).
         MISCREG_M_BASEPRI_MAX,
         MISCREG_M_FAULTMASK,
+        // ARMv8-M Mainline stack limits (SYSm 10, 11), for cores modelled
+        // as stand-ins for an ARMv8-M part such as the Cortex-M33.
+        MISCREG_M_MSPLIM,
+        MISCREG_M_PSPLIM,
 
         // M-profile System Control Block (SCB) registers
         MISCREG_M_CPUID,
@@ -2521,6 +2525,8 @@ namespace ArmISA
         "m_basepri",
         "m_basepri_max",   // conditional-write alias
         "m_faultmask",
+        "m_msplim",
+        "m_psplim",
 
         // M-profile SCB registers
         "m_cpuid",

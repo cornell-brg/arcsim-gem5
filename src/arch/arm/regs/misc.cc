@@ -7881,6 +7881,12 @@ ISA::initializeMiscRegMetadata()
     InitReg(MISCREG_M_FAULTMASK)
         .reset(0)
         .allPrivileges();
+    InitReg(MISCREG_M_MSPLIM)
+        .reset(0)
+        .allPrivileges();
+    InitReg(MISCREG_M_PSPLIM)
+        .reset(0)
+        .allPrivileges();
 
     // M-Class SCB registers
     InitReg(MISCREG_M_CPUID)

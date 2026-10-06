@@ -150,6 +150,9 @@ MISA::clear()
     miscRegs[MISCREG_M_PRIMASK] = 0;
     miscRegs[MISCREG_M_BASEPRI] = 0;
     miscRegs[MISCREG_M_FAULTMASK] = 0;
+    // Stack limits: 0 (no limit) until software sets them
+    miscRegs[MISCREG_M_MSPLIM] = 0;
+    miscRegs[MISCREG_M_PSPLIM] = 0;
 
     // -- SCB registers (DDI0403E B3.2) --
     // BUG-3 fix: CPUID value comes from ArmMSystem (set by platform),
@@ -476,7 +479,8 @@ MISA::copyRegsFrom(ThreadContext *src)
     static const RegIndex mRegs[] = {
         MISCREG_M_XPSR, MISCREG_M_MSP, MISCREG_M_PSP,
         MISCREG_M_CONTROL, MISCREG_M_PRIMASK, MISCREG_M_BASEPRI,
-        MISCREG_M_FAULTMASK, MISCREG_M_CPUID,
+        MISCREG_M_FAULTMASK, MISCREG_M_MSPLIM, MISCREG_M_PSPLIM,
+        MISCREG_M_CPUID,
         // ICSR omitted — not a misc reg, computed by MProfileSCS
         MISCREG_M_VTOR, MISCREG_M_AIRCR, MISCREG_M_SCR,
         MISCREG_M_CCR, MISCREG_M_SHPR1, MISCREG_M_SHPR2,
