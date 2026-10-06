@@ -72,6 +72,10 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
     # throw errors for bad addresses
     board.badaddr = BadAddr()
     board.sram_bus.default = board.badaddr.pio
+    # SIO (CPUID and the GPIO registers), shared by both core types.
+    from m5.objects import RP2350SIO
+    board.sio = RP2350SIO(pio_latency="1ns")
+    board.sio.pio = board.sram_bus.mem_side_ports
     board._banked_sram = sram_model == "banked"
     if board._banked_sram:
         from m5.objects import RP2350SRAM
@@ -211,6 +215,17 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     # The DWT (cycle counter) on the same bus, counting core clock cycles.
     board.platform.dwt.pio = board.sram_bus.mem_side_ports
     board.platform.dwt.clk_domain = board.clk_domain
+    # The M33s' coprocessors: GPIO (p0) on the SIO, the DCP (p4, p5) as far
+    # as the SDK's start-up uses it, and the RCP (p7), present but not
+    # modelled.
+    from m5.objects import (
+        MProfileCoprocessor,
+        RP2350DcpCoprocessor,
+        RP2350GpioCoprocessor,
+    )
+    board.gpio_coprocessor = RP2350GpioCoprocessor(sio=board.sio)
+    board.dcp = RP2350DcpCoprocessor()
+    board.rcp = MProfileCoprocessor(numbers=[7])
     board.semihosting = ArmSemihosting(mem_reserve="0B", stack_size="0B")
     board.workload = ArmMFsWorkload(object_file=firmware)
     return board
