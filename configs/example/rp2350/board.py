@@ -126,6 +126,7 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
               scratch_bank_bandwidth, arm_predictor, arm_divider, sram_model,
               arm_timing):
     from m5.objects import ArmMSystem, ArmSemihosting
+    from m5.objects.ArmMSystem import ArmMReleaseCortexM33
     from m5.objects.ArmMFsWorkload import ArmMFsWorkload
     from m5.objects.MProfilePlatform import ArmMPlatform
     from m5.objects.MProfileSCS import MProfileSCS
@@ -141,7 +142,9 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
             has_basepri=True, systick_calib=0, pio_latency="1ns",
         )
 
-    board = ArmMSystem()
+    # The RP2350's Arm cores are Cortex-M33s: the M4 proxy CPU's timing with
+    # the M33's instruction set (FPv5).
+    board = ArmMSystem(release=ArmMReleaseCortexM33())
     _attach_memory(board, xip_miss_ns=xip_miss_ns,
                    sram_latency_ns=sram_latency_ns,
                    scratch_bank_bandwidth=scratch_bank_bandwidth,
