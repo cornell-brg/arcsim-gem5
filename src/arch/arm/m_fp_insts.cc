@@ -891,51 +891,14 @@ MFpCvtS::doFpOp(ExecContext *xc, trace::InstRecord *traceData) const
         fesetround(savedRound);
         resultBits = floatToBits32(result);
     } else {
-        // Float → integer: use round-towards-zero (ARM spec)
-        float srcFloat = bitsToFloat32(srcBits);
-
-        // Flush denormal input if FPSCR.FZ
-        if (fpscr.fz && isDenormal(srcFloat)) {
-            srcFloat = std::copysign(0.0f, srcFloat);
-            fpscr.idc = 1;
-        }
-
-        int savedRound = fegetround();
-        fesetround(FE_TOWARDZERO);
-        feclearexcept(FE_ALL_EXCEPT);
-
-        if (isSigned) {
-            int32_t intResult;
-            if (std::isnan(srcFloat)) {
-                intResult = 0;
-                fpscr.ioc = 1;
-            } else if (srcFloat >= 2147483648.0f) {
-                intResult = 2147483647;
-                fpscr.ioc = 1;
-            } else if (srcFloat < -2147483648.0f) {
-                intResult = -2147483648;
-                fpscr.ioc = 1;
-            } else {
-                intResult = (int32_t)srcFloat;
-            }
-            std::memcpy(&resultBits, &intResult, 4);
-        } else {
-            uint32_t uintResult;
-            if (std::isnan(srcFloat) || srcFloat < 0.0f) {
-                uintResult = 0;
-                fpscr.ioc = 1;
-            } else if (srcFloat >= 4294967296.0f) {
-                uintResult = 0xFFFFFFFF;
-                fpscr.ioc = 1;
-            } else {
-                uintResult = (uint32_t)srcFloat;
-            }
-            resultBits = uintResult;
-        }
-
-        int excepts = fetestexcept(FE_ALL_EXCEPT);
-        if (excepts & FE_INEXACT) fpscr.ixc = 1;
-        fesetround(savedRound);
+        // Float → integer: the instruction's rounding (toward zero for
+        // VCVT), or FPSCR.RMode for VCVTR. fplibFPToFixed with no
+        // fraction bits flushes a denormal input under FPSCR.FZ,
+        // saturates, and sets IOC/IXC/IDC as the Arm ARM pseudocode does.
+        const FPRounding r = rounding
+            ? *rounding : FPRounding(uint32_t(fpscr.rMode));
+        resultBits = fplibFPToFixed<uint32_t, uint32_t>(
+            srcBits, 0, !isSigned, r, fpscr);
     }
 
     tc->setReg(vfpSRegId(dest), (RegVal)resultBits);
@@ -955,9 +918,106 @@ MFpCvtS::generateDisassembly(Addr pc,
     if (toFloat) {
         ss << "vcvt.f32." << (isSigned ? "s32" : "u32");
     } else {
-        ss << "vcvt." << (isSigned ? "s32" : "u32") << ".f32";
+        ss << mnemonic << "." << (isSigned ? "s32" : "u32") << ".f32";
     }
     ss << " s" << dest << ", s" << op1;
+    return ss.str();
+}
+
+// =====================================================================
+// MFpSelS — VSEL<cc>.F32
+// =====================================================================
+
+Fault
+MFpSelS::doFpOp(ExecContext *xc, trace::InstRecord *traceData) const
+{
+    ThreadContext *tc = xc->tcBase();
+
+    const bool take = testPredicate(tc->getReg(cc_reg::Nz),
+                                    tc->getReg(cc_reg::C),
+                                    tc->getReg(cc_reg::V), cond);
+    RegVal val = tc->getReg(vfpSRegId(take ? op1 : op2));
+    tc->setReg(vfpSRegId(dest), val);
+
+    if (traceData)
+        traceData->setData(vecElemClass, val);
+
+    return NoFault;
+}
+
+std::string
+MFpSelS::generateDisassembly(
+    Addr pc, const loader::SymbolTable *symtab) const
+{
+    std::ostringstream ss;
+    ss << mnemonic << " s" << dest << ", s" << op1 << ", s" << op2;
+    return ss.str();
+}
+
+// =====================================================================
+// MFpMinMaxNumS — VMAXNM.F32 / VMINNM.F32
+// =====================================================================
+
+Fault
+MFpMinMaxNumS::doFpOp(ExecContext *xc,
+                      trace::InstRecord *traceData) const
+{
+    ThreadContext *tc = xc->tcBase();
+    FPSCR fpscr = tc->readMiscRegNoEffect(MISCREG_FPSCR);
+
+    uint32_t a = (uint32_t)tc->getReg(vfpSRegId(op1));
+    uint32_t b = (uint32_t)tc->getReg(vfpSRegId(op2));
+    uint32_t result = isMax ? fplibMaxNum<uint32_t>(a, b, fpscr)
+                            : fplibMinNum<uint32_t>(a, b, fpscr);
+
+    tc->setReg(vfpSRegId(dest), (RegVal)result);
+    tc->setMiscRegNoEffect(MISCREG_FPSCR, fpscr);
+
+    if (traceData)
+        traceData->setData(vecElemClass, (RegVal)result);
+
+    return NoFault;
+}
+
+std::string
+MFpMinMaxNumS::generateDisassembly(
+    Addr pc, const loader::SymbolTable *symtab) const
+{
+    std::ostringstream ss;
+    ss << mnemonic << " s" << dest << ", s" << op1 << ", s" << op2;
+    return ss.str();
+}
+
+// =====================================================================
+// MFpRintS — VRINT{A,N,P,M,Z,R,X}.F32
+// =====================================================================
+
+Fault
+MFpRintS::doFpOp(ExecContext *xc, trace::InstRecord *traceData) const
+{
+    ThreadContext *tc = xc->tcBase();
+    FPSCR fpscr = tc->readMiscRegNoEffect(MISCREG_FPSCR);
+
+    uint32_t a = (uint32_t)tc->getReg(vfpSRegId(op1));
+    const FPRounding r = rounding
+        ? *rounding : FPRounding(uint32_t(fpscr.rMode));
+    uint32_t result = fplibRoundInt<uint32_t>(a, r, exact, fpscr);
+
+    tc->setReg(vfpSRegId(dest), (RegVal)result);
+    tc->setMiscRegNoEffect(MISCREG_FPSCR, fpscr);
+
+    if (traceData)
+        traceData->setData(vecElemClass, (RegVal)result);
+
+    return NoFault;
+}
+
+std::string
+MFpRintS::generateDisassembly(
+    Addr pc, const loader::SymbolTable *symtab) const
+{
+    std::ostringstream ss;
+    ss << mnemonic << " s" << dest << ", s" << op1;
     return ss.str();
 }
 

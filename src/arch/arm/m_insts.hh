@@ -460,6 +460,34 @@ class MProfileUndefined : public PredOp
 };
 
 /**
+ * An encoding the M-profile model does not implement although the
+ * release has it (e.g. a floating-point form no decoder case covers).
+ * Executing it stops the simulation with the encoding, instead of
+ * running some other instruction's semantics or raising a UsageFault
+ * that real hardware would not.
+ */
+class MProfileUnmodelled : public PredOp
+{
+  protected:
+    const char *what;
+
+  public:
+    MProfileUnmodelled(ExtMachInst mach_inst, const char *_what)
+        : PredOp("unmodelled", mach_inst, IntAluOp),
+          what(_what)
+    {
+        flags[IsInvalid] = true;
+    }
+
+    Fault execute(ExecContext *xc,
+                  trace::InstRecord *traceData) const override;
+
+    std::string generateDisassembly(
+            Addr pc,
+            const loader::SymbolTable *symtab) const override;
+};
+
+/**
  * M-profile exception return triggered by POP {PC} / LDM {PC}.
  *
  * When a load instruction writes an EXC_RETURN value to PC, the

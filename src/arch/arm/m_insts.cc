@@ -566,6 +566,28 @@ MProfileUndefined::generateDisassembly(Addr pc,
 }
 
 // =========================================================================
+// MProfileUnmodelled::execute — an encoding the model does not implement
+// =========================================================================
+
+Fault
+MProfileUnmodelled::execute(ExecContext *xc,
+                            trace::InstRecord *traceData) const
+{
+    if (!mProfilePredicateHolds(xc->tcBase(), condCode)) return NoFault;
+    panic("M-profile: %s is not modelled, at PC=%#x, encoding=%#x\n",
+          what, xc->pcState().instAddr(), (uint32_t)machInst);
+}
+
+std::string
+MProfileUnmodelled::generateDisassembly(Addr pc,
+    const loader::SymbolTable *symtab) const
+{
+    std::stringstream ss;
+    ss << "  unmodelled (" << what << ")";
+    return ss.str();
+}
+
+// =========================================================================
 // ExcReturnFromPC::execute — POP {PC} / LDM {PC} exception return
 // =========================================================================
 

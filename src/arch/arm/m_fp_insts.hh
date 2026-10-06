@@ -51,8 +51,10 @@
  */
 
 #include <cmath>
+#include <optional>
 #include <type_traits>
 
+#include "arch/arm/insts/fplib.hh"
 #include "arch/arm/insts/pred_inst.hh"
 #include "arch/arm/m_insts.hh"     // mProfilePredicateHolds
 #include "arch/arm/pcstate.hh"
@@ -616,11 +618,14 @@ class MFpMovDToCorePair : public MFpOp
 
 // =====================================================================
 // MFpCvtS — VCVT integer ↔ float single-precision
-// Handles VCVT.F32.U32, VCVT.F32.S32, VCVT.U32.F32, VCVT.S32.F32.
+// Handles VCVT.F32.U32, VCVT.F32.S32, VCVT.U32.F32, VCVT.S32.F32, and
+// the float→int forms with other roundings: VCVTR (FPSCR.RMode) and the
+// FPv5 VCVTA/N/P/M (ties away, ties to even, +inf, -inf).
 // Does NOT use mFpUnaryOp because:
 //   - int→float: input is integer bits, NOT a float (denormal flush
 //     would corrupt it); uses round-to-nearest, not FPSCR.RMode
-//   - float→int: uses round-towards-zero, not FPSCR.RMode
+//   - float→int: rounds as the instruction says (toward zero for VCVT),
+//     through fplibFPToFixed, which also saturates and sets the flags
 // =====================================================================
 
 class MFpCvtS : public MFpOp
@@ -633,16 +638,20 @@ class MFpCvtS : public MFpOp
     RegIndex dest, op1;
     bool toFloat;   // true: int→float, false: float→int
     bool isSigned;  // true: S32, false: U32
+    // float→int rounding; empty: FPSCR.RMode (VCVTR)
+    std::optional<FPRounding> rounding;
 
     Fault doFpOp(ExecContext *xc,
                  trace::InstRecord *traceData) const override;
 
   public:
     MFpCvtS(ExtMachInst mach_inst, RegIndex _dest, RegIndex _op1,
-            bool _toFloat, bool _isSigned)
-        : MFpOp("vcvt", mach_inst, SimdFloatCvtOp),
+            bool _toFloat, bool _isSigned,
+            std::optional<FPRounding> _rounding = FPRounding_ZERO,
+            const char *mnem = "vcvt")
+        : MFpOp(mnem, mach_inst, SimdFloatCvtOp),
           dest(_dest), op1(_op1),
-          toFloat(_toFloat), isSigned(_isSigned)
+          toFloat(_toFloat), isSigned(_isSigned), rounding(_rounding)
     {
         setRegIdxArrays(
             reinterpret_cast<RegIdArrayPtr>(
@@ -707,6 +716,145 @@ class MFpCvtFixedS : public MFpOp
           dest(_dest), op1(_op1),
           toFloat(_toFloat), isSigned(_isSigned),
           intWidth(_intWidth), fbits(_fbits)
+    {
+        setRegIdxArrays(
+            reinterpret_cast<RegIdArrayPtr>(
+                &std::remove_pointer_t<decltype(this)>::srcRegIdxArr),
+            reinterpret_cast<RegIdArrayPtr>(
+                &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
+
+        setSrcRegIdx(_numSrcRegs++, vfpSRegId(op1));
+        setSrcRegIdx(_numSrcRegs++, miscRegClass[MISCREG_FPSCR]);
+        setDestRegIdx(_numDestRegs++, vfpSRegId(dest));
+        _numTypedDestRegs[vecElemClass.type()]++;
+        setDestRegIdx(_numDestRegs++, miscRegClass[MISCREG_FPSCR]);
+        _numTypedDestRegs[miscRegClass.type()]++;
+    }
+
+    std::string generateDisassembly(
+        Addr pc, const loader::SymbolTable *symtab) const override;
+};
+
+// =====================================================================
+// MFpSelS — VSEL<cc>.F32 Sd, Sn, Sm (FPv5)
+// Sd = cond ? Sn : Sm, cond one of EQ, VS, GE, GT on the APSR flags.
+// A register copy: no FP exceptions, FPSCR untouched.
+// src: S[op1], S[op2], NZ, C, V   dest: S[dest]
+// =====================================================================
+
+class MFpSelS : public MFpOp
+{
+  private:
+    RegId srcRegIdxArr[5];
+    RegId destRegIdxArr[1];
+
+  protected:
+    RegIndex dest, op1, op2;
+    ConditionCode cond;
+
+    Fault doFpOp(ExecContext *xc,
+                 trace::InstRecord *traceData) const override;
+
+  public:
+    MFpSelS(const char *mnem, ExtMachInst mach_inst, RegIndex _dest,
+            RegIndex _op1, RegIndex _op2, ConditionCode _cond)
+        : MFpOp(mnem, mach_inst, SimdFloatCmpOp),
+          dest(_dest), op1(_op1), op2(_op2), cond(_cond)
+    {
+        setRegIdxArrays(
+            reinterpret_cast<RegIdArrayPtr>(
+                &std::remove_pointer_t<decltype(this)>::srcRegIdxArr),
+            reinterpret_cast<RegIdArrayPtr>(
+                &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
+
+        setSrcRegIdx(_numSrcRegs++, vfpSRegId(op1));
+        setSrcRegIdx(_numSrcRegs++, vfpSRegId(op2));
+        setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::Nz]);
+        setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::C]);
+        setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::V]);
+        setDestRegIdx(_numDestRegs++, vfpSRegId(dest));
+        _numTypedDestRegs[vecElemClass.type()]++;
+    }
+
+    std::string generateDisassembly(
+        Addr pc, const loader::SymbolTable *symtab) const override;
+};
+
+// =====================================================================
+// MFpMinMaxNumS — VMAXNM.F32 / VMINNM.F32 Sd, Sn, Sm (FPv5)
+// IEEE 754-2008 maxNum/minNum through fplibMaxNum/fplibMinNum: a quiet
+// NaN against a number gives the number.
+// src: S[op1], S[op2], FPSCR   dest: S[dest], FPSCR
+// =====================================================================
+
+class MFpMinMaxNumS : public MFpOp
+{
+  private:
+    RegId srcRegIdxArr[3];
+    RegId destRegIdxArr[2];
+
+  protected:
+    RegIndex dest, op1, op2;
+    bool isMax;
+
+    Fault doFpOp(ExecContext *xc,
+                 trace::InstRecord *traceData) const override;
+
+  public:
+    MFpMinMaxNumS(const char *mnem, ExtMachInst mach_inst,
+                  RegIndex _dest, RegIndex _op1, RegIndex _op2,
+                  bool _isMax)
+        : MFpOp(mnem, mach_inst, SimdFloatCmpOp),
+          dest(_dest), op1(_op1), op2(_op2), isMax(_isMax)
+    {
+        setRegIdxArrays(
+            reinterpret_cast<RegIdArrayPtr>(
+                &std::remove_pointer_t<decltype(this)>::srcRegIdxArr),
+            reinterpret_cast<RegIdArrayPtr>(
+                &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
+
+        setSrcRegIdx(_numSrcRegs++, vfpSRegId(op1));
+        setSrcRegIdx(_numSrcRegs++, vfpSRegId(op2));
+        setSrcRegIdx(_numSrcRegs++, miscRegClass[MISCREG_FPSCR]);
+        setDestRegIdx(_numDestRegs++, vfpSRegId(dest));
+        _numTypedDestRegs[vecElemClass.type()]++;
+        setDestRegIdx(_numDestRegs++, miscRegClass[MISCREG_FPSCR]);
+        _numTypedDestRegs[miscRegClass.type()]++;
+    }
+
+    std::string generateDisassembly(
+        Addr pc, const loader::SymbolTable *symtab) const override;
+};
+
+// =====================================================================
+// MFpRintS — VRINT{A,N,P,M,Z,R,X}.F32 Sd, Sm (FPv5)
+// Round to an integral value in floating point, through fplibRoundInt.
+// A/N/P/M/Z round as named; R and X use FPSCR.RMode. Only X (exact)
+// raises Inexact.
+// src: S[op1], FPSCR   dest: S[dest], FPSCR
+// =====================================================================
+
+class MFpRintS : public MFpOp
+{
+  private:
+    RegId srcRegIdxArr[2];
+    RegId destRegIdxArr[2];
+
+  protected:
+    RegIndex dest, op1;
+    // empty: FPSCR.RMode (VRINTR, VRINTX)
+    std::optional<FPRounding> rounding;
+    bool exact;
+
+    Fault doFpOp(ExecContext *xc,
+                 trace::InstRecord *traceData) const override;
+
+  public:
+    MFpRintS(const char *mnem, ExtMachInst mach_inst, RegIndex _dest,
+             RegIndex _op1, std::optional<FPRounding> _rounding,
+             bool _exact)
+        : MFpOp(mnem, mach_inst, SimdFloatCvtOp),
+          dest(_dest), op1(_op1), rounding(_rounding), exact(_exact)
     {
         setRegIdxArrays(
             reinterpret_cast<RegIdArrayPtr>(

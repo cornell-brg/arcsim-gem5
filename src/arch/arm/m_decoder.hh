@@ -135,6 +135,7 @@ class MDecoder : public InstDecoder
      *  Returns nullptr if the encoding is not recognized (falls through
      *  to ISA-generated decoder). */
     StaticInstPtr decodeMProfileVfp(ExtMachInst mach_inst);
+    StaticInstPtr decodeMProfileFpv5(ExtMachInst mach_inst);
 };
 
 } // namespace ArmISA

@@ -668,6 +668,9 @@ MDecoder::tryMProfileDecode32(ExtMachInst mach_inst)
                     return new MProfileUndefined(mach_inst,
                         "VFP instruction without FPU in release");
                 }
+                // hw1[12] set: the FPv5 data-processing space
+                if (bits(inst, 28))
+                    return decodeMProfileFpv5(mach_inst);
                 StaticInstPtr fpInst = decodeMProfileVfp(mach_inst);
                 if (fpInst)
                     return fpInst;
@@ -1244,6 +1247,31 @@ MDecoder::decodeMProfileVfp(ExtMachInst mach_inst)
                                         toFloat, isSigned,
                                         intWidth, fbits);
               }
+              case 0x6:
+              case 0x7: {
+                // VRINTR / VRINTZ (opc2=6, op=0 / 1) and VRINTX (opc2=7,
+                // op=0), FPv5 [DDI0553]. opc2=7 with op=1 is
+                // VCVT between single and double, which needs FPU_DP.
+                const bool op = bits(opc3, 1);
+                if (opc2 == 0x7 && op) {
+                    if (!has(ArmExtension::M_PROFILE_FPU_DP))
+                        return new MProfileUndefined(mach_inst,
+                            "VCVT between single and double without "
+                            "FPU_DP");
+                    break;
+                }
+                if (!has(ArmExtension::M_PROFILE_FPV5))
+                    return new MProfileUndefined(mach_inst,
+                        "VRINT without FPv5");
+                if (opc2 == 0x6 && op)
+                    return new MFpRintS("vrintz.f32", mach_inst, vd(), vm(),
+                                        FPRounding_ZERO, false);
+                if (opc2 == 0x6)
+                    return new MFpRintS("vrintr.f32", mach_inst, vd(), vm(),
+                                        std::nullopt, false);
+                return new MFpRintS("vrintx.f32", mach_inst, vd(), vm(),
+                                    std::nullopt, true);
+              }
               default:
                 // Other conversions — fall through
                 return nullptr;
@@ -1257,6 +1285,84 @@ MDecoder::decodeMProfileVfp(ExtMachInst mach_inst)
 
     // Not recognized — fall through to ISA-generated decoder.
     return nullptr;
+}
+
+// =========================================================================
+// decodeMProfileFpv5 — FPv5 data processing (hw1 = 1111 1110 ...)
+// =========================================================================
+//
+// The coprocessor encodings with hw1[12] (bit 28) set and coproc 10/11:
+// VSEL, VMAXNM/VMINNM, VRINT{A,N,P,M} and VCVT{A,N,P,M}
+// [DDI0553]. Fields as the A-profile decodeFloatingPointDataProcessing
+// (isa/formats/fp.isa). Undefined without FPv5 in the release, as on a
+// Cortex-M4.
+
+StaticInstPtr
+MDecoder::decodeMProfileFpv5(ExtMachInst mach_inst)
+{
+    const uint32_t inst = (uint32_t)mach_inst;
+
+    if (!has(ArmExtension::M_PROFILE_FPV5))
+        return new MProfileUndefined(mach_inst,
+            "FPv5 instruction without FPv5");
+
+    // Only data processing (hw1[11:8] = 1110, bit4 = 0) is allocated.
+    if (bits(inst, 31, 24) != 0xfe || bits(inst, 4))
+        return new MProfileUndefined(mach_inst, "unallocated FPv5 encoding");
+
+    if (bits(inst, 8)) {
+        if (!has(ArmExtension::M_PROFILE_FPU_DP))
+            return new MProfileUndefined(mach_inst,
+                "FPv5 double precision without FPU_DP");
+        return new MProfileUnmodelled(mach_inst, "FPv5 double precision");
+    }
+
+    const RegIndex vd = (RegIndex)(bits(inst, 22) | (bits(inst, 15, 12) << 1));
+    const RegIndex vn = (RegIndex)(bits(inst, 7) | (bits(inst, 19, 16) << 1));
+    const RegIndex vm = (RegIndex)(bits(inst, 5) | (bits(inst, 3, 0) << 1));
+
+    // VSEL<cc>.F32: 1111 1110 0 D cc Vn | Vd 101 0 N 0 M 0 Vm
+    if (bits(inst, 23) == 0 && bits(inst, 6) == 0) {
+        static const ConditionCode conds[] = {
+            COND_EQ, COND_VS, COND_GE, COND_GT};
+        static const char *const mnems[] = {
+            "vseleq.f32", "vselvs.f32", "vselge.f32", "vselgt.f32"};
+        const uint32_t cc = bits(inst, 21, 20);
+        return new MFpSelS(mnems[cc], mach_inst, vd, vn, vm, conds[cc]);
+    }
+
+    // VMAXNM / VMINNM.F32: 1111 1110 1 D 00 Vn | Vd 101 0 N op M 0 Vm
+    if (bits(inst, 23) == 1 && bits(inst, 21, 20) == 0) {
+        const bool isMin = bits(inst, 6);
+        return new MFpMinMaxNumS(isMin ? "vminnm.f32" : "vmaxnm.f32",
+                                 mach_inst, vd, vn, vm, !isMin);
+    }
+
+    // VRINT{A,N,P,M}.F32:     1111 1110 1 D 11 10 RM | Vd 101 0 0 1 M 0 Vm
+    // VCVT{A,N,P,M}.xx.F32:   1111 1110 1 D 11 11 RM | Vd 101 0 op 1 M 0 Vm
+    if (bits(inst, 23) == 1 && bits(inst, 21, 19) == 0x7 &&
+        bits(inst, 6) == 1) {
+        static const FPRounding modes[] = {
+            FPRounding_TIEAWAY, FPRounding_TIEEVEN,
+            FPRounding_POSINF, FPRounding_NEGINF};
+        const uint32_t rm = bits(inst, 17, 16);
+        if (bits(inst, 18) == 0) {
+            if (bits(inst, 7))
+                return new MProfileUndefined(mach_inst,
+                    "unallocated FPv5 encoding");
+            static const char *const mnems[] = {
+                "vrinta.f32", "vrintn.f32", "vrintp.f32", "vrintm.f32"};
+            return new MFpRintS(mnems[rm], mach_inst, vd, vm, modes[rm],
+                                false);
+        }
+        static const char *const mnems[] = {
+            "vcvta", "vcvtn", "vcvtp", "vcvtm"};
+        const bool isSigned = bits(inst, 7);
+        return new MFpCvtS(mach_inst, vd, vm, false, isSigned, modes[rm],
+                           mnems[rm]);
+    }
+
+    return new MProfileUndefined(mach_inst, "unallocated FPv5 encoding");
 }
 
 // =========================================================================
