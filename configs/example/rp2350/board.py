@@ -196,6 +196,9 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     board.cpu.dcache_port = board.dcode_router.cpu_side_ports
     board.cpu.mmu.stacking_port = board.sram_bus.cpu_side_ports
     board.platform.scs.pio = board.sram_bus.mem_side_ports
+    # The DWT (cycle counter) on the same bus, counting core clock cycles.
+    board.platform.dwt.pio = board.sram_bus.mem_side_ports
+    board.platform.dwt.clk_domain = board.clk_domain
     board.semihosting = ArmSemihosting(mem_reserve="0B", stack_size="0B")
     board.workload = ArmMFsWorkload(object_file=firmware)
     return board
