@@ -1,0 +1,6 @@
+Import('*')
+
+SimObject('RP2350SIO.py', sim_objects=['RP2350SIO'])
+Source('rp2350_sio.cc')
+
+DebugFlag('RP2350SIO')
