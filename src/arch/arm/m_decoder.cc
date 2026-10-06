@@ -674,8 +674,11 @@ MDecoder::tryMProfileDecode32(ExtMachInst mach_inst)
                 StaticInstPtr fpInst = decodeMProfileVfp(mach_inst);
                 if (fpInst)
                     return fpInst;
-                // Unrecognized VFP encoding — fall through to
-                // ISA-generated decoder as a safety net.
+                // An FP encoding decodeMProfileVfp does not cover stops the
+                // simulation when executed. The A-profile FP classes are
+                // not usable on M-profile (see MFpCvtFixedS).
+                return new MProfileUnmodelled(mach_inst,
+                    "this FP encoding");
             }
         }
     }
@@ -1008,11 +1011,11 @@ MDecoder::decodeMProfileVfp(ExtMachInst mach_inst)
         if (!single) {
             bool is_load_store = (bits(inst, 25) == 0);
             if (is_load_store)
-                return nullptr;  // shouldn't reach here, but safety net
+                return nullptr;  // shouldn't reach here
             if (!has(ArmExtension::M_PROFILE_FPU_DP))
                 return new MProfileUndefined(mach_inst,
                     "VFP double-precision arithmetic without FPU_DP");
-            return nullptr;  // fall through for DP-capable processors
+            return nullptr;  // double-precision arithmetic: not modelled
         }
 
         switch (opc1 & 0xb /* mask to match A-profile table */) {
@@ -1281,7 +1284,7 @@ MDecoder::decodeMProfileVfp(ExtMachInst mach_inst)
                                     std::nullopt, true);
               }
               default:
-                // Other conversions — fall through
+                // Other conversions (VCVTB/VCVTT): not modelled
                 return nullptr;
             }
             break;
@@ -1291,7 +1294,7 @@ MDecoder::decodeMProfileVfp(ExtMachInst mach_inst)
         }
     }
 
-    // Not recognized — fall through to ISA-generated decoder.
+    // Not recognized: the caller treats it as unmodelled.
     return nullptr;
 }
 
