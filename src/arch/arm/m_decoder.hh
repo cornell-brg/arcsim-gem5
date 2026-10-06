@@ -136,6 +136,7 @@ class MDecoder : public InstDecoder
      *  to ISA-generated decoder). */
     StaticInstPtr decodeMProfileVfp(ExtMachInst mach_inst);
     StaticInstPtr decodeMProfileFpv5(ExtMachInst mach_inst);
+    StaticInstPtr decodeMProfileCoproc(ExtMachInst mach_inst);
 };
 
 } // namespace ArmISA

@@ -50,6 +50,7 @@
 #include "arch/arm/regs/misc_types.hh"
 #include "arch/arm/utility.hh"
 #include "cpu/thread_context.hh"
+#include "dev/arm/m_profile_coprocessor.hh"
 
 namespace gem5
 {
@@ -478,6 +479,36 @@ class MProfileUnmodelled : public PredOp
     {
         flags[IsInvalid] = true;
     }
+
+    Fault execute(ExecContext *xc,
+                  trace::InstRecord *traceData) const override;
+
+    std::string generateDisassembly(
+            Addr pc,
+            const loader::SymbolTable *symtab) const override;
+};
+
+/**
+ * MCR, MRC, MCRR, MRRC and CDP (and their hw1[12] forms) for coprocessors
+ * p0-p7. Access needs CPACR to grant the coprocessor (privileged-only
+ * grants need a privileged caller) and a coprocessor attached as that number
+ * on the ArmMSystem; otherwise a UsageFault (NOCP), as on the RP2350. The
+ * attached MProfileCoprocessor performs the access; one it does not model
+ * stops the simulation. MRC with Rt = 15 writes APSR.NZCV.
+ */
+class MCoprocOp : public PredOp
+{
+  private:
+    RegId srcRegIdxArr[2];
+    RegId destRegIdxArr[3];
+
+  protected:
+    MProfileCoprocAccess form;
+    RegIndex rt, rt2;
+
+  public:
+    MCoprocOp(ExtMachInst mach_inst, MProfileCoprocAccess _form,
+              RegIndex _rt, RegIndex _rt2);
 
     Fault execute(ExecContext *xc,
                   trace::InstRecord *traceData) const override;

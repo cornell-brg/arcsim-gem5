@@ -126,6 +126,17 @@ SimObject(
     sim_objects=['MProfileDWT'],
     tags=['arm isa'],
 )
+# Arm-M coprocessor port (p0-p7), and the RP2350's coprocessors on it.
+SimObject(
+    'MProfileCoprocessor.py',
+    sim_objects=['MProfileCoprocessor'],
+    tags=['arm isa'],
+)
+SimObject(
+    'RP2350Coprocessors.py',
+    sim_objects=['RP2350GpioCoprocessor', 'RP2350DcpCoprocessor'],
+    tags=['arm isa'],
+)
 SimObject(
     'VirtIOMMIO.py',
     sim_objects=['MmioVirtIO'],
@@ -142,6 +153,8 @@ Source('m_profile_platform.cc', tags=['arm isa'])
 Source('m_profile_scs.cc', tags=['arm isa'])
 Source('m_profile_bridge_io.cc', tags=['arm isa'])
 Source('m_profile_dwt.cc', tags=['arm isa'])
+Source('m_profile_coprocessor.cc', tags=['arm isa'])
+Source('rp2350_coprocessors.cc', tags=['arm isa'])
 Source('a9scu.cc', tags=['arm isa'])
 Source('amba_device.cc', tags=['arm isa'])
 Source('amba_fake.cc', tags=['arm isa'])

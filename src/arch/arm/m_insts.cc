@@ -588,6 +588,154 @@ MProfileUnmodelled::generateDisassembly(Addr pc,
 }
 
 // =========================================================================
+// MCoprocOp — coprocessor instructions for p0-p7
+// =========================================================================
+
+namespace
+{
+
+const char *
+coprocMnemonic(MProfileCoprocAccess::Kind kind)
+{
+    using Kind = MProfileCoprocAccess::Kind;
+    switch (kind) {
+      case Kind::Mcr: return "mcr";
+      case Kind::Mrc: return "mrc";
+      case Kind::Mcrr: return "mcrr";
+      case Kind::Mrrc: return "mrrc";
+      case Kind::Cdp: return "cdp";
+    }
+    return "coproc";
+}
+
+} // anonymous namespace
+
+MCoprocOp::MCoprocOp(ExtMachInst mach_inst, MProfileCoprocAccess _form,
+                     RegIndex _rt, RegIndex _rt2)
+    : PredOp(coprocMnemonic(_form.kind), mach_inst, IntAluOp),
+      form(_form), rt(_rt), rt2(_rt2)
+{
+    using Kind = MProfileCoprocAccess::Kind;
+    setRegIdxArrays(
+        reinterpret_cast<RegIdArrayPtr>(
+            &std::remove_pointer_t<decltype(this)>::srcRegIdxArr),
+        reinterpret_cast<RegIdArrayPtr>(
+            &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
+
+    switch (form.kind) {
+      case Kind::Mcrr:
+        setSrcRegIdx(_numSrcRegs++, intRegClass[rt]);
+        setSrcRegIdx(_numSrcRegs++, intRegClass[rt2]);
+        break;
+      case Kind::Mcr:
+        setSrcRegIdx(_numSrcRegs++, intRegClass[rt]);
+        break;
+      case Kind::Mrrc:
+        setDestRegIdx(_numDestRegs++, intRegClass[rt]);
+        _numTypedDestRegs[intRegClass.type()]++;
+        setDestRegIdx(_numDestRegs++, intRegClass[rt2]);
+        _numTypedDestRegs[intRegClass.type()]++;
+        break;
+      case Kind::Mrc:
+        if (rt == 15) {
+            setDestRegIdx(_numDestRegs++, ccRegClass[cc_reg::Nz]);
+            _numTypedDestRegs[ccRegClass.type()]++;
+            setDestRegIdx(_numDestRegs++, ccRegClass[cc_reg::C]);
+            _numTypedDestRegs[ccRegClass.type()]++;
+            setDestRegIdx(_numDestRegs++, ccRegClass[cc_reg::V]);
+            _numTypedDestRegs[ccRegClass.type()]++;
+        } else {
+            setDestRegIdx(_numDestRegs++, intRegClass[rt]);
+            _numTypedDestRegs[intRegClass.type()]++;
+        }
+        break;
+      case Kind::Cdp:
+        break;
+    }
+}
+
+Fault
+MCoprocOp::execute(ExecContext *xc, trace::InstRecord *traceData) const
+{
+    using Kind = MProfileCoprocAccess::Kind;
+    ThreadContext *tc = xc->tcBase();
+    if (!mProfilePredicateHolds(tc, condCode)) return NoFault;
+
+    // CPACR: two bits per coprocessor, 0b11 full access, 0b01 privileged
+    // only [DDI0553].
+    const uint32_t cpacr = tc->readMiscRegNoEffect(MISCREG_M_CPACR);
+    const unsigned grant = bits(cpacr, 2 * form.coproc + 1, 2 * form.coproc);
+    bool allowed = grant == 0x3;
+    if (grant == 0x1) {
+        ArmMISA::XPSR xpsr = tc->readMiscRegNoEffect(MISCREG_M_XPSR);
+        ArmMISA::CONTROL_M ctrl =
+            tc->readMiscRegNoEffect(MISCREG_M_CONTROL);
+        allowed = xpsr.exception != 0 || ctrl.npriv == 0;
+    }
+    auto *msys = dynamic_cast<ArmMSystem *>(tc->getSystemPtr());
+    MProfileCoprocessor *cp = msys ? msys->getCoprocessor(form.coproc)
+                                   : nullptr;
+    // NOCP: not granted, or nothing attached. CFSR.NOCP is not set (the
+    // model has no CFSR fault-status support yet).
+    if (!allowed || !cp)
+        return std::make_shared<ArmMFault>(MPEXC_USAGEFAULT);
+
+    MProfileCoprocAccess a = form;
+    if (a.kind == Kind::Mcr || a.kind == Kind::Mcrr)
+        a.rt = (uint32_t)tc->getReg(RegId(intRegClass, rt));
+    if (a.kind == Kind::Mcrr)
+        a.rt2 = (uint32_t)tc->getReg(RegId(intRegClass, rt2));
+
+    if (!cp->access(a)) {
+        panic("M-profile: %s p%u, #%u, c%u, c%u, #%u on %s is not modelled, "
+              "at PC=%#x, encoding=%#x\n", mnemonic, a.coproc, a.opc1,
+              a.crn, a.crm, a.opc2, cp->name(), xc->pcState().instAddr(),
+              (uint32_t)machInst);
+    }
+
+    if (a.kind == Kind::Mrrc) {
+        tc->setReg(RegId(intRegClass, rt), (RegVal)a.rt);
+        tc->setReg(RegId(intRegClass, rt2), (RegVal)a.rt2);
+    } else if (a.kind == Kind::Mrc && rt == 15) {
+        tc->setReg(cc_reg::Nz, (RegVal)((bits(a.rt, 31) << 1) |
+                                        bits(a.rt, 30)));
+        tc->setReg(cc_reg::C, (RegVal)bits(a.rt, 29));
+        tc->setReg(cc_reg::V, (RegVal)bits(a.rt, 28));
+    } else if (a.kind == Kind::Mrc) {
+        tc->setReg(RegId(intRegClass, rt), (RegVal)a.rt);
+    }
+    if (traceData && (a.kind == Kind::Mrc || a.kind == Kind::Mrrc))
+        traceData->setData(intRegClass, a.rt);
+    return NoFault;
+}
+
+std::string
+MCoprocOp::generateDisassembly(Addr pc,
+    const loader::SymbolTable *symtab) const
+{
+    using Kind = MProfileCoprocAccess::Kind;
+    std::stringstream ss;
+    ss << mnemonic << (form.two ? "2" : "") << " p" << form.coproc
+       << ", #" << form.opc1;
+    switch (form.kind) {
+      case Kind::Mcrr:
+      case Kind::Mrrc:
+        ss << ", r" << (int)rt << ", r" << (int)rt2 << ", c" << form.crm;
+        break;
+      case Kind::Mcr:
+      case Kind::Mrc:
+        ss << ", r" << (int)rt << ", c" << form.crn << ", c" << form.crm
+           << ", #" << form.opc2;
+        break;
+      case Kind::Cdp:
+        ss << ", c" << (int)rt << ", c" << form.crn << ", c" << form.crm
+           << ", #" << form.opc2;
+        break;
+    }
+    return ss.str();
+}
+
+// =========================================================================
 // ExcReturnFromPC::execute — POP {PC} / LDM {PC} exception return
 // =========================================================================
 

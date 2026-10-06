@@ -654,6 +654,9 @@ MDecoder::tryMProfileDecode32(ExtMachInst mach_inst)
                 is_coproc = true;
         }
         if (is_coproc) {
+            // p0-p7: whatever coprocessors the system attaches
+            if (ltcoproc <= 0x7)
+                return decodeMProfileCoproc(mach_inst);
             if (ltcoproc == 0xe) {
                 // CP14 — debug coprocessor, A-profile only
                 return new MProfileUndefined(mach_inst, "MRC/MCR CP14");
@@ -1296,6 +1299,50 @@ MDecoder::decodeMProfileVfp(ExtMachInst mach_inst)
 
     // Not recognized: the caller treats it as unmodelled.
     return nullptr;
+}
+
+// =========================================================================
+// decodeMProfileCoproc — coprocessor instructions for p0-p7
+// =========================================================================
+//
+// MCRR/MRRC: 111x 1100 010L Rt2 | Rt coproc opc1 CRm
+// MCR/MRC:   111x 1110 opc1 L CRn | Rt coproc opc2 1 CRm
+// CDP:       111x 1110 opc1 CRn | CRd coproc opc2 0 CRm
+// x = hw1[12] (bit 28): the MCRR2/MRRC2/MCR2/MRC2/CDP2 forms. LDC/STC (the
+// rest of the 111x 110x space) are not modelled.
+
+StaticInstPtr
+MDecoder::decodeMProfileCoproc(ExtMachInst mach_inst)
+{
+    using Kind = MProfileCoprocAccess::Kind;
+    const uint32_t inst = (uint32_t)mach_inst;
+
+    MProfileCoprocAccess form{};
+    form.two = bits(inst, 28);
+    form.coproc = bits(inst, 11, 8);
+    const RegIndex rt = (RegIndex)bits(inst, 15, 12);
+
+    if (bits(inst, 27, 21) == 0x62) {
+        form.kind = bits(inst, 20) ? Kind::Mrrc : Kind::Mcrr;
+        form.opc1 = bits(inst, 7, 4);
+        form.crm = bits(inst, 3, 0);
+        return new MCoprocOp(mach_inst, form, rt,
+                             (RegIndex)bits(inst, 19, 16));
+    }
+    if (bits(inst, 27, 24) == 0xe) {
+        form.crn = bits(inst, 19, 16);
+        form.crm = bits(inst, 3, 0);
+        form.opc2 = bits(inst, 7, 5);
+        if (bits(inst, 4)) {
+            form.kind = bits(inst, 20) ? Kind::Mrc : Kind::Mcr;
+            form.opc1 = bits(inst, 23, 21);
+        } else {
+            form.kind = Kind::Cdp;
+            form.opc1 = bits(inst, 23, 20);
+        }
+        return new MCoprocOp(mach_inst, form, rt, 0);
+    }
+    return new MProfileUnmodelled(mach_inst, "LDC/STC to coprocessors 0-7");
 }
 
 // =========================================================================

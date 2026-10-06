@@ -39,7 +39,10 @@
  * (extension checking), which is stored as a direct member.
  */
 
+#include <array>
+
 #include "base/bitfield.hh"
+#include "base/logging.hh"
 #include "enums/ArmExtension.hh"
 #include "params/ArmMSystem.hh"
 #include "sim/system.hh"
@@ -49,6 +52,7 @@ namespace gem5
 
 class ArmRelease;
 class ArmSemihosting;
+class MProfileCoprocessor;
 class MProfileSCS;
 
 class ArmMSystem : public System
@@ -58,6 +62,10 @@ class ArmMSystem : public System
 
     /** SCS/NVIC device pointer, set by MProfileSCS::init(). */
     MProfileSCS *_scs = nullptr;
+
+    /** Coprocessors on the coprocessor port, by number (p0-p7); nullptr
+     *  where none is attached. */
+    std::array<MProfileCoprocessor *, 8> coprocessors{};
 
     /** CPUID register value (DDI0403E B3.2.3).
      *  Set from Python param (provided by platform).  Identifies the
@@ -92,6 +100,20 @@ class ArmMSystem : public System
 
     /** Used by MProfileInterrupts to discover the SCS device. */
     MProfileSCS *getSCS() const { return _scs; }
+
+    /** Called by each MProfileCoprocessor for the numbers it answers. */
+    void
+    setCoprocessor(unsigned n, MProfileCoprocessor *c)
+    {
+        fatal_if(coprocessors.at(n), "coprocessor p%u attached twice", n);
+        coprocessors[n] = c;
+    }
+
+    /** The coprocessor attached as p<n> (n < 8), or nullptr. */
+    MProfileCoprocessor *getCoprocessor(unsigned n) const
+    {
+        return coprocessors.at(n);
+    }
 };
 
 } // namespace gem5
