@@ -102,6 +102,12 @@ parser.add_argument(
     default="m4",
     help="Architecture release: m4 (default) or m33 (adds FPv5)",
 )
+parser.add_argument(
+    "--rp2350-coprocessors",
+    action="store_true",
+    help="Attach an RP2350 SIO and the RP2350's coprocessors (GPIO p0, "
+    "DCP p4/p5, RCP p7)",
+)
 args = parser.parse_args()
 
 # ---------------------------------------------------------------------------
@@ -155,6 +161,20 @@ if args.release == "m33":
     from m5.objects.ArmMSystem import ArmMReleaseCortexM33
 
     board.release = ArmMReleaseCortexM33()
+
+if args.rp2350_coprocessors:
+    from m5.objects import (
+        MProfileCoprocessor,
+        RP2350DcpCoprocessor,
+        RP2350GpioCoprocessor,
+        RP2350SIO,
+    )
+
+    board.sio = RP2350SIO(pio_latency="1ns")
+    board.sio.pio = board.membus.mem_side_ports
+    board.gpio_coprocessor = RP2350GpioCoprocessor(sio=board.sio)
+    board.dcp = RP2350DcpCoprocessor()
+    board.rcp = MProfileCoprocessor(numbers=[7])
 
 board.semihosting = ArmSemihosting()
 

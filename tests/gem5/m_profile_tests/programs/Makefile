@@ -45,7 +45,9 @@ TESTS = cortexm4_basic test_cps test_mrs_msr test_bx_exc_return \
         test_bridge_io_irq \
         test_dwt_cyccnt \
         test_fpv5 \
-        test_fpv5_undefined
+        test_fpv5_undefined \
+        test_coproc_nocp \
+        test_coproc_rp2350
 
 all: $(addsuffix .elf, $(TESTS)) freertos-tests
 
@@ -54,8 +56,8 @@ all: $(addsuffix .elf, $(TESTS)) freertos-tests
 freertos-tests:
 	$(MAKE) -C freertos
 
-# FPv5 tests use Cortex-M33 instructions
-test_fpv5.o test_fpv5_undefined.o: ASFLAGS = -mcpu=cortex-m33 -mfpu=fpv5-sp-d16 -mthumb
+# FPv5 and coprocessor tests use Cortex-M33 instructions
+test_fpv5.o test_fpv5_undefined.o test_coproc_nocp.o test_coproc_rp2350.o: ASFLAGS = -mcpu=cortex-m33 -mfpu=fpv5-sp-d16 -mthumb
 
 %.o: %.S
 	$(AS) $(ASFLAGS) $< -o $@

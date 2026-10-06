@@ -175,6 +175,19 @@ m_profile_test(
     "test_fpv5_undefined.elf",
     extra_args=["--cpu-type", "timing"],
 )
+# Coprocessor instructions for p0-p7: NOCP with nothing attached; the RP2350's
+# GPIO coprocessor and DCP when attached
+m_profile_test(
+    "coproc_nocp",
+    "test_coproc_nocp.elf",
+    extra_args=["--cpu-type", "timing"],
+)
+m_profile_test(
+    "coproc_rp2350",
+    "test_coproc_rp2350.elf",
+    extra_args=["--cpu-type", "timing", "--release", "m33",
+                "--rp2350-coprocessors"],
+)
 
 
 def m_profile_checkpoint_test(name, firmware_name):
