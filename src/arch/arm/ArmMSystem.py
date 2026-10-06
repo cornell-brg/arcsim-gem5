@@ -138,7 +138,25 @@ class ArmMReleaseCortexM7(ArmMReleaseCortexM4):
     Reference: DDI0489 (Cortex-M7 Technical Reference Manual)
     """
 
-    extensions = ArmMReleaseCortexM4.extensions + ["M_PROFILE_FPU_DP"]
+    extensions = ArmMReleaseCortexM4.extensions + [
+        "M_PROFILE_FPU_DP",
+        "M_PROFILE_FPV5",
+    ]
+
+
+class ArmMReleaseCortexM33(ArmMReleaseCortexM4):
+    """
+    Cortex-M33 — ARMv8-M Mainline with DSP + single-precision FPv5.
+
+    The M4's instruction set plus the FPv5 additions (VSEL, VMAXNM/VMINNM,
+    VRINT, VCVTA/N/P/M); its FPU has no double precision. The RP2350's Arm
+    cores.
+
+    Reference: DDI0553 (Armv8-M Architecture Reference Manual),
+               100230 (Cortex-M33 Technical Reference Manual)
+    """
+
+    extensions = ArmMReleaseCortexM4.extensions + ["M_PROFILE_FPV5"]
 
 
 class ArmMSystem(System):
@@ -156,7 +174,7 @@ class ArmMSystem(System):
     release = Param.ArmRelease(
         ArmMReleaseCortexM4(),
         "Arm M-profile Release (default: Cortex-M4 with DSP + FPU). "
-        "Use ArmMReleaseCortexM0/M3/M7 for other variants.",
+        "Use ArmMReleaseCortexM0/M3/M7/M33 for other variants.",
     )
 
     # CPUID register value (DDI0403E B3.2.3).  Identifies the core

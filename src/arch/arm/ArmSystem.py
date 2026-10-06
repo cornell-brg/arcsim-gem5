@@ -155,6 +155,8 @@ class ArmExtension(ScopedEnum):
         "M_PROFILE_DSP",  # DSP/SIMD packed arithmetic instructions
         "M_PROFILE_FPU_SP",  # Single-precision FPU (VFPv4-SP / VFPv5)
         "M_PROFILE_FPU_DP",  # Double-precision FPU (Cortex-M7 only)
+        # FPv5 additions to the FPU: VSEL, VMAXNM/VMINNM, VRINT, VCVTA/N/P/M
+        "M_PROFILE_FPV5",
     ]
 
 

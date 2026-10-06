@@ -479,6 +479,7 @@ class TestArmMReleaseHierarchy(unittest.TestCase):
         self.assertIn("M_PROFILE_DSP", ext_names)
         self.assertIn("M_PROFILE_FPU_SP", ext_names)
         self.assertNotIn("M_PROFILE_FPU_DP", ext_names)
+        self.assertNotIn("M_PROFILE_FPV5", ext_names)
 
     def test_cortex_m4_no_fpu_release(self):
         """CortexM4NoFPU has DSP but no FPU."""
@@ -497,6 +498,20 @@ class TestArmMReleaseHierarchy(unittest.TestCase):
         ext_names = [str(e) for e in release.extensions]
         self.assertIn("M_PROFILE_FPU_SP", ext_names)
         self.assertIn("M_PROFILE_FPU_DP", ext_names)
+        self.assertIn("M_PROFILE_FPV5", ext_names)
+
+    def test_cortex_m33_release(self):
+        """CortexM33 has everything M4 has plus FPv5, single precision only."""
+        from m5.objects.ArmMSystem import (
+            ArmMReleaseCortexM4,
+            ArmMReleaseCortexM33,
+        )
+
+        m4_exts = {str(e) for e in ArmMReleaseCortexM4().extensions}
+        m33_exts = {str(e) for e in ArmMReleaseCortexM33().extensions}
+        self.assertTrue(m4_exts.issubset(m33_exts))
+        self.assertIn("M_PROFILE_FPV5", m33_exts)
+        self.assertNotIn("M_PROFILE_FPU_DP", m33_exts)
 
     def test_hierarchy_is_cumulative(self):
         """Each level inherits all extensions from parent."""
