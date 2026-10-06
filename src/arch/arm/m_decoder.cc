@@ -1211,8 +1211,16 @@ MDecoder::decodeMProfileVfp(ExtMachInst mach_inst)
                 const bool toFloat = (opc2 == 0x8);
                 const bool isSigned = toFloat ? bits(opc3, 1)
                                               : bits(opc2, 0);
-                return new MFpCvtS(mach_inst, vd(), vm(),
-                                   toFloat, isSigned);
+                if (toFloat)
+                    return new MFpCvtS(mach_inst, vd(), vm(),
+                                       toFloat, isSigned);
+                // float→int: op=1 rounds toward zero (VCVT), op=0 with
+                // FPSCR.RMode (VCVTR).
+                if (bits(opc3, 1))
+                    return new MFpCvtS(mach_inst, vd(), vm(),
+                                       toFloat, isSigned);
+                return new MFpCvtS(mach_inst, vd(), vm(), toFloat,
+                                   isSigned, std::nullopt, "vcvtr");
               }
               case 0xa:
               case 0xb:
