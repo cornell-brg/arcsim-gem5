@@ -123,7 +123,8 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
 
 
 def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
-              scratch_bank_bandwidth, arm_predictor, arm_divider, sram_model):
+              scratch_bank_bandwidth, arm_predictor, arm_divider, sram_model,
+              arm_timing):
     from m5.objects import ArmMSystem, ArmSemihosting
     from m5.objects.ArmMFsWorkload import ArmMFsWorkload
     from m5.objects.MProfilePlatform import ArmMPlatform
@@ -169,6 +170,14 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     # This is the existing Cortex-M4 model, not an Armv8-M Cortex-M33 ISA.
     board.cpuid = 0x410FC241
     board.cpu = CortexM4CPU(cpu_id=0)
+
+    # The CortexM4CPU timing as tuned against the STM32G474 (the default), or
+    # as it was before that tuning
+    if arm_timing == "pre-tuning":
+        from gem5.prebuilt.cortexm.cpu.cortex_m4 import use_pre_tuning_timing
+        use_pre_tuning_timing(board.cpu)
+    elif arm_timing != "tuned":
+        raise ValueError(f"Unknown Arm timing: {arm_timing}")
 
     # For playing around with different branch predictors and dividers
     if arm_divider == "rp2350-m33":
@@ -266,7 +275,7 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
 def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                scratch_bank_bandwidth=SCRATCH_BANK_BANDWIDTH,
                arm_predictor="m4", arm_divider="rp2350-m33",
-               sram_model="legacy"):
+               sram_model="legacy", arm_timing="tuned"):
     """Return exactly one active core with the RP2350 memory baseline."""
     if sram_model not in ("legacy", "banked"):
         raise ValueError(f"Unknown SRAM model: {sram_model}")
@@ -275,7 +284,8 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                          sram_latency_ns=sram_latency_ns,
                          scratch_bank_bandwidth=scratch_bank_bandwidth,
                          arm_predictor=arm_predictor,
-                         arm_divider=arm_divider, sram_model=sram_model)
+                         arm_divider=arm_divider, sram_model=sram_model,
+                         arm_timing=arm_timing)
     if core == "hazard3-proxy":
         return _make_riscv(firmware, xip_miss_ns=xip_miss_ns,
                            sram_latency_ns=sram_latency_ns,

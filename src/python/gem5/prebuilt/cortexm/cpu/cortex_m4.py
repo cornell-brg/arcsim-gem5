@@ -332,3 +332,29 @@ class CortexM4CPU(ArmMMinorCPU):
     # -- FU pool and branch predictor --
     executeFuncUnits = CortexM4FUPool()
     branchPred = CortexM4BP()
+
+
+def use_pre_tuning_timing(cpu):
+    """Put a CortexM4CPU back on the timing it had before the October 2026
+    tuning (f71c4ee3c3, 2d7ff50b27, 2834935439), for comparing with results
+    calibrated on that model: branches redirect at commit and are predicted,
+    instructions complete out of order, a data-dependent divide only keeps its
+    FU busy, a load's result is assumed one cycle after issue, and VDIV/VSQRT
+    hold the pipeline for 14 cycles. The tuning's bug fixes (single-stage
+    fetch, stale decode input, LSQ wakeup) have no switch and stay."""
+    cpu.fetchBranchTargetAtDecode = False
+    cpu.executeBranchAtIssue = False
+    cpu.executeInOrderCompletion = False
+    cpu.executeDynamicLatencyHoldsInst = False
+    for fu in cpu.executeFuncUnits.funcUnits:
+        if isinstance(fu, M4FloatDivFU):
+            fu.opLat = 14
+            fu.resultAfterCommit = False
+            fu.timings = []
+        elif isinstance(fu, M4MemFU):
+            fu.timings = [
+                MinorFUTiming(
+                    description="M4Mem", srcRegsRelativeLats=[1],
+                    extraAssumedLat=1,
+                )
+            ]
