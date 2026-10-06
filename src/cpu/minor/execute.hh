@@ -122,6 +122,9 @@ class Execute : public Named
     /** See executeInOrderCompletion in BaseMinorCPU.py */
     bool inOrderCompletion;
 
+    /** See executeDynamicLatencyHoldsInst in BaseMinorCPU.py */
+    bool dynamicLatencyHoldsInst;
+
     /** The last cycle at which a result from a resultAfterCommit FU
      *  arrives; Execute keeps ticking until then */
     Cycles lastBackgroundResult;

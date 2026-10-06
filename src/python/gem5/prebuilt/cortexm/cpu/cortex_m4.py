@@ -320,6 +320,9 @@ class CortexM4CPU(ArmMMinorCPU):
     # neighbouring loads and stores 1 each] and VDIV/VSQRT complete
     # beside the pipeline (M4FloatDivFU).
     executeInOrderCompletion = True
+    # SDIV/UDIV's data-dependent cycles (M4IntDivFU) stall the pipeline
+    # like any other multi-cycle instruction [DDI0439D Table 3-1].
+    executeDynamicLatencyHoldsInst = True
     executeMemoryWidth = 8  # max LSQ transfer width (LDRD/STRD = 8 bytes)
     executeSetTraceTimeOnCommit = True
     executeSetTraceTimeOnIssue = False

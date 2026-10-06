@@ -479,6 +479,15 @@ class BaseMinorCPU(BaseCPU):
         " pipeline.  Micro-ops after the first of a macro-op follow it",
     )
 
+    executeDynamicLatencyHoldsInst = Param.Bool(
+        False,
+        "An FU's data-dependent extra latency (dynamicExtraLatency, e.g. an"
+        " operand-dependent divide) keeps the instruction itself from"
+        " completing until it has passed, as on cores whose divider stalls"
+        " the pipeline; otherwise it keeps only the FU busy and delays the"
+        " instruction's results",
+    )
+
     executeBranchAtIssue = Param.Bool(
         False,
         "A single-cycle branch or squash-after instruction that issues with"

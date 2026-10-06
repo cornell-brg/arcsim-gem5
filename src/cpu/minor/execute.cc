@@ -80,6 +80,7 @@ Execute::Execute(const std::string &name_, MinorCPU &cpu_,
       allowEarlyMemIssue(params.executeAllowEarlyMemoryIssue),
       branchAtIssue(params.executeBranchAtIssue),
       inOrderCompletion(params.executeInOrderCompletion),
+      dynamicLatencyHoldsInst(params.executeDynamicLatencyHoldsInst),
       lastBackgroundResult(0),
       noCostFUIndex(fuDescriptions.funcUnits.size() + 1),
       lsq(name_ + ".lsq", name_ + ".dcache_port", cpu_, *this,
@@ -782,10 +783,18 @@ Execute::issue(ThreadID thread_id)
                                 cpu.getContext(thread_id),
                                 inst->staticInst);
                         if (dynExtra != Cycles(0)) {
-                            /* The instruction itself takes that long,
-                             *  holding its FU until it commits */
+                            if (dynamicLatencyHoldsInst) {
+                                /* The instruction itself takes that
+                                 *  long, holding its FU until it
+                                 *  commits */
+                                inst->extraCommitDelay += dynExtra;
+                            } else {
+                                /* The FU stays busy that long; the
+                                 *  instruction's results arrive late */
+                                fu->nextInsertCycle = cpu.curCycle() +
+                                    fu->description.opLat + dynExtra;
+                            }
                             extra_dest_retire_lat += dynExtra;
-                            inst->extraCommitDelay += dynExtra;
                             DPRINTF(MinorExecute, "Dynamic extra latency"
                                 " for %s: %d cycles (total %d)\n",
                                 *inst, dynExtra,
