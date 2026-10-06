@@ -231,6 +231,9 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     board.cpu.isa = [RiscvISA(
         riscv_type="RV32", enable_rvv=False, privilege_mode_set="M",
         enable_Zicbom_fs=False, enable_Zicboz_fs=False,
+        # Hazard3 has Zcmp (cm.push/cm.pop) and no FPU; gem5 decodes Zcmp only
+        # with Zcd, whose encodings it reuses, turned off.
+        enable_Zcd=False,
     )]
     board.cpu.decodeInputWidth = 1
     board.cpu.executeInputWidth = 1
