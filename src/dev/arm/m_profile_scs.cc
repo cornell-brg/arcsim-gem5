@@ -619,8 +619,8 @@ MProfileSCS::write(PacketPtr pkt)
 
     } else if (daddr == 0xD88) {
         // -- CPACR: Coprocessor Access Control [DDI0403E B3.2.20] --
-        // Only CP10/CP11 (bits [23:20]) are meaningful on M-profile.
-        // CP10 and CP11 must be set identically; other CP fields are RAZ/WI.
+        // Stored whole: CP10/CP11 (bits [23:20]) gate the FPU, and CP0-CP7
+        // gate the coprocessors on the coprocessor port (MCoprocOp).
         tc->setMiscRegNoEffect(ArmISA::MISCREG_M_CPACR, data);
 
     } else if (daddr == 0xDFC) {

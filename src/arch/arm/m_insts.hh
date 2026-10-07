@@ -50,7 +50,7 @@
 #include "arch/arm/regs/misc_types.hh"
 #include "arch/arm/utility.hh"
 #include "cpu/thread_context.hh"
-#include "dev/arm/m_profile_coprocessor.hh"
+#include "arch/arm/m_coproc_access.hh"
 
 namespace gem5
 {
@@ -490,9 +490,10 @@ class MProfileUnmodelled : public PredOp
 
 /**
  * MCR, MRC, MCRR, MRRC and CDP (and their hw1[12] forms) for coprocessors
- * p0-p7. Access needs CPACR to grant the coprocessor (privileged-only
- * grants need a privileged caller) and a coprocessor attached as that number
- * on the ArmMSystem; otherwise a UsageFault (NOCP), as on the RP2350. The
+ * p0-p9 and p12-p13 (p10/p11 are the FPU). Access needs CPACR to grant the
+ * coprocessor (privileged-only grants need a privileged caller) and a
+ * coprocessor attached as that number on the ArmMSystem (p0-p7 only);
+ * otherwise a UsageFault (NOCP), as on the RP2350. The
  * attached MProfileCoprocessor performs the access; one it does not model
  * stops the simulation. MRC with Rt = 15 writes APSR.NZCV.
  */

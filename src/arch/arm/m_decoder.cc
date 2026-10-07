@@ -654,8 +654,9 @@ MDecoder::tryMProfileDecode32(ExtMachInst mach_inst)
                 is_coproc = true;
         }
         if (is_coproc) {
-            // p0-p7: whatever coprocessors the system attaches
-            if (ltcoproc <= 0x7)
+            // p0-p7: whatever coprocessors the system attaches; p8, p9,
+            // p12 and p13 have none (NOCP)
+            if (ltcoproc <= 0x9 || ltcoproc == 0xc || ltcoproc == 0xd)
                 return decodeMProfileCoproc(mach_inst);
             if (ltcoproc == 0xe) {
                 // CP14 — debug coprocessor, A-profile only
@@ -1308,8 +1309,9 @@ MDecoder::decodeMProfileVfp(ExtMachInst mach_inst)
 // MCRR/MRRC: 111x 1100 010L Rt2 | Rt coproc opc1 CRm
 // MCR/MRC:   111x 1110 opc1 L CRn | Rt coproc opc2 1 CRm
 // CDP:       111x 1110 opc1 CRn | CRd coproc opc2 0 CRm
-// x = hw1[12] (bit 28): the MCRR2/MRRC2/MCR2/MRC2/CDP2 forms. LDC/STC (the
-// rest of the 111x 110x space) are not modelled.
+// x = hw1[12] (bit 28): the MCRR2/MRRC2/MCR2/MRC2/CDP2 forms. 111x 1100 000x
+// and 111x 1111 are UNDEFINED; LDC/STC (the rest of 111x 110x) are not
+// modelled.
 
 StaticInstPtr
 MDecoder::decodeMProfileCoproc(ExtMachInst mach_inst)
@@ -1342,7 +1344,9 @@ MDecoder::decodeMProfileCoproc(ExtMachInst mach_inst)
         }
         return new MCoprocOp(mach_inst, form, rt, 0);
     }
-    return new MProfileUnmodelled(mach_inst, "LDC/STC to coprocessors 0-7");
+    if (bits(inst, 27, 24) == 0xf || bits(inst, 27, 21) == 0x60)
+        return new MProfileUndefined(mach_inst, "unallocated encoding");
+    return new MProfileUnmodelled(mach_inst, "LDC/STC to a coprocessor");
 }
 
 // =========================================================================

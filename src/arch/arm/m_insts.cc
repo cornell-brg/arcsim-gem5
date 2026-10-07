@@ -41,6 +41,7 @@
 #include "arch/arm/m_faults.hh"
 #include "arch/arm/m_interrupts.hh"
 #include "arch/arm/m_system.hh"
+#include "dev/arm/m_profile_coprocessor.hh"
 #include "arch/arm/pcstate.hh"
 #include "arch/arm/regs/int.hh"
 #include "arch/arm/regs/misc.hh"
@@ -673,10 +674,9 @@ MCoprocOp::execute(ExecContext *xc, trace::InstRecord *traceData) const
         allowed = xpsr.exception != 0 || ctrl.npriv == 0;
     }
     auto *msys = dynamic_cast<ArmMSystem *>(tc->getSystemPtr());
-    MProfileCoprocessor *cp = msys ? msys->getCoprocessor(form.coproc)
-                                   : nullptr;
-    // NOCP: not granted, or nothing attached. CFSR.NOCP is not set (the
-    // model has no CFSR fault-status support yet).
+    MProfileCoprocessor *cp = msys && form.coproc < 8
+        ? msys->getCoprocessor(form.coproc) : nullptr;
+    // NOCP: not granted, or nothing attached.
     if (!allowed || !cp)
         return std::make_shared<ArmMFault>(MPEXC_USAGEFAULT);
 
