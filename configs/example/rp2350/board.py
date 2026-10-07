@@ -99,9 +99,12 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
     # The physical XIP cache is shared by instruction fetch and data reads.
     # Cache geometry matches RP2350; gem5 hit and QMI miss timing are proxies.
     board.flash = SimpleMemory(range=xip_range, latency="1ns")
+    # A hit answers in one core cycle (RP2350 datasheet 4.4.1, "1 cycle
+    # hit"): a request waits for the cache's next clock edge, so zero tag,
+    # data and response latency give a one-cycle round trip.
     board.xip_cache = NoncoherentCache(
-        size="16KiB", assoc=2, tag_latency=1, data_latency=1,
-        response_latency=1, mshrs=4, tgts_per_mshr=4,
+        size="16KiB", assoc=2, tag_latency=0, data_latency=0,
+        response_latency=0, mshrs=4, tgts_per_mshr=4,
         addr_ranges=[xip_range],
     )
     board.qmi_delay = Bridge(delay=f"{xip_miss_ns}ns")
