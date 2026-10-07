@@ -64,9 +64,12 @@ RP2350SIO::unmodelled(Addr offset, bool isWrite)
 Tick
 RP2350SIO::read(PacketPtr pkt)
 {
-    const Addr offset = pkt->getAddr() - pioAddr;
-    panic_if(pkt->getSize() != 4, "RP2350SIO: %d-byte read at %#x",
-             pkt->getSize(), offset);
+    // Registers are 32-bit; a narrow read returns its byte lane.
+    const Addr byte = pkt->getAddr() - pioAddr;
+    const Addr offset = byte & ~Addr(3);
+    const unsigned size = pkt->getSize();
+    panic_if(size != 1 && size != 2 && size != 4,
+             "RP2350SIO: %d-byte read at %#x", size, byte);
 
     uint32_t data = 0;
     switch (offset) {
@@ -84,7 +87,13 @@ RP2350SIO::read(PacketPtr pkt)
         // Including reads of the SET, CLR and XOR aliases.
         unmodelled(offset, false);
     }
-    pkt->setLE<uint32_t>(data);
+    data >>= 8 * (byte & 3);
+    if (size == 1)
+        pkt->setLE<uint8_t>(data);
+    else if (size == 2)
+        pkt->setLE<uint16_t>(data);
+    else
+        pkt->setLE<uint32_t>(data);
     pkt->makeAtomicResponse();
     return pioDelay;
 }
@@ -92,10 +101,18 @@ RP2350SIO::read(PacketPtr pkt)
 Tick
 RP2350SIO::write(PacketPtr pkt)
 {
-    const Addr offset = pkt->getAddr() - pioAddr;
-    panic_if(pkt->getSize() != 4, "RP2350SIO: %d-byte write at %#x",
-             pkt->getSize(), offset);
-    const uint32_t data = pkt->getLE<uint32_t>();
+    // A narrow write updates the whole register, with the value replicated
+    // across the 32-bit bus (RP2350 datasheet 2.1.5).
+    const Addr byte = pkt->getAddr() - pioAddr;
+    const Addr offset = byte & ~Addr(3);
+    uint32_t data;
+    switch (pkt->getSize()) {
+      case 1: data = pkt->getLE<uint8_t>() * 0x01010101u; break;
+      case 2: data = pkt->getLE<uint16_t>() * 0x00010001u; break;
+      case 4: data = pkt->getLE<uint32_t>(); break;
+      default:
+        panic("RP2350SIO: %d-byte write at %#x", pkt->getSize(), byte);
+    }
 
     if (offset >= GPIO_OUT && offset <= GPIO_LAST) {
         // 0x10-0x2C: OUT, 0x30-0x4C: OE; within each, plain, SET, CLR, XOR
