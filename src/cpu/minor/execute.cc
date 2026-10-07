@@ -1072,6 +1072,16 @@ Execute::commitInst(MinorDynInstPtr inst, bool early_memory_issue,
             " there isn't space in the store buffer\n", *inst);
 
         completed_inst = false;
+    } else if (inst->isInst() && inst->staticInst->isFullMemBarrier() &&
+        inst->staticInst->isSerializeBefore() && !lsq.storesDrained())
+    {
+        /* A barrier that also serializes before acts on state outside the
+         *  memory system at commit (an M-profile coprocessor instruction):
+         *  its effect follows every older store's, so it waits for them */
+        DPRINTF(MinorExecute, "Can't commit serializing barrier inst: %s"
+            " yet as older stores are still in the store buffer\n", *inst);
+
+        completed_inst = false;
     } else if (inst->isInst() && inst->staticInst->isQuiesce()
             && !branch.isBubble()){
         /* This instruction can suspend, need to be able to communicate

@@ -680,6 +680,13 @@ class LSQ : public Named
     /** Must check this before trying to insert into the store buffer */
     bool canPushIntoStoreBuffer() const { return storeBuffer.canInsert(); }
 
+    /** Every committed store has left the store buffer and none is on its
+     *  way into it */
+    bool storesDrained() const
+    {
+        return numStoresInTransfers == 0 && storeBuffer.isDrained();
+    }
+
     /** A store has been committed, please move it to the store buffer */
     void sendStoreToStoreBuffer(LSQRequestPtr request);
 

@@ -617,6 +617,12 @@ MCoprocOp::MCoprocOp(ExtMachInst mach_inst, MProfileCoprocAccess _form,
       form(_form), rt(_rt), rt2(_rt2)
 {
     using Kind = MProfileCoprocAccess::Kind;
+    // In program order with loads and stores, as on the M33: later memory
+    // accesses wait for it (a full barrier), and it waits for earlier
+    // stores to complete (serialize before).
+    flags[IsReadBarrier] = true;
+    flags[IsWriteBarrier] = true;
+    flags[IsSerializeBefore] = true;
     setRegIdxArrays(
         reinterpret_cast<RegIdArrayPtr>(
             &std::remove_pointer_t<decltype(this)>::srcRegIdxArr),
