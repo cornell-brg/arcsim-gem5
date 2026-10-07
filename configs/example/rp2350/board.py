@@ -133,6 +133,7 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     from m5.objects.ArmMSystem import ArmMReleaseCortexM33
     from m5.objects.ArmMFsWorkload import ArmMFsWorkload
     from m5.objects.MProfilePlatform import ArmMPlatform
+    from m5.objects.MProfileDWT import MProfileDWT
     from m5.objects.MProfileSCS import MProfileSCS
     from m5.objects.BranchPredictor import LocalBP, SimpleBTB
     from gem5.prebuilt.cortexm.cpu.cortex_m4 import CortexM4CPU
@@ -145,6 +146,9 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
             num_irqs=52, priority_bits=4, num_systick=1,
             has_basepri=True, systick_calib=0, pio_latency="1ns",
         )
+        # The cycle counter answers within the core's cycle, like the SCS
+        # (BasicPioDevice's default is 100ns, 15 core cycles).
+        dwt = MProfileDWT(pio_latency="1ns")
 
     # The RP2350's Arm cores are Cortex-M33s: the M4 proxy CPU's timing with
     # the M33's instruction set (FPv5).
