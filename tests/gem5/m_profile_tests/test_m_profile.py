@@ -190,9 +190,10 @@ m_profile_test(
 )
 
 
-def m_profile_rp2350_test(name, firmware_name, ok_message):
+def m_profile_rp2350_test(name, firmware_name, ok_message, slow_sio=False):
     """Register a test that runs firmware on the RP2350 board's Arm proxy
-    (configs/example/rp2350/run.py) and passes when it prints ok_message."""
+    (configs/example/rp2350/run.py, or configs/run_rp2350_slow_sio.py with
+    slow_sio) and passes when it prints ok_message."""
     firmware_path = joinpath(
         config.base_dir,
         "tests",
@@ -203,14 +204,23 @@ def m_profile_rp2350_test(name, firmware_name, ok_message):
     )
     if not os.path.exists(firmware_path):
         return
+    if slow_sio:
+        run_config = joinpath(
+            config.base_dir, "tests", "gem5", "m_profile_tests", "configs",
+            "run_rp2350_slow_sio.py",
+        )
+        run_args = ["--firmware", firmware_path]
+    else:
+        run_config = joinpath(
+            config.base_dir, "configs", "example", "rp2350", "run.py"
+        )
+        run_args = ["--core", "arm-m4-proxy", "--firmware", firmware_path]
     gem5_verify_config(
         name=f"m_profile_{name}",
         verifiers=[verifier.MatchRegex(re.compile(ok_message))],
         fixtures=(),
-        config=joinpath(
-            config.base_dir, "configs", "example", "rp2350", "run.py"
-        ),
-        config_args=["--core", "arm-m4-proxy", "--firmware", firmware_path],
+        config=run_config,
+        config_args=run_args,
         valid_isas=(constants.all_compiled_tag,),
         valid_hosts=constants.supported_hosts,
         length=constants.quick_tag,
@@ -220,6 +230,12 @@ def m_profile_rp2350_test(name, firmware_name, ok_message):
 # The RP2350 GPIO coprocessor and SIO against values recorded on silicon
 m_profile_rp2350_test(
     "rp2350_gpioc", "test_rp2350_gpioc.elf", r"RP2350_GPIOC_OK"
+)
+# GPIO coprocessor instructions stay in program order with SIO accesses on
+# the Minor-based Arm proxy
+m_profile_rp2350_test(
+    "rp2350_order", "test_rp2350_order.elf", r"RP2350_ORDER_OK",
+    slow_sio=True,
 )
 
 

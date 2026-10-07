@@ -1,0 +1,107 @@
+
+test_rp2350_order.elf:     file format elf32-littlearm
+
+SYMBOL TABLE:
+20010000 l    d  .text	00000000 .text
+00000000 l    d  .ARM.attributes	00000000 .ARM.attributes
+00000000 l    df *ABS*	00000000 test_rp2350_order.o
+d0000000 l       *ABS*	00000000 SIO
+00000010 l       *ABS*	00000000 GPIO_OUT
+00000028 l       *ABS*	00000000 GPIO_OUT_XOR
+200100ec l       .text	00000000 ok_message
+200100fd l       .text	00000000 fail_message
+20010008 g     F .text	00000000 Reset_Handler
+
+
+
+Disassembly of section .text:
+
+20010000 <Reset_Handler-0x8>:
+20010000:	20040000 	.word	0x20040000
+20010004:	20010009 	.word	0x20010009
+
+20010008 <Reset_Handler>:
+20010008:	4831      	ldr	r0, [pc, #196]	@ (200100d0 <Reset_Handler+0xc8>)
+2001000a:	4932      	ldr	r1, [pc, #200]	@ (200100d4 <Reset_Handler+0xcc>)
+2001000c:	6001      	str	r1, [r0, #0]
+2001000e:	f3bf 8f4f 	dsb	sy
+20010012:	f3bf 8f6f 	isb	sy
+20010016:	f04f 4b50 	mov.w	fp, #3489660928	@ 0xd0000000
+2001001a:	f8df a0bc 	ldr.w	sl, [pc, #188]	@ 200100d8 <Reset_Handler+0xd0>
+2001001e:	f04f 0900 	mov.w	r9, #0
+20010022:	f04f 3111 	mov.w	r1, #286331153	@ 0x11111111
+20010026:	f8cb 1010 	str.w	r1, [fp, #16]
+2001002a:	ee10 2010 			@ <UNDEFINED> instruction: 0xee102010
+2001002e:	428a      	cmp	r2, r1
+20010030:	bf18      	it	ne
+20010032:	f049 0902 	orrne.w	r9, r9, #2
+20010036:	f04f 3122 	mov.w	r1, #572662306	@ 0x22222222
+2001003a:	ee00 1010 			@ <UNDEFINED> instruction: 0xee001010
+2001003e:	f8db 2010 	ldr.w	r2, [fp, #16]
+20010042:	428a      	cmp	r2, r1
+20010044:	bf18      	it	ne
+20010046:	f049 0904 	orrne.w	r9, r9, #4
+2001004a:	f64f 71ff 	movw	r1, #65535	@ 0xffff
+2001004e:	f04f 3333 	mov.w	r3, #858993459	@ 0x33333333
+20010052:	f8cb 1028 	str.w	r1, [fp, #40]	@ 0x28
+20010056:	ee00 3010 			@ <UNDEFINED> instruction: 0xee003010
+2001005a:	f8db 2010 	ldr.w	r2, [fp, #16]
+2001005e:	429a      	cmp	r2, r3
+20010060:	bf18      	it	ne
+20010062:	f049 0908 	orrne.w	r9, r9, #8
+20010066:	f04f 3344 	mov.w	r3, #1145324612	@ 0x44444444
+2001006a:	ee00 3010 			@ <UNDEFINED> instruction: 0xee003010
+2001006e:	f8cb 1028 	str.w	r1, [fp, #40]	@ 0x28
+20010072:	ee10 2010 			@ <UNDEFINED> instruction: 0xee102010
+20010076:	ea83 0301 	eor.w	r3, r3, r1
+2001007a:	429a      	cmp	r2, r3
+2001007c:	bf18      	it	ne
+2001007e:	f049 0910 	orrne.w	r9, r9, #16
+20010082:	f04f 3155 	mov.w	r1, #1431655765	@ 0x55555555
+20010086:	e88a 00ff 	stmia.w	sl, {r0, r1, r2, r3, r4, r5, r6, r7}
+2001008a:	f8cb 1010 	str.w	r1, [fp, #16]
+2001008e:	ee10 2010 			@ <UNDEFINED> instruction: 0xee102010
+20010092:	428a      	cmp	r2, r1
+20010094:	bf18      	it	ne
+20010096:	f049 0920 	orrne.w	r9, r9, #32
+2001009a:	f04f 3166 	mov.w	r1, #1717986918	@ 0x66666666
+2001009e:	e88a 00ff 	stmia.w	sl, {r0, r1, r2, r3, r4, r5, r6, r7}
+200100a2:	ee00 1010 			@ <UNDEFINED> instruction: 0xee001010
+200100a6:	f8db 2010 	ldr.w	r2, [fp, #16]
+200100aa:	428a      	cmp	r2, r1
+200100ac:	bf18      	it	ne
+200100ae:	f049 0940 	orrne.w	r9, r9, #64	@ 0x40
+200100b2:	480a      	ldr	r0, [pc, #40]	@ (200100dc <Reset_Handler+0xd4>)
+200100b4:	f8c0 9000 	str.w	r9, [r0]
+200100b8:	4909      	ldr	r1, [pc, #36]	@ (200100e0 <Reset_Handler+0xd8>)
+200100ba:	f1b9 0f00 	cmp.w	r9, #0
+200100be:	bf18      	it	ne
+200100c0:	4908      	ldrne	r1, [pc, #32]	@ (200100e4 <Reset_Handler+0xdc>)
+200100c2:	2004      	movs	r0, #4
+200100c4:	beab      	bkpt	0x00ab
+200100c6:	f04f 0018 	mov.w	r0, #24
+200100ca:	4907      	ldr	r1, [pc, #28]	@ (200100e8 <Reset_Handler+0xe0>)
+200100cc:	beab      	bkpt	0x00ab
+200100ce:	e7fe      	b.n	200100ce <Reset_Handler+0xc6>
+200100d0:	e000ed88 	.word	0xe000ed88
+200100d4:	00f00303 	.word	0x00f00303
+200100d8:	20030000 	.word	0x20030000
+200100dc:	20004000 	.word	0x20004000
+200100e0:	200100ec 	.word	0x200100ec
+200100e4:	200100fd 	.word	0x200100fd
+200100e8:	00020026 	.word	0x00020026
+
+200100ec <ok_message>:
+200100ec:	33325052 	.word	0x33325052
+200100f0:	4f5f3035 	.word	0x4f5f3035
+200100f4:	52454452 	.word	0x52454452
+200100f8:	0a4b4f5f 	.word	0x0a4b4f5f
+	...
+
+200100fd <fail_message>:
+200100fd:	52          	.byte	0x52
+200100fe:	3250      	.short	0x3250
+20010100:	5f303533 	.word	0x5f303533
+20010104:	4544524f 	.word	0x4544524f
+20010108:	41465f52 	.word	0x41465f52
+2001010c:	000a4c49 	.word	0x000a4c49

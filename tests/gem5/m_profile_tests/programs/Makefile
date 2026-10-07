@@ -48,7 +48,8 @@ TESTS = cortexm4_basic test_cps test_mrs_msr test_bx_exc_return \
         test_fpv5_undefined \
         test_coproc_nocp \
         test_coproc_rp2350 \
-        test_rp2350_gpioc
+        test_rp2350_gpioc \
+        test_rp2350_order
 
 all: $(addsuffix .elf, $(TESTS)) freertos-tests
 
@@ -64,6 +65,9 @@ test_fpv5.o test_fpv5_undefined.o test_coproc_nocp.o test_coproc_rp2350.o: ASFLA
 test_rp2350_gpioc.o: ASFLAGS = -mcpu=cortex-m33 -mthumb --defsym CHECK=1
 test_rp2350_gpioc.elf: LDFLAGS = -T rp2350_sram.ld --no-warn-rwx-segments
 test_rp2350_gpioc.elf: rp2350_sram.ld
+test_rp2350_order.o: ASFLAGS = -mcpu=cortex-m33 -mthumb
+test_rp2350_order.elf: LDFLAGS = -T rp2350_sram.ld --no-warn-rwx-segments
+test_rp2350_order.elf: rp2350_sram.ld
 
 %.o: %.S
 	$(AS) $(ASFLAGS) $< -o $@
