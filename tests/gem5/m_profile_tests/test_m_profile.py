@@ -190,6 +190,39 @@ m_profile_test(
 )
 
 
+def m_profile_rp2350_test(name, firmware_name, ok_message):
+    """Register a test that runs firmware on the RP2350 board's Arm proxy
+    (configs/example/rp2350/run.py) and passes when it prints ok_message."""
+    firmware_path = joinpath(
+        config.base_dir,
+        "tests",
+        "gem5",
+        "m_profile_tests",
+        "programs",
+        firmware_name,
+    )
+    if not os.path.exists(firmware_path):
+        return
+    gem5_verify_config(
+        name=f"m_profile_{name}",
+        verifiers=[verifier.MatchRegex(re.compile(ok_message))],
+        fixtures=(),
+        config=joinpath(
+            config.base_dir, "configs", "example", "rp2350", "run.py"
+        ),
+        config_args=["--core", "arm-m4-proxy", "--firmware", firmware_path],
+        valid_isas=(constants.all_compiled_tag,),
+        valid_hosts=constants.supported_hosts,
+        length=constants.quick_tag,
+    )
+
+
+# The RP2350 GPIO coprocessor and SIO against values recorded on silicon
+m_profile_rp2350_test(
+    "rp2350_gpioc", "test_rp2350_gpioc.elf", r"RP2350_GPIOC_OK"
+)
+
+
 def m_profile_checkpoint_test(name, firmware_name):
     """Register an M-profile checkpoint/restore test.
 

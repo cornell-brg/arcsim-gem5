@@ -4,7 +4,7 @@ test_coproc_rp2350.elf:     file format elf32-littlearm
 SYMBOL TABLE:
 08000000 l    d  .isr_vector	00000000 .isr_vector
 0800001c l    d  .text	00000000 .text
-08000144 l    d  .rodata	00000000 .rodata
+080001b8 l    d  .rodata	00000000 .rodata
 20000000 l    d  .data	00000000 .data
 20000000 l    d  .bss	00000000 .bss
 00000000 l    d  .ARM.attributes	00000000 .ARM.attributes
@@ -17,12 +17,12 @@ deaddead l       *ABS*	00000000 FAIL_VAL
 e000ed88 l       *ABS*	00000000 CPACR
 d0000010 l       *ABS*	00000000 SIO_GPIO_OUT
 08000000 l       .isr_vector	00000000 __isr_vector
-08000112 l     F .text	00000000 default_handler
-080000fa l     F .text	00000000 HardFault_Handler
-080000e6 l     F .text	00000000 UsageFault_Handler
-080000d2 l       .text	00000000 fail
-080000ca l       .text	00000000 pass
-080000dc l       .text	00000000 done
+08000180 l     F .text	00000000 default_handler
+08000168 l     F .text	00000000 HardFault_Handler
+08000154 l     F .text	00000000 UsageFault_Handler
+08000140 l       .text	00000000 fail
+08000138 l       .text	00000000 pass
+0800014a l       .text	00000000 done
 0800001c g     F .text	00000000 Reset_Handler
 20020000 g       *ABS*	00000000 _estack
 
@@ -31,16 +31,16 @@ d0000010 l       *ABS*	00000000 SIO_GPIO_OUT
 Disassembly of section .text:
 
 0800001c <Reset_Handler>:
- 800001c:	483d      	ldr	r0, [pc, #244]	@ (8000114 <default_handler+0x2>)
+ 800001c:	4859      	ldr	r0, [pc, #356]	@ (8000184 <default_handler+0x4>)
  800001e:	6801      	ldr	r1, [r0, #0]
  8000020:	f441 2180 	orr.w	r1, r1, #262144	@ 0x40000
  8000024:	6001      	str	r1, [r0, #0]
- 8000026:	483c      	ldr	r0, [pc, #240]	@ (8000118 <default_handler+0x6>)
- 8000028:	493c      	ldr	r1, [pc, #240]	@ (800011c <default_handler+0xa>)
+ 8000026:	4858      	ldr	r0, [pc, #352]	@ (8000188 <default_handler+0x8>)
+ 8000028:	4958      	ldr	r1, [pc, #352]	@ (800018c <default_handler+0xc>)
  800002a:	6001      	str	r1, [r0, #0]
  800002c:	f3bf 8f4f 	dsb	sy
  8000030:	f3bf 8f6f 	isb	sy
- 8000034:	4c3a      	ldr	r4, [pc, #232]	@ (8000120 <default_handler+0xe>)
+ 8000034:	4c56      	ldr	r4, [pc, #344]	@ (8000190 <default_handler+0x10>)
  8000036:	f04f 0000 	mov.w	r0, #0
  800003a:	6020      	str	r0, [r4, #0]
  800003c:	f04f 0201 	mov.w	r2, #1
@@ -51,101 +51,139 @@ Disassembly of section .text:
  8000050:	ec41 0040 	mcrr	0, 4, r0, r1, cr0
  8000054:	ee10 0010 			@ <UNDEFINED> instruction: 0xee100010
  8000058:	2845      	cmp	r0, #69	@ 0x45
- 800005a:	d13a      	bne.n	80000d2 <fail>
- 800005c:	4931      	ldr	r1, [pc, #196]	@ (8000124 <default_handler+0x12>)
+ 800005a:	d171      	bne.n	8000140 <fail>
+ 800005c:	494d      	ldr	r1, [pc, #308]	@ (8000194 <default_handler+0x14>)
  800005e:	6808      	ldr	r0, [r1, #0]
  8000060:	2845      	cmp	r0, #69	@ 0x45
- 8000062:	d136      	bne.n	80000d2 <fail>
+ 8000062:	d16d      	bne.n	8000140 <fail>
  8000064:	f04f 0202 	mov.w	r2, #2
  8000068:	f04f 0007 	mov.w	r0, #7
  800006c:	ee10 0430 			@ <UNDEFINED> instruction: 0xee100430
  8000070:	2800      	cmp	r0, #0
- 8000072:	d12e      	bne.n	80000d2 <fail>
+ 8000072:	d165      	bne.n	8000140 <fail>
  8000074:	6820      	ldr	r0, [r4, #0]
  8000076:	2800      	cmp	r0, #0
- 8000078:	d12b      	bne.n	80000d2 <fail>
+ 8000078:	d162      	bne.n	8000140 <fail>
  800007a:	f04f 0203 	mov.w	r2, #3
  800007e:	ee00 0110 			@ <UNDEFINED> instruction: 0xee000110
  8000082:	6820      	ldr	r0, [r4, #0]
  8000084:	2801      	cmp	r0, #1
- 8000086:	d124      	bne.n	80000d2 <fail>
+ 8000086:	d15b      	bne.n	8000140 <fail>
  8000088:	f04f 0204 	mov.w	r2, #4
- 800008c:	4d22      	ldr	r5, [pc, #136]	@ (8000118 <default_handler+0x6>)
- 800008e:	4926      	ldr	r1, [pc, #152]	@ (8000128 <default_handler+0x16>)
+ 800008c:	4d3e      	ldr	r5, [pc, #248]	@ (8000188 <default_handler+0x8>)
+ 800008e:	4942      	ldr	r1, [pc, #264]	@ (8000198 <default_handler+0x18>)
  8000090:	6029      	str	r1, [r5, #0]
  8000092:	f3bf 8f4f 	dsb	sy
  8000096:	f3bf 8f6f 	isb	sy
  800009a:	ee00 0010 			@ <UNDEFINED> instruction: 0xee000010
  800009e:	6820      	ldr	r0, [r4, #0]
  80000a0:	2802      	cmp	r0, #2
- 80000a2:	d116      	bne.n	80000d2 <fail>
+ 80000a2:	d14d      	bne.n	8000140 <fail>
  80000a4:	f04f 0205 	mov.w	r2, #5
- 80000a8:	4920      	ldr	r1, [pc, #128]	@ (800012c <default_handler+0x1a>)
+ 80000a8:	493c      	ldr	r1, [pc, #240]	@ (800019c <default_handler+0x1c>)
  80000aa:	6029      	str	r1, [r5, #0]
  80000ac:	f3bf 8f4f 	dsb	sy
  80000b0:	f3bf 8f6f 	isb	sy
  80000b4:	ee00 0010 			@ <UNDEFINED> instruction: 0xee000010
  80000b8:	6820      	ldr	r0, [r4, #0]
  80000ba:	2802      	cmp	r0, #2
- 80000bc:	d109      	bne.n	80000d2 <fail>
+ 80000bc:	d140      	bne.n	8000140 <fail>
  80000be:	f04f 0206 	mov.w	r2, #6
  80000c2:	6820      	ldr	r0, [r4, #0]
  80000c4:	2802      	cmp	r0, #2
- 80000c6:	d104      	bne.n	80000d2 <fail>
- 80000c8:	e7ff      	b.n	80000ca <pass>
+ 80000c6:	d13b      	bne.n	8000140 <fail>
+ 80000c8:	f04f 0207 	mov.w	r2, #7
+ 80000cc:	492f      	ldr	r1, [pc, #188]	@ (800018c <default_handler+0xc>)
+ 80000ce:	6029      	str	r1, [r5, #0]
+ 80000d0:	f3bf 8f4f 	dsb	sy
+ 80000d4:	f3bf 8f6f 	isb	sy
+ 80000d8:	f04f 00f0 	mov.w	r0, #240	@ 0xf0
+ 80000dc:	ee00 0010 			@ <UNDEFINED> instruction: 0xee000010
+ 80000e0:	f04f 0033 	mov.w	r0, #51	@ 0x33
+ 80000e4:	ee00 0014 			@ <UNDEFINED> instruction: 0xee000014
+ 80000e8:	ee10 0018 			@ <UNDEFINED> instruction: 0xee100018
+ 80000ec:	2830      	cmp	r0, #48	@ 0x30
+ 80000ee:	d127      	bne.n	8000140 <fail>
+ 80000f0:	492b      	ldr	r1, [pc, #172]	@ (80001a0 <default_handler+0x20>)
+ 80000f2:	6808      	ldr	r0, [r1, #0]
+ 80000f4:	2830      	cmp	r0, #48	@ 0x30
+ 80000f6:	d123      	bne.n	8000140 <fail>
+ 80000f8:	f04f 0208 	mov.w	r2, #8
+ 80000fc:	4925      	ldr	r1, [pc, #148]	@ (8000194 <default_handler+0x14>)
+ 80000fe:	f04f 005a 	mov.w	r0, #90	@ 0x5a
+ 8000102:	7048      	strb	r0, [r1, #1]
+ 8000104:	ee10 0010 			@ <UNDEFINED> instruction: 0xee100010
+ 8000108:	f04f 315a 	mov.w	r1, #1515870810	@ 0x5a5a5a5a
+ 800010c:	4288      	cmp	r0, r1
+ 800010e:	d117      	bne.n	8000140 <fail>
+ 8000110:	f04f 0209 	mov.w	r2, #9
+ 8000114:	4921      	ldr	r1, [pc, #132]	@ (800019c <default_handler+0x1c>)
+ 8000116:	6029      	str	r1, [r5, #0]
+ 8000118:	f3bf 8f4f 	dsb	sy
+ 800011c:	f3bf 8f6f 	isb	sy
+ 8000120:	f04f 0001 	mov.w	r0, #1
+ 8000124:	f380 8814 	msr	CONTROL, r0
+ 8000128:	f3bf 8f6f 	isb	sy
+ 800012c:	ee00 0010 			@ <UNDEFINED> instruction: 0xee000010
+ 8000130:	6820      	ldr	r0, [r4, #0]
+ 8000132:	2803      	cmp	r0, #3
+ 8000134:	d104      	bne.n	8000140 <fail>
+ 8000136:	e7ff      	b.n	8000138 <pass>
 
-080000ca <pass>:
- 80000ca:	4819      	ldr	r0, [pc, #100]	@ (8000130 <default_handler+0x1e>)
- 80000cc:	4919      	ldr	r1, [pc, #100]	@ (8000134 <default_handler+0x22>)
- 80000ce:	6008      	str	r0, [r1, #0]
- 80000d0:	e004      	b.n	80000dc <done>
+08000138 <pass>:
+ 8000138:	481a      	ldr	r0, [pc, #104]	@ (80001a4 <default_handler+0x24>)
+ 800013a:	491b      	ldr	r1, [pc, #108]	@ (80001a8 <default_handler+0x28>)
+ 800013c:	6008      	str	r0, [r1, #0]
+ 800013e:	e004      	b.n	800014a <done>
 
-080000d2 <fail>:
- 80000d2:	4819      	ldr	r0, [pc, #100]	@ (8000138 <default_handler+0x26>)
- 80000d4:	4917      	ldr	r1, [pc, #92]	@ (8000134 <default_handler+0x22>)
- 80000d6:	6008      	str	r0, [r1, #0]
- 80000d8:	4918      	ldr	r1, [pc, #96]	@ (800013c <default_handler+0x2a>)
- 80000da:	600a      	str	r2, [r1, #0]
+08000140 <fail>:
+ 8000140:	481a      	ldr	r0, [pc, #104]	@ (80001ac <default_handler+0x2c>)
+ 8000142:	4919      	ldr	r1, [pc, #100]	@ (80001a8 <default_handler+0x28>)
+ 8000144:	6008      	str	r0, [r1, #0]
+ 8000146:	491a      	ldr	r1, [pc, #104]	@ (80001b0 <default_handler+0x30>)
+ 8000148:	600a      	str	r2, [r1, #0]
 
-080000dc <done>:
- 80000dc:	f04f 0018 	mov.w	r0, #24
- 80000e0:	4917      	ldr	r1, [pc, #92]	@ (8000140 <default_handler+0x2e>)
- 80000e2:	beab      	bkpt	0x00ab
- 80000e4:	e7fe      	b.n	80000e4 <done+0x8>
+0800014a <done>:
+ 800014a:	f04f 0018 	mov.w	r0, #24
+ 800014e:	4919      	ldr	r1, [pc, #100]	@ (80001b4 <default_handler+0x34>)
+ 8000150:	beab      	bkpt	0x00ab
+ 8000152:	e7fe      	b.n	8000152 <done+0x8>
 
-080000e6 <UsageFault_Handler>:
- 80000e6:	480e      	ldr	r0, [pc, #56]	@ (8000120 <default_handler+0xe>)
- 80000e8:	6801      	ldr	r1, [r0, #0]
- 80000ea:	f101 0101 	add.w	r1, r1, #1
- 80000ee:	6001      	str	r1, [r0, #0]
- 80000f0:	9806      	ldr	r0, [sp, #24]
- 80000f2:	f100 0004 	add.w	r0, r0, #4
- 80000f6:	9006      	str	r0, [sp, #24]
- 80000f8:	4770      	bx	lr
+08000154 <UsageFault_Handler>:
+ 8000154:	480e      	ldr	r0, [pc, #56]	@ (8000190 <default_handler+0x10>)
+ 8000156:	6801      	ldr	r1, [r0, #0]
+ 8000158:	f101 0101 	add.w	r1, r1, #1
+ 800015c:	6001      	str	r1, [r0, #0]
+ 800015e:	9806      	ldr	r0, [sp, #24]
+ 8000160:	f100 0004 	add.w	r0, r0, #4
+ 8000164:	9006      	str	r0, [sp, #24]
+ 8000166:	4770      	bx	lr
 
-080000fa <HardFault_Handler>:
- 80000fa:	480f      	ldr	r0, [pc, #60]	@ (8000138 <default_handler+0x26>)
- 80000fc:	490d      	ldr	r1, [pc, #52]	@ (8000134 <default_handler+0x22>)
- 80000fe:	6008      	str	r0, [r1, #0]
- 8000100:	f04f 0263 	mov.w	r2, #99	@ 0x63
- 8000104:	490d      	ldr	r1, [pc, #52]	@ (800013c <default_handler+0x2a>)
- 8000106:	600a      	str	r2, [r1, #0]
- 8000108:	f04f 0018 	mov.w	r0, #24
- 800010c:	490c      	ldr	r1, [pc, #48]	@ (8000140 <default_handler+0x2e>)
- 800010e:	beab      	bkpt	0x00ab
- 8000110:	e7fe      	b.n	8000110 <HardFault_Handler+0x16>
+08000168 <HardFault_Handler>:
+ 8000168:	4810      	ldr	r0, [pc, #64]	@ (80001ac <default_handler+0x2c>)
+ 800016a:	490f      	ldr	r1, [pc, #60]	@ (80001a8 <default_handler+0x28>)
+ 800016c:	6008      	str	r0, [r1, #0]
+ 800016e:	f04f 0263 	mov.w	r2, #99	@ 0x63
+ 8000172:	490f      	ldr	r1, [pc, #60]	@ (80001b0 <default_handler+0x30>)
+ 8000174:	600a      	str	r2, [r1, #0]
+ 8000176:	f04f 0018 	mov.w	r0, #24
+ 800017a:	490e      	ldr	r1, [pc, #56]	@ (80001b4 <default_handler+0x34>)
+ 800017c:	beab      	bkpt	0x00ab
+ 800017e:	e7fe      	b.n	800017e <HardFault_Handler+0x16>
 
-08000112 <default_handler>:
- 8000112:	e7fe      	b.n	8000112 <default_handler>
- 8000114:	e000ed24 	.word	0xe000ed24
- 8000118:	e000ed88 	.word	0xe000ed88
- 800011c:	00f0ffff 	.word	0x00f0ffff
- 8000120:	20000108 	.word	0x20000108
- 8000124:	d0000010 	.word	0xd0000010
- 8000128:	00f0fffc 	.word	0x00f0fffc
- 800012c:	00f0fffd 	.word	0x00f0fffd
- 8000130:	cafecafe 	.word	0xcafecafe
- 8000134:	20000100 	.word	0x20000100
- 8000138:	deaddead 	.word	0xdeaddead
- 800013c:	20000104 	.word	0x20000104
- 8000140:	00020026 	.word	0x00020026
+08000180 <default_handler>:
+ 8000180:	e7fe      	b.n	8000180 <default_handler>
+ 8000182:	0000      	.short	0x0000
+ 8000184:	e000ed24 	.word	0xe000ed24
+ 8000188:	e000ed88 	.word	0xe000ed88
+ 800018c:	00f0ffff 	.word	0x00f0ffff
+ 8000190:	20000108 	.word	0x20000108
+ 8000194:	d0000010 	.word	0xd0000010
+ 8000198:	00f0fffc 	.word	0x00f0fffc
+ 800019c:	00f0fffd 	.word	0x00f0fffd
+ 80001a0:	d0000004 	.word	0xd0000004
+ 80001a4:	cafecafe 	.word	0xcafecafe
+ 80001a8:	20000100 	.word	0x20000100
+ 80001ac:	deaddead 	.word	0xdeaddead
+ 80001b0:	20000104 	.word	0x20000104
+ 80001b4:	00020026 	.word	0x00020026

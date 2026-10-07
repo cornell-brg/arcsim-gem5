@@ -47,7 +47,8 @@ TESTS = cortexm4_basic test_cps test_mrs_msr test_bx_exc_return \
         test_fpv5 \
         test_fpv5_undefined \
         test_coproc_nocp \
-        test_coproc_rp2350
+        test_coproc_rp2350 \
+        test_rp2350_gpioc
 
 all: $(addsuffix .elf, $(TESTS)) freertos-tests
 
@@ -58,6 +59,11 @@ freertos-tests:
 
 # FPv5 and coprocessor tests use Cortex-M33 instructions
 test_fpv5.o test_fpv5_undefined.o test_coproc_nocp.o test_coproc_rp2350.o: ASFLAGS = -mcpu=cortex-m33 -mfpu=fpv5-sp-d16 -mthumb
+
+# The RP2350 GPIO test runs from SRAM on the RP2350 board and checks itself
+test_rp2350_gpioc.o: ASFLAGS = -mcpu=cortex-m33 -mthumb --defsym CHECK=1
+test_rp2350_gpioc.elf: LDFLAGS = -T rp2350_sram.ld --no-warn-rwx-segments
+test_rp2350_gpioc.elf: rp2350_sram.ld
 
 %.o: %.S
 	$(AS) $(ASFLAGS) $< -o $@

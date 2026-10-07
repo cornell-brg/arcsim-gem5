@@ -1,8 +1,9 @@
 /*
- * Test: coprocessor instructions for p0-p7 with no coprocessor attached
+ * Test: coprocessor instructions with no coprocessor attached
  *
- * MCR, MRC, MCRR, MRRC and CDP (and an MCR2) to each of p0-p7, with CPACR
- * granting full access: with nothing attached to the coprocessor port, each
+ * MCR, MRC, MCRR, MRRC and CDP (and an MCR2) to each of p0-p7, and MCR to
+ * p8, p9, p12 and p13, with CPACR granting full access to p0-p7: with
+ * nothing attached to the coprocessor port, each
  * raises a UsageFault (NOCP), as the RP2350's Cortex-M33 does for the numbers
  * it has no coprocessor on. The UsageFault handler counts the faults and skips
  * the instruction.
@@ -10,7 +11,7 @@
  * Runs on the timing CPU, which takes consecutive UsageFaults.
  *
  * Result at 0x20000100:
- *   0xCAFECAFE = all nine instructions faulted
+ *   0xCAFECAFE = all thirteen instructions faulted
  */
 
     .syntax unified
@@ -67,10 +68,14 @@ Reset_Handler:
     mcr     p6, #0, r0, c0, c0
     mcr     p7, #0, r0, c0, c0
     mcr2    p0, #0, r0, c0, c0
+    mcr     p8, #0, r0, c0, c0
+    mcr     p9, #0, r0, c0, c0
+    mcr     p12, #0, r0, c0, c0
+    mcr     p13, #0, r0, c0, c0
 
     ldr     r0, [r4]
     mov     r2, #1
-    cmp     r0, #9
+    cmp     r0, #13
     bne     fail
     b       pass
 

@@ -9,6 +9,9 @@
  *   4. p0 with CPACR.CP0 = 0: UsageFault (NOCP)
  *   5. p0 with CPACR.CP0 = privileged only, from privileged code: no fault
  *   6. exactly the two faults of 3 and 4
+ *   7. GPIO_IN reads OUT & OE (no pads), through MRC and through SIO
+ *   8. a byte write to SIO GPIO_OUT replicates across the register
+ *   9. p0 with CPACR.CP0 = privileged only, from unprivileged code: NOCP
  *
  * Runs on the M33 release and the timing CPU.
  *
@@ -122,6 +125,48 @@ Reset_Handler:
     mov     r2, #6
     ldr     r0, [r4]
     cmp     r0, #2
+    bne     fail
+
+    /* 7: GPIO_IN = OUT & OE */
+    mov     r2, #7
+    ldr     r1, =0x00F0FFFF
+    str     r1, [r5]
+    dsb
+    isb
+    ldr     r0, =0x000000F0
+    mcr     p0, #0, r0, c0, c0
+    ldr     r0, =0x00000033
+    mcr     p0, #0, r0, c0, c4
+    mrc     p0, #0, r0, c0, c8
+    cmp     r0, #0x30
+    bne     fail
+    ldr     r1, =0xD0000004
+    ldr     r0, [r1]
+    cmp     r0, #0x30
+    bne     fail
+
+    /* 8: strb replicates: GPIO_OUT = 0x5A5A5A5A */
+    mov     r2, #8
+    ldr     r1, =SIO_GPIO_OUT
+    mov     r0, #0x5A
+    strb    r0, [r1, #1]
+    mrc     p0, #0, r0, c0, c0
+    ldr     r1, =0x5A5A5A5A
+    cmp     r0, r1
+    bne     fail
+
+    /* 9: privileged-only grant, unprivileged caller (CONTROL.nPRIV = 1) */
+    mov     r2, #9
+    ldr     r1, =0x00F0FFFD
+    str     r1, [r5]
+    dsb
+    isb
+    mov     r0, #1
+    msr     control, r0
+    isb
+    mcr     p0, #0, r0, c0, c0
+    ldr     r0, [r4]
+    cmp     r0, #3
     bne     fail
     b       pass
 

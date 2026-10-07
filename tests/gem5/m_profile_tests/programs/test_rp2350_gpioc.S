@@ -8,13 +8,12 @@
  * for 32 of each access. The expected values were recorded on a Pimoroni Pico
  * Plus 2 (RP2350, Cortex-M33 core 0, Secure, this code in SRAM) through
  * OpenOCD; with CHECK the image compares its records with them (all but the
- * pad inputs, the state before the baseline writes, and the cycle counts) and
+ * pad inputs, the state before the baseline writes finish, and the cycle counts) and
  * prints RP2350_GPIOC_OK or RP2350_GPIOC_FAIL.
  *
- *   arm-none-eabi-as -mcpu=cortex-m33 -mthumb --defsym CHECK=1 gpioc.S -o gpioc.o
- *   arm-none-eabi-ld -T gpioc.ld gpioc.o -o gpioc.elf
- *   build/ARM/gem5.opt configs/example/rp2350/run.py --core arm-m4-proxy \
- *       --firmware gpioc.elf
+ * Built by this directory's Makefile (with CHECK) and registered in
+ * test_m_profile.py to run on configs/example/rp2350/run.py --core
+ * arm-m4-proxy.
  *
  * Without CHECK the image only records, from 0x20004000 on: the build that
  * ran on the Pico (OpenOCD: load_image, then start at Reset_Handler). With
@@ -1077,7 +1076,7 @@ expected:
     .word 0x00000022, 0x00000023, 0x00000022, 0x00000023, 0x00000011
 compare:
     .byte 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-    .byte 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1
+    .byte 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1
     .byte 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0
     .byte 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1
     .byte 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1

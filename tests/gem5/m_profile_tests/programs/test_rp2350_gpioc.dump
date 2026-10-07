@@ -1,0 +1,3546 @@
+
+test_rp2350_gpioc.elf:     file format elf32-littlearm
+
+SYMBOL TABLE:
+20010000 l    d  .text	00000000 .text
+00000000 l    d  .ARM.attributes	00000000 .ARM.attributes
+00000000 l    df *ABS*	00000000 test_rp2350_gpioc.o
+00000001 l       *ABS*	00000000 CHECK
+20004000 l       *ABS*	00000000 OUT_BASE
+d0000000 l       *ABS*	00000000 SIO
+20011e18 l       .text	00000000 expected
+200132ac l       .text	00000000 compare
+00000525 l       *ABS*	00000000 N_RECORDS
+200137d1 l       .text	00000000 ok_message
+200137e2 l       .text	00000000 fail_message
+20010008 g     F .text	00000000 Reset_Handler
+
+
+
+Disassembly of section .text:
+
+20010000 <Reset_Handler-0x8>:
+20010000:	20040000 	.word	0x20040000
+20010004:	20010009 	.word	0x20010009
+
+20010008 <Reset_Handler>:
+20010008:	4850      	ldr	r0, [pc, #320]	@ (2001014c <Reset_Handler+0x144>)
+2001000a:	4685      	mov	sp, r0
+2001000c:	b672      	cpsid	i
+2001000e:	4850      	ldr	r0, [pc, #320]	@ (20010150 <Reset_Handler+0x148>)
+20010010:	4950      	ldr	r1, [pc, #320]	@ (20010154 <Reset_Handler+0x14c>)
+20010012:	6001      	str	r1, [r0, #0]
+20010014:	f3bf 8f4f 	dsb	sy
+20010018:	f3bf 8f6f 	isb	sy
+2001001c:	f8df a138 	ldr.w	sl, [pc, #312]	@ 20010158 <Reset_Handler+0x150>
+20010020:	f04f 4b50 	mov.w	fp, #3489660928	@ 0xd0000000
+20010024:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010028:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001002c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010030:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010034:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010038:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001003c:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010040:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010044:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010048:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001004c:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010050:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010054:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010058:	f04f 0000 	mov.w	r0, #0
+2001005c:	f8cb 0010 	str.w	r0, [fp, #16]
+20010060:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010064:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010068:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001006c:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010070:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010074:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010078:	f8db 1014 	ldr.w	r1, [fp, #20]
+2001007c:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010080:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010084:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010088:	f8db 0004 	ldr.w	r0, [fp, #4]
+2001008c:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010090:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010094:	f04f 0000 	mov.w	r0, #0
+20010098:	f8cb 0014 	str.w	r0, [fp, #20]
+2001009c:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200100a0:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200100a4:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200100a8:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200100ac:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200100b0:	f8db 0010 	ldr.w	r0, [fp, #16]
+200100b4:	f8db 1014 	ldr.w	r1, [fp, #20]
+200100b8:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200100bc:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200100c0:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200100c4:	f8db 0004 	ldr.w	r0, [fp, #4]
+200100c8:	f8db 1008 	ldr.w	r1, [fp, #8]
+200100cc:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200100d0:	f04f 0000 	mov.w	r0, #0
+200100d4:	f8cb 0030 	str.w	r0, [fp, #48]	@ 0x30
+200100d8:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200100dc:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200100e0:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200100e4:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200100e8:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200100ec:	f8db 0010 	ldr.w	r0, [fp, #16]
+200100f0:	f8db 1014 	ldr.w	r1, [fp, #20]
+200100f4:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200100f8:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200100fc:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010100:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010104:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010108:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001010c:	f04f 0000 	mov.w	r0, #0
+20010110:	f8cb 0034 	str.w	r0, [fp, #52]	@ 0x34
+20010114:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010118:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001011c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010120:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010124:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010128:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001012c:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010130:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010134:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010138:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001013c:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010140:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010144:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010148:	e008      	b.n	2001015c <Reset_Handler+0x154>
+2001014a:	0000      	.short	0x0000
+2001014c:	20040000 	.word	0x20040000
+20010150:	e000ed88 	.word	0xe000ed88
+20010154:	00f00303 	.word	0x00f00303
+20010158:	20004000 	.word	0x20004000
+2001015c:	f04f 30a5 	mov.w	r0, #2779096485	@ 0xa5a5a5a5
+20010160:	ee00 0010 			@ <UNDEFINED> instruction: 0xee000010
+20010164:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010168:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001016c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010170:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010174:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010178:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001017c:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010180:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010184:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010188:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001018c:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010190:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010194:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010198:	f04f 30ff 	mov.w	r0, #4294967295	@ 0xffffffff
+2001019c:	ee00 0011 			@ <UNDEFINED> instruction: 0xee000011
+200101a0:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200101a4:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200101a8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200101ac:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200101b0:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200101b4:	f8db 0010 	ldr.w	r0, [fp, #16]
+200101b8:	f8db 1014 	ldr.w	r1, [fp, #20]
+200101bc:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200101c0:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200101c4:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200101c8:	f8db 0004 	ldr.w	r0, [fp, #4]
+200101cc:	f8db 1008 	ldr.w	r1, [fp, #8]
+200101d0:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200101d4:	481d      	ldr	r0, [pc, #116]	@ (2001024c <Reset_Handler+0x244>)
+200101d6:	ee20 0010 			@ <UNDEFINED> instruction: 0xee200010
+200101da:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200101de:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200101e2:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200101e6:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200101ea:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200101ee:	f8db 0010 	ldr.w	r0, [fp, #16]
+200101f2:	f8db 1014 	ldr.w	r1, [fp, #20]
+200101f6:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200101fa:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200101fe:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010202:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010206:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001020a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001020e:	f04f 000f 	mov.w	r0, #15
+20010212:	ee40 0010 			@ <UNDEFINED> instruction: 0xee400010
+20010216:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001021a:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001021e:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010222:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010226:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001022a:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001022e:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010232:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010236:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001023a:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001023e:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010242:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010246:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001024a:	e001      	b.n	20010250 <Reset_Handler+0x248>
+2001024c:	ffff0000 	.word	0xffff0000
+20010250:	f04f 00f0 	mov.w	r0, #240	@ 0xf0
+20010254:	ee60 0010 			@ <UNDEFINED> instruction: 0xee600010
+20010258:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001025c:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010260:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010264:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010268:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001026c:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010270:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010274:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010278:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001027c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010280:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010284:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010288:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001028c:	f64f 70ff 	movw	r0, #65535	@ 0xffff
+20010290:	ee20 0011 			@ <UNDEFINED> instruction: 0xee200011
+20010294:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010298:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001029c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200102a0:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200102a4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200102a8:	f8db 0010 	ldr.w	r0, [fp, #16]
+200102ac:	f8db 1014 	ldr.w	r1, [fp, #20]
+200102b0:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200102b4:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200102b8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200102bc:	f8db 0004 	ldr.w	r0, [fp, #4]
+200102c0:	f8db 1008 	ldr.w	r1, [fp, #8]
+200102c4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200102c8:	f04f 0001 	mov.w	r0, #1
+200102cc:	ee40 0011 			@ <UNDEFINED> instruction: 0xee400011
+200102d0:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200102d4:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200102d8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200102dc:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200102e0:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200102e4:	f8db 0010 	ldr.w	r0, [fp, #16]
+200102e8:	f8db 1014 	ldr.w	r1, [fp, #20]
+200102ec:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200102f0:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200102f4:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200102f8:	f8db 0004 	ldr.w	r0, [fp, #4]
+200102fc:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010300:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010304:	f04f 0002 	mov.w	r0, #2
+20010308:	ee60 0011 			@ <UNDEFINED> instruction: 0xee600011
+2001030c:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010310:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010314:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010318:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001031c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010320:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010324:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010328:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001032c:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010330:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010334:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010338:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001033c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010340:	e7ff      	b.n	20010342 <Reset_Handler+0x33a>
+20010342:	4840      	ldr	r0, [pc, #256]	@ (20010444 <Reset_Handler+0x43c>)
+20010344:	f245 5155 	movw	r1, #21845	@ 0x5555
+20010348:	ec41 0000 	mcrr	0, 0, r0, r1, cr0
+2001034c:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010350:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010354:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010358:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001035c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010360:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010364:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010368:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001036c:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010370:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010374:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010378:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001037c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010380:	f04f 00ff 	mov.w	r0, #255	@ 0xff
+20010384:	f04f 0103 	mov.w	r1, #3
+20010388:	ec41 0010 	mcrr	0, 1, r0, r1, cr0
+2001038c:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010390:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010394:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010398:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001039c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200103a0:	f8db 0010 	ldr.w	r0, [fp, #16]
+200103a4:	f8db 1014 	ldr.w	r1, [fp, #20]
+200103a8:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200103ac:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200103b0:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200103b4:	f8db 0004 	ldr.w	r0, [fp, #4]
+200103b8:	f8db 1008 	ldr.w	r1, [fp, #8]
+200103bc:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200103c0:	f04f 6070 	mov.w	r0, #251658240	@ 0xf000000
+200103c4:	f44f 7180 	mov.w	r1, #256	@ 0x100
+200103c8:	ec41 0020 	mcrr	0, 2, r0, r1, cr0
+200103cc:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200103d0:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200103d4:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200103d8:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200103dc:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200103e0:	f8db 0010 	ldr.w	r0, [fp, #16]
+200103e4:	f8db 1014 	ldr.w	r1, [fp, #20]
+200103e8:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200103ec:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200103f0:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200103f4:	f8db 0004 	ldr.w	r0, [fp, #4]
+200103f8:	f8db 1008 	ldr.w	r1, [fp, #8]
+200103fc:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010400:	f44f 6070 	mov.w	r0, #3840	@ 0xf00
+20010404:	f04f 0104 	mov.w	r1, #4
+20010408:	ec41 0030 	mcrr	0, 3, r0, r1, cr0
+2001040c:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010410:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010414:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010418:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001041c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010420:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010424:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010428:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001042c:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010430:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010434:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010438:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001043c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010440:	e002      	b.n	20010448 <Reset_Handler+0x440>
+20010442:	0000      	.short	0x0000
+20010444:	12345678 	.word	0x12345678
+20010448:	f04f 0006 	mov.w	r0, #6
+2001044c:	f04f 0101 	mov.w	r1, #1
+20010450:	ec41 0040 	mcrr	0, 4, r0, r1, cr0
+20010454:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010458:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001045c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010460:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010464:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010468:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001046c:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010470:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010474:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010478:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001047c:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010480:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010484:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010488:	f04f 0006 	mov.w	r0, #6
+2001048c:	f04f 0100 	mov.w	r1, #0
+20010490:	ec41 0040 	mcrr	0, 4, r0, r1, cr0
+20010494:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010498:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001049c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200104a0:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200104a4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200104a8:	f8db 0010 	ldr.w	r0, [fp, #16]
+200104ac:	f8db 1014 	ldr.w	r1, [fp, #20]
+200104b0:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200104b4:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200104b8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200104bc:	f8db 0004 	ldr.w	r0, [fp, #4]
+200104c0:	f8db 1008 	ldr.w	r1, [fp, #8]
+200104c4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200104c8:	f04f 0028 	mov.w	r0, #40	@ 0x28
+200104cc:	f04f 0101 	mov.w	r1, #1
+200104d0:	ec41 0040 	mcrr	0, 4, r0, r1, cr0
+200104d4:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200104d8:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200104dc:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200104e0:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200104e4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200104e8:	f8db 0010 	ldr.w	r0, [fp, #16]
+200104ec:	f8db 1014 	ldr.w	r1, [fp, #20]
+200104f0:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200104f4:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200104f8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200104fc:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010500:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010504:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010508:	f04f 0006 	mov.w	r0, #6
+2001050c:	f04f 0102 	mov.w	r1, #2
+20010510:	ec41 0040 	mcrr	0, 4, r0, r1, cr0
+20010514:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010518:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001051c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010520:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010524:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010528:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001052c:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010530:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010534:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010538:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001053c:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010540:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010544:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010548:	e7ff      	b.n	2001054a <Reset_Handler+0x542>
+2001054a:	f04f 0007 	mov.w	r0, #7
+2001054e:	f04f 31ff 	mov.w	r1, #4294967295	@ 0xffffffff
+20010552:	ec41 0040 	mcrr	0, 4, r0, r1, cr0
+20010556:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001055a:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001055e:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010562:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010566:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001056a:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001056e:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010572:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010576:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001057a:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001057e:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010582:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010586:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001058a:	f04f 003f 	mov.w	r0, #63	@ 0x3f
+2001058e:	f04f 0101 	mov.w	r1, #1
+20010592:	ec41 0040 	mcrr	0, 4, r0, r1, cr0
+20010596:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001059a:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001059e:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200105a2:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200105a6:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200105aa:	f8db 0010 	ldr.w	r0, [fp, #16]
+200105ae:	f8db 1014 	ldr.w	r1, [fp, #20]
+200105b2:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200105b6:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200105ba:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200105be:	f8db 0004 	ldr.w	r0, [fp, #4]
+200105c2:	f8db 1008 	ldr.w	r1, [fp, #8]
+200105c6:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200105ca:	f04f 0040 	mov.w	r0, #64	@ 0x40
+200105ce:	f04f 0101 	mov.w	r1, #1
+200105d2:	ec41 0040 	mcrr	0, 4, r0, r1, cr0
+200105d6:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200105da:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200105de:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200105e2:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200105e6:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200105ea:	f8db 0010 	ldr.w	r0, [fp, #16]
+200105ee:	f8db 1014 	ldr.w	r1, [fp, #20]
+200105f2:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200105f6:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200105fa:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200105fe:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010602:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010606:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001060a:	f04f 0046 	mov.w	r0, #70	@ 0x46
+2001060e:	f04f 0101 	mov.w	r1, #1
+20010612:	ec41 0040 	mcrr	0, 4, r0, r1, cr0
+20010616:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001061a:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001061e:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010622:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010626:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001062a:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001062e:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010632:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010636:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001063a:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001063e:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010642:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010646:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001064a:	e7ff      	b.n	2001064c <Reset_Handler+0x644>
+2001064c:	f04f 0009 	mov.w	r0, #9
+20010650:	eea0 0010 			@ <UNDEFINED> instruction: 0xeea00010
+20010654:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010658:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001065c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010660:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010664:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010668:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001066c:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010670:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010674:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010678:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001067c:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010680:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010684:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010688:	f04f 0029 	mov.w	r0, #41	@ 0x29
+2001068c:	eea0 0010 			@ <UNDEFINED> instruction: 0xeea00010
+20010690:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010694:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010698:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001069c:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200106a0:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200106a4:	f8db 0010 	ldr.w	r0, [fp, #16]
+200106a8:	f8db 1014 	ldr.w	r1, [fp, #20]
+200106ac:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200106b0:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200106b4:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200106b8:	f8db 0004 	ldr.w	r0, [fp, #4]
+200106bc:	f8db 1008 	ldr.w	r1, [fp, #8]
+200106c0:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200106c4:	f04f 000a 	mov.w	r0, #10
+200106c8:	f04f 0100 	mov.w	r1, #0
+200106cc:	ec41 0050 	mcrr	0, 5, r0, r1, cr0
+200106d0:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200106d4:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200106d8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200106dc:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200106e0:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200106e4:	f8db 0010 	ldr.w	r0, [fp, #16]
+200106e8:	f8db 1014 	ldr.w	r1, [fp, #20]
+200106ec:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200106f0:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200106f4:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200106f8:	f8db 0004 	ldr.w	r0, [fp, #4]
+200106fc:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010700:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010704:	f04f 000a 	mov.w	r0, #10
+20010708:	f04f 0101 	mov.w	r1, #1
+2001070c:	ec41 0050 	mcrr	0, 5, r0, r1, cr0
+20010710:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010714:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010718:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001071c:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010720:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010724:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010728:	f8db 1014 	ldr.w	r1, [fp, #20]
+2001072c:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010730:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010734:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010738:	f8db 0004 	ldr.w	r0, [fp, #4]
+2001073c:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010740:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010744:	e7ff      	b.n	20010746 <Reset_Handler+0x73e>
+20010746:	f04f 0009 	mov.w	r0, #9
+2001074a:	eec0 0010 			@ <UNDEFINED> instruction: 0xeec00010
+2001074e:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010752:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010756:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001075a:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001075e:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010762:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010766:	f8db 1014 	ldr.w	r1, [fp, #20]
+2001076a:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001076e:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010772:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010776:	f8db 0004 	ldr.w	r0, [fp, #4]
+2001077a:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001077e:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010782:	f04f 0029 	mov.w	r0, #41	@ 0x29
+20010786:	eec0 0010 			@ <UNDEFINED> instruction: 0xeec00010
+2001078a:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001078e:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010792:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010796:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001079a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001079e:	f8db 0010 	ldr.w	r0, [fp, #16]
+200107a2:	f8db 1014 	ldr.w	r1, [fp, #20]
+200107a6:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200107aa:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200107ae:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200107b2:	f8db 0004 	ldr.w	r0, [fp, #4]
+200107b6:	f8db 1008 	ldr.w	r1, [fp, #8]
+200107ba:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200107be:	f04f 000a 	mov.w	r0, #10
+200107c2:	f04f 0100 	mov.w	r1, #0
+200107c6:	ec41 0060 	mcrr	0, 6, r0, r1, cr0
+200107ca:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200107ce:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200107d2:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200107d6:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200107da:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200107de:	f8db 0010 	ldr.w	r0, [fp, #16]
+200107e2:	f8db 1014 	ldr.w	r1, [fp, #20]
+200107e6:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200107ea:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200107ee:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200107f2:	f8db 0004 	ldr.w	r0, [fp, #4]
+200107f6:	f8db 1008 	ldr.w	r1, [fp, #8]
+200107fa:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200107fe:	f04f 000a 	mov.w	r0, #10
+20010802:	f04f 0101 	mov.w	r1, #1
+20010806:	ec41 0060 	mcrr	0, 6, r0, r1, cr0
+2001080a:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001080e:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010812:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010816:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001081a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001081e:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010822:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010826:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001082a:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001082e:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010832:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010836:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001083a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001083e:	e7ff      	b.n	20010840 <Reset_Handler+0x838>
+20010840:	f04f 0009 	mov.w	r0, #9
+20010844:	eee0 0010 			@ <UNDEFINED> instruction: 0xeee00010
+20010848:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001084c:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010850:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010854:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010858:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001085c:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010860:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010864:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010868:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001086c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010870:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010874:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010878:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001087c:	f04f 0029 	mov.w	r0, #41	@ 0x29
+20010880:	eee0 0010 			@ <UNDEFINED> instruction: 0xeee00010
+20010884:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010888:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001088c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010890:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010894:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010898:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001089c:	f8db 1014 	ldr.w	r1, [fp, #20]
+200108a0:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200108a4:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200108a8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200108ac:	f8db 0004 	ldr.w	r0, [fp, #4]
+200108b0:	f8db 1008 	ldr.w	r1, [fp, #8]
+200108b4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200108b8:	f04f 000a 	mov.w	r0, #10
+200108bc:	f04f 0100 	mov.w	r1, #0
+200108c0:	ec41 0070 	mcrr	0, 7, r0, r1, cr0
+200108c4:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200108c8:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200108cc:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200108d0:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200108d4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200108d8:	f8db 0010 	ldr.w	r0, [fp, #16]
+200108dc:	f8db 1014 	ldr.w	r1, [fp, #20]
+200108e0:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200108e4:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200108e8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200108ec:	f8db 0004 	ldr.w	r0, [fp, #4]
+200108f0:	f8db 1008 	ldr.w	r1, [fp, #8]
+200108f4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200108f8:	f04f 000a 	mov.w	r0, #10
+200108fc:	f04f 0101 	mov.w	r1, #1
+20010900:	ec41 0070 	mcrr	0, 7, r0, r1, cr0
+20010904:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010908:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001090c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010910:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010914:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010918:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001091c:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010920:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010924:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010928:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001092c:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010930:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010934:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010938:	e7ff      	b.n	2001093a <Reset_Handler+0x932>
+2001093a:	483f      	ldr	r0, [pc, #252]	@ (20010a38 <Reset_Handler+0xa30>)
+2001093c:	f04f 0100 	mov.w	r1, #0
+20010940:	ec41 0080 	mcrr	0, 8, r0, r1, cr0
+20010944:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010948:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001094c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010950:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010954:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010958:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001095c:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010960:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010964:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010968:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001096c:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010970:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010974:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010978:	482f      	ldr	r0, [pc, #188]	@ (20010a38 <Reset_Handler+0xa30>)
+2001097a:	f04f 0101 	mov.w	r1, #1
+2001097e:	ec41 0080 	mcrr	0, 8, r0, r1, cr0
+20010982:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010986:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001098a:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001098e:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010992:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010996:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001099a:	f8db 1014 	ldr.w	r1, [fp, #20]
+2001099e:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200109a2:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200109a6:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200109aa:	f8db 0004 	ldr.w	r0, [fp, #4]
+200109ae:	f8db 1008 	ldr.w	r1, [fp, #8]
+200109b2:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200109b6:	4820      	ldr	r0, [pc, #128]	@ (20010a38 <Reset_Handler+0xa30>)
+200109b8:	f04f 0102 	mov.w	r1, #2
+200109bc:	ec41 0080 	mcrr	0, 8, r0, r1, cr0
+200109c0:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200109c4:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200109c8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200109cc:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200109d0:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200109d4:	f8db 0010 	ldr.w	r0, [fp, #16]
+200109d8:	f8db 1014 	ldr.w	r1, [fp, #20]
+200109dc:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200109e0:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200109e4:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200109e8:	f8db 0004 	ldr.w	r0, [fp, #4]
+200109ec:	f8db 1008 	ldr.w	r1, [fp, #8]
+200109f0:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200109f4:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+200109f8:	f04f 0100 	mov.w	r1, #0
+200109fc:	ec41 0090 	mcrr	0, 9, r0, r1, cr0
+20010a00:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010a04:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010a08:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010a0c:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010a10:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010a14:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010a18:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010a1c:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010a20:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010a24:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010a28:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010a2c:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010a30:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010a34:	e002      	b.n	20010a3c <Reset_Handler+0xa34>
+20010a36:	0000      	.short	0x0000
+20010a38:	deadbeef 	.word	0xdeadbeef
+20010a3c:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+20010a40:	f04f 0101 	mov.w	r1, #1
+20010a44:	ec41 0090 	mcrr	0, 9, r0, r1, cr0
+20010a48:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010a4c:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010a50:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010a54:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010a58:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010a5c:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010a60:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010a64:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010a68:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010a6c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010a70:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010a74:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010a78:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010a7c:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+20010a80:	f04f 0102 	mov.w	r1, #2
+20010a84:	ec41 0090 	mcrr	0, 9, r0, r1, cr0
+20010a88:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010a8c:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010a90:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010a94:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010a98:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010a9c:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010aa0:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010aa4:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010aa8:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010aac:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010ab0:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010ab4:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010ab8:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010abc:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+20010ac0:	f04f 0100 	mov.w	r1, #0
+20010ac4:	ec41 00a0 	mcrr	0, 10, r0, r1, cr0
+20010ac8:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010acc:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010ad0:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010ad4:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010ad8:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010adc:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010ae0:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010ae4:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010ae8:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010aec:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010af0:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010af4:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010af8:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010afc:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+20010b00:	f04f 0101 	mov.w	r1, #1
+20010b04:	ec41 00a0 	mcrr	0, 10, r0, r1, cr0
+20010b08:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010b0c:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010b10:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010b14:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010b18:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010b1c:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010b20:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010b24:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010b28:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010b2c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010b30:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010b34:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010b38:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010b3c:	e7ff      	b.n	20010b3e <Reset_Handler+0xb36>
+20010b3e:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+20010b42:	f04f 0102 	mov.w	r1, #2
+20010b46:	ec41 00a0 	mcrr	0, 10, r0, r1, cr0
+20010b4a:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010b4e:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010b52:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010b56:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010b5a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010b5e:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010b62:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010b66:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010b6a:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010b6e:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010b72:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010b76:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010b7a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010b7e:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+20010b82:	f04f 0100 	mov.w	r1, #0
+20010b86:	ec41 00b0 	mcrr	0, 11, r0, r1, cr0
+20010b8a:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010b8e:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010b92:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010b96:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010b9a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010b9e:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010ba2:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010ba6:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010baa:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010bae:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010bb2:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010bb6:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010bba:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010bbe:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+20010bc2:	f04f 0101 	mov.w	r1, #1
+20010bc6:	ec41 00b0 	mcrr	0, 11, r0, r1, cr0
+20010bca:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010bce:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010bd2:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010bd6:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010bda:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010bde:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010be2:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010be6:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010bea:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010bee:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010bf2:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010bf6:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010bfa:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010bfe:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+20010c02:	f04f 0102 	mov.w	r1, #2
+20010c06:	ec41 00b0 	mcrr	0, 11, r0, r1, cr0
+20010c0a:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010c0e:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010c12:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010c16:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010c1a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010c1e:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010c22:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010c26:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010c2a:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010c2e:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010c32:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010c36:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010c3a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010c3e:	e7ff      	b.n	20010c40 <Reset_Handler+0xc38>
+20010c40:	f04f 30a5 	mov.w	r0, #2779096485	@ 0xa5a5a5a5
+20010c44:	ee00 0014 			@ <UNDEFINED> instruction: 0xee000014
+20010c48:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010c4c:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010c50:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010c54:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010c58:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010c5c:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010c60:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010c64:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010c68:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010c6c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010c70:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010c74:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010c78:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010c7c:	f04f 30ff 	mov.w	r0, #4294967295	@ 0xffffffff
+20010c80:	ee00 0015 			@ <UNDEFINED> instruction: 0xee000015
+20010c84:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010c88:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010c8c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010c90:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010c94:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010c98:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010c9c:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010ca0:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010ca4:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010ca8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010cac:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010cb0:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010cb4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010cb8:	481d      	ldr	r0, [pc, #116]	@ (20010d30 <Reset_Handler+0xd28>)
+20010cba:	ee20 0014 			@ <UNDEFINED> instruction: 0xee200014
+20010cbe:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010cc2:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010cc6:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010cca:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010cce:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010cd2:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010cd6:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010cda:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010cde:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010ce2:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010ce6:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010cea:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010cee:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010cf2:	f04f 000f 	mov.w	r0, #15
+20010cf6:	ee40 0014 			@ <UNDEFINED> instruction: 0xee400014
+20010cfa:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010cfe:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010d02:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010d06:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010d0a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010d0e:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010d12:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010d16:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010d1a:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010d1e:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010d22:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010d26:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010d2a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010d2e:	e001      	b.n	20010d34 <Reset_Handler+0xd2c>
+20010d30:	ffff0000 	.word	0xffff0000
+20010d34:	f04f 00f0 	mov.w	r0, #240	@ 0xf0
+20010d38:	ee60 0014 			@ <UNDEFINED> instruction: 0xee600014
+20010d3c:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010d40:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010d44:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010d48:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010d4c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010d50:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010d54:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010d58:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010d5c:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010d60:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010d64:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010d68:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010d6c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010d70:	f64f 70ff 	movw	r0, #65535	@ 0xffff
+20010d74:	ee20 0015 			@ <UNDEFINED> instruction: 0xee200015
+20010d78:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010d7c:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010d80:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010d84:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010d88:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010d8c:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010d90:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010d94:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010d98:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010d9c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010da0:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010da4:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010da8:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010dac:	f04f 0001 	mov.w	r0, #1
+20010db0:	ee40 0015 			@ <UNDEFINED> instruction: 0xee400015
+20010db4:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010db8:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010dbc:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010dc0:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010dc4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010dc8:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010dcc:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010dd0:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010dd4:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010dd8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010ddc:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010de0:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010de4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010de8:	f04f 0002 	mov.w	r0, #2
+20010dec:	ee60 0015 			@ <UNDEFINED> instruction: 0xee600015
+20010df0:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010df4:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010df8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010dfc:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010e00:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010e04:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010e08:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010e0c:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010e10:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010e14:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010e18:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010e1c:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010e20:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010e24:	e7ff      	b.n	20010e26 <Reset_Handler+0xe1e>
+20010e26:	4840      	ldr	r0, [pc, #256]	@ (20010f28 <Reset_Handler+0xf20>)
+20010e28:	f245 5155 	movw	r1, #21845	@ 0x5555
+20010e2c:	ec41 0004 	mcrr	0, 0, r0, r1, cr4
+20010e30:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010e34:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010e38:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010e3c:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010e40:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010e44:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010e48:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010e4c:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010e50:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010e54:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010e58:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010e5c:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010e60:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010e64:	f04f 00ff 	mov.w	r0, #255	@ 0xff
+20010e68:	f04f 0103 	mov.w	r1, #3
+20010e6c:	ec41 0014 	mcrr	0, 1, r0, r1, cr4
+20010e70:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010e74:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010e78:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010e7c:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010e80:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010e84:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010e88:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010e8c:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010e90:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010e94:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010e98:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010e9c:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010ea0:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010ea4:	f04f 6070 	mov.w	r0, #251658240	@ 0xf000000
+20010ea8:	f44f 7180 	mov.w	r1, #256	@ 0x100
+20010eac:	ec41 0024 	mcrr	0, 2, r0, r1, cr4
+20010eb0:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010eb4:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010eb8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010ebc:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010ec0:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010ec4:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010ec8:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010ecc:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010ed0:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010ed4:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010ed8:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010edc:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010ee0:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010ee4:	f44f 6070 	mov.w	r0, #3840	@ 0xf00
+20010ee8:	f04f 0104 	mov.w	r1, #4
+20010eec:	ec41 0034 	mcrr	0, 3, r0, r1, cr4
+20010ef0:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010ef4:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010ef8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010efc:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010f00:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010f04:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010f08:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010f0c:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010f10:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010f14:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010f18:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010f1c:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010f20:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010f24:	e002      	b.n	20010f2c <Reset_Handler+0xf24>
+20010f26:	0000      	.short	0x0000
+20010f28:	12345678 	.word	0x12345678
+20010f2c:	f04f 0006 	mov.w	r0, #6
+20010f30:	f04f 0101 	mov.w	r1, #1
+20010f34:	ec41 0044 	mcrr	0, 4, r0, r1, cr4
+20010f38:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010f3c:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010f40:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010f44:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010f48:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010f4c:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010f50:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010f54:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010f58:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010f5c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010f60:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010f64:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010f68:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010f6c:	f04f 0006 	mov.w	r0, #6
+20010f70:	f04f 0100 	mov.w	r1, #0
+20010f74:	ec41 0044 	mcrr	0, 4, r0, r1, cr4
+20010f78:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010f7c:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010f80:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010f84:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010f88:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010f8c:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010f90:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010f94:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010f98:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010f9c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010fa0:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010fa4:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010fa8:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010fac:	f04f 0028 	mov.w	r0, #40	@ 0x28
+20010fb0:	f04f 0101 	mov.w	r1, #1
+20010fb4:	ec41 0044 	mcrr	0, 4, r0, r1, cr4
+20010fb8:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010fbc:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20010fc0:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010fc4:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20010fc8:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010fcc:	f8db 0010 	ldr.w	r0, [fp, #16]
+20010fd0:	f8db 1014 	ldr.w	r1, [fp, #20]
+20010fd4:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20010fd8:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20010fdc:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20010fe0:	f8db 0004 	ldr.w	r0, [fp, #4]
+20010fe4:	f8db 1008 	ldr.w	r1, [fp, #8]
+20010fe8:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20010fec:	f04f 0006 	mov.w	r0, #6
+20010ff0:	f04f 0102 	mov.w	r1, #2
+20010ff4:	ec41 0044 	mcrr	0, 4, r0, r1, cr4
+20010ff8:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20010ffc:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011000:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011004:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20011008:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001100c:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011010:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011014:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011018:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001101c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011020:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011024:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011028:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001102c:	e7ff      	b.n	2001102e <Reset_Handler+0x1026>
+2001102e:	f04f 0007 	mov.w	r0, #7
+20011032:	f04f 31ff 	mov.w	r1, #4294967295	@ 0xffffffff
+20011036:	ec41 0044 	mcrr	0, 4, r0, r1, cr4
+2001103a:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001103e:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011042:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011046:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001104a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001104e:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011052:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011056:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001105a:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001105e:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011062:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011066:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001106a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001106e:	f04f 003f 	mov.w	r0, #63	@ 0x3f
+20011072:	f04f 0101 	mov.w	r1, #1
+20011076:	ec41 0044 	mcrr	0, 4, r0, r1, cr4
+2001107a:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001107e:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011082:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011086:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001108a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001108e:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011092:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011096:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001109a:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001109e:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200110a2:	f8db 0004 	ldr.w	r0, [fp, #4]
+200110a6:	f8db 1008 	ldr.w	r1, [fp, #8]
+200110aa:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200110ae:	f04f 0040 	mov.w	r0, #64	@ 0x40
+200110b2:	f04f 0101 	mov.w	r1, #1
+200110b6:	ec41 0044 	mcrr	0, 4, r0, r1, cr4
+200110ba:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200110be:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200110c2:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200110c6:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200110ca:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200110ce:	f8db 0010 	ldr.w	r0, [fp, #16]
+200110d2:	f8db 1014 	ldr.w	r1, [fp, #20]
+200110d6:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200110da:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200110de:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200110e2:	f8db 0004 	ldr.w	r0, [fp, #4]
+200110e6:	f8db 1008 	ldr.w	r1, [fp, #8]
+200110ea:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200110ee:	f04f 0046 	mov.w	r0, #70	@ 0x46
+200110f2:	f04f 0101 	mov.w	r1, #1
+200110f6:	ec41 0044 	mcrr	0, 4, r0, r1, cr4
+200110fa:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200110fe:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011102:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011106:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001110a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001110e:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011112:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011116:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001111a:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001111e:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011122:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011126:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001112a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001112e:	e7ff      	b.n	20011130 <Reset_Handler+0x1128>
+20011130:	f04f 0009 	mov.w	r0, #9
+20011134:	eea0 0014 			@ <UNDEFINED> instruction: 0xeea00014
+20011138:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001113c:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011140:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011144:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20011148:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001114c:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011150:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011154:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011158:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001115c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011160:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011164:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011168:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001116c:	f04f 0029 	mov.w	r0, #41	@ 0x29
+20011170:	eea0 0014 			@ <UNDEFINED> instruction: 0xeea00014
+20011174:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011178:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001117c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011180:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20011184:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011188:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001118c:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011190:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011194:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011198:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001119c:	f8db 0004 	ldr.w	r0, [fp, #4]
+200111a0:	f8db 1008 	ldr.w	r1, [fp, #8]
+200111a4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200111a8:	f04f 000a 	mov.w	r0, #10
+200111ac:	f04f 0100 	mov.w	r1, #0
+200111b0:	ec41 0054 	mcrr	0, 5, r0, r1, cr4
+200111b4:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200111b8:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200111bc:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200111c0:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200111c4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200111c8:	f8db 0010 	ldr.w	r0, [fp, #16]
+200111cc:	f8db 1014 	ldr.w	r1, [fp, #20]
+200111d0:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200111d4:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200111d8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200111dc:	f8db 0004 	ldr.w	r0, [fp, #4]
+200111e0:	f8db 1008 	ldr.w	r1, [fp, #8]
+200111e4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200111e8:	f04f 000a 	mov.w	r0, #10
+200111ec:	f04f 0101 	mov.w	r1, #1
+200111f0:	ec41 0054 	mcrr	0, 5, r0, r1, cr4
+200111f4:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200111f8:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200111fc:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011200:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20011204:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011208:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001120c:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011210:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011214:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011218:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001121c:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011220:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011224:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011228:	e7ff      	b.n	2001122a <Reset_Handler+0x1222>
+2001122a:	f04f 0009 	mov.w	r0, #9
+2001122e:	eec0 0014 			@ <UNDEFINED> instruction: 0xeec00014
+20011232:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011236:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001123a:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001123e:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20011242:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011246:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001124a:	f8db 1014 	ldr.w	r1, [fp, #20]
+2001124e:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011252:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011256:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001125a:	f8db 0004 	ldr.w	r0, [fp, #4]
+2001125e:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011262:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011266:	f04f 0029 	mov.w	r0, #41	@ 0x29
+2001126a:	eec0 0014 			@ <UNDEFINED> instruction: 0xeec00014
+2001126e:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011272:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011276:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001127a:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001127e:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011282:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011286:	f8db 1014 	ldr.w	r1, [fp, #20]
+2001128a:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001128e:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011292:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011296:	f8db 0004 	ldr.w	r0, [fp, #4]
+2001129a:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001129e:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200112a2:	f04f 000a 	mov.w	r0, #10
+200112a6:	f04f 0100 	mov.w	r1, #0
+200112aa:	ec41 0064 	mcrr	0, 6, r0, r1, cr4
+200112ae:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200112b2:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200112b6:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200112ba:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200112be:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200112c2:	f8db 0010 	ldr.w	r0, [fp, #16]
+200112c6:	f8db 1014 	ldr.w	r1, [fp, #20]
+200112ca:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200112ce:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200112d2:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200112d6:	f8db 0004 	ldr.w	r0, [fp, #4]
+200112da:	f8db 1008 	ldr.w	r1, [fp, #8]
+200112de:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200112e2:	f04f 000a 	mov.w	r0, #10
+200112e6:	f04f 0101 	mov.w	r1, #1
+200112ea:	ec41 0064 	mcrr	0, 6, r0, r1, cr4
+200112ee:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200112f2:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200112f6:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200112fa:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200112fe:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011302:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011306:	f8db 1014 	ldr.w	r1, [fp, #20]
+2001130a:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001130e:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011312:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011316:	f8db 0004 	ldr.w	r0, [fp, #4]
+2001131a:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001131e:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011322:	e7ff      	b.n	20011324 <Reset_Handler+0x131c>
+20011324:	f04f 0009 	mov.w	r0, #9
+20011328:	eee0 0014 			@ <UNDEFINED> instruction: 0xeee00014
+2001132c:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011330:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011334:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011338:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001133c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011340:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011344:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011348:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001134c:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011350:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011354:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011358:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001135c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011360:	f04f 0029 	mov.w	r0, #41	@ 0x29
+20011364:	eee0 0014 			@ <UNDEFINED> instruction: 0xeee00014
+20011368:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001136c:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011370:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011374:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20011378:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001137c:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011380:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011384:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011388:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001138c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011390:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011394:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011398:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001139c:	f04f 000a 	mov.w	r0, #10
+200113a0:	f04f 0100 	mov.w	r1, #0
+200113a4:	ec41 0074 	mcrr	0, 7, r0, r1, cr4
+200113a8:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200113ac:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200113b0:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200113b4:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200113b8:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200113bc:	f8db 0010 	ldr.w	r0, [fp, #16]
+200113c0:	f8db 1014 	ldr.w	r1, [fp, #20]
+200113c4:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200113c8:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200113cc:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200113d0:	f8db 0004 	ldr.w	r0, [fp, #4]
+200113d4:	f8db 1008 	ldr.w	r1, [fp, #8]
+200113d8:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200113dc:	f04f 000a 	mov.w	r0, #10
+200113e0:	f04f 0101 	mov.w	r1, #1
+200113e4:	ec41 0074 	mcrr	0, 7, r0, r1, cr4
+200113e8:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200113ec:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200113f0:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200113f4:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200113f8:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200113fc:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011400:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011404:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011408:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001140c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011410:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011414:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011418:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001141c:	e7ff      	b.n	2001141e <Reset_Handler+0x1416>
+2001141e:	483f      	ldr	r0, [pc, #252]	@ (2001151c <Reset_Handler+0x1514>)
+20011420:	f04f 0100 	mov.w	r1, #0
+20011424:	ec41 0084 	mcrr	0, 8, r0, r1, cr4
+20011428:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001142c:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011430:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011434:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20011438:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001143c:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011440:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011444:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011448:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001144c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011450:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011454:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011458:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001145c:	482f      	ldr	r0, [pc, #188]	@ (2001151c <Reset_Handler+0x1514>)
+2001145e:	f04f 0101 	mov.w	r1, #1
+20011462:	ec41 0084 	mcrr	0, 8, r0, r1, cr4
+20011466:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001146a:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001146e:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011472:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20011476:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001147a:	f8db 0010 	ldr.w	r0, [fp, #16]
+2001147e:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011482:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011486:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001148a:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001148e:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011492:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011496:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001149a:	4820      	ldr	r0, [pc, #128]	@ (2001151c <Reset_Handler+0x1514>)
+2001149c:	f04f 0102 	mov.w	r1, #2
+200114a0:	ec41 0084 	mcrr	0, 8, r0, r1, cr4
+200114a4:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200114a8:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200114ac:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200114b0:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200114b4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200114b8:	f8db 0010 	ldr.w	r0, [fp, #16]
+200114bc:	f8db 1014 	ldr.w	r1, [fp, #20]
+200114c0:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200114c4:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200114c8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200114cc:	f8db 0004 	ldr.w	r0, [fp, #4]
+200114d0:	f8db 1008 	ldr.w	r1, [fp, #8]
+200114d4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200114d8:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+200114dc:	f04f 0100 	mov.w	r1, #0
+200114e0:	ec41 0094 	mcrr	0, 9, r0, r1, cr4
+200114e4:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200114e8:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200114ec:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200114f0:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200114f4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200114f8:	f8db 0010 	ldr.w	r0, [fp, #16]
+200114fc:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011500:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011504:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011508:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001150c:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011510:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011514:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011518:	e002      	b.n	20011520 <Reset_Handler+0x1518>
+2001151a:	0000      	.short	0x0000
+2001151c:	deadbeef 	.word	0xdeadbeef
+20011520:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+20011524:	f04f 0101 	mov.w	r1, #1
+20011528:	ec41 0094 	mcrr	0, 9, r0, r1, cr4
+2001152c:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011530:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011534:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011538:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001153c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011540:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011544:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011548:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001154c:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011550:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011554:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011558:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001155c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011560:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+20011564:	f04f 0102 	mov.w	r1, #2
+20011568:	ec41 0094 	mcrr	0, 9, r0, r1, cr4
+2001156c:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011570:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011574:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011578:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001157c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011580:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011584:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011588:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001158c:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011590:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011594:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011598:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001159c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200115a0:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+200115a4:	f04f 0100 	mov.w	r1, #0
+200115a8:	ec41 00a4 	mcrr	0, 10, r0, r1, cr4
+200115ac:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200115b0:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200115b4:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200115b8:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200115bc:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200115c0:	f8db 0010 	ldr.w	r0, [fp, #16]
+200115c4:	f8db 1014 	ldr.w	r1, [fp, #20]
+200115c8:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200115cc:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200115d0:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200115d4:	f8db 0004 	ldr.w	r0, [fp, #4]
+200115d8:	f8db 1008 	ldr.w	r1, [fp, #8]
+200115dc:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200115e0:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+200115e4:	f04f 0101 	mov.w	r1, #1
+200115e8:	ec41 00a4 	mcrr	0, 10, r0, r1, cr4
+200115ec:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200115f0:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200115f4:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200115f8:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200115fc:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011600:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011604:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011608:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001160c:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011610:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011614:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011618:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001161c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011620:	e7ff      	b.n	20011622 <Reset_Handler+0x161a>
+20011622:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+20011626:	f04f 0102 	mov.w	r1, #2
+2001162a:	ec41 00a4 	mcrr	0, 10, r0, r1, cr4
+2001162e:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011632:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011636:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001163a:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001163e:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011642:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011646:	f8db 1014 	ldr.w	r1, [fp, #20]
+2001164a:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001164e:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011652:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011656:	f8db 0004 	ldr.w	r0, [fp, #4]
+2001165a:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001165e:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011662:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+20011666:	f04f 0100 	mov.w	r1, #0
+2001166a:	ec41 00b4 	mcrr	0, 11, r0, r1, cr4
+2001166e:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011672:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011676:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001167a:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001167e:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011682:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011686:	f8db 1014 	ldr.w	r1, [fp, #20]
+2001168a:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001168e:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011692:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011696:	f8db 0004 	ldr.w	r0, [fp, #4]
+2001169a:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001169e:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200116a2:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+200116a6:	f04f 0101 	mov.w	r1, #1
+200116aa:	ec41 00b4 	mcrr	0, 11, r0, r1, cr4
+200116ae:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200116b2:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200116b6:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200116ba:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200116be:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200116c2:	f8db 0010 	ldr.w	r0, [fp, #16]
+200116c6:	f8db 1014 	ldr.w	r1, [fp, #20]
+200116ca:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200116ce:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200116d2:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200116d6:	f8db 0004 	ldr.w	r0, [fp, #4]
+200116da:	f8db 1008 	ldr.w	r1, [fp, #8]
+200116de:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200116e2:	f04f 10f0 	mov.w	r0, #15728880	@ 0xf000f0
+200116e6:	f04f 0102 	mov.w	r1, #2
+200116ea:	ec41 00b4 	mcrr	0, 11, r0, r1, cr4
+200116ee:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200116f2:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200116f6:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200116fa:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200116fe:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011702:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011706:	f8db 1014 	ldr.w	r1, [fp, #20]
+2001170a:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001170e:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011712:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011716:	f8db 0004 	ldr.w	r0, [fp, #4]
+2001171a:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001171e:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011722:	e7ff      	b.n	20011724 <Reset_Handler+0x171c>
+20011724:	f44f 7080 	mov.w	r0, #256	@ 0x100
+20011728:	f8cb 0018 	str.w	r0, [fp, #24]
+2001172c:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011730:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011734:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011738:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001173c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011740:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011744:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011748:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001174c:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011750:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011754:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011758:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001175c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011760:	f44f 7080 	mov.w	r0, #256	@ 0x100
+20011764:	f8cb 0020 	str.w	r0, [fp, #32]
+20011768:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001176c:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011770:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011774:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20011778:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001177c:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011780:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011784:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011788:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001178c:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011790:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011794:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011798:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001179c:	f04f 0003 	mov.w	r0, #3
+200117a0:	f8cb 0028 	str.w	r0, [fp, #40]	@ 0x28
+200117a4:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200117a8:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200117ac:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200117b0:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200117b4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200117b8:	f8db 0010 	ldr.w	r0, [fp, #16]
+200117bc:	f8db 1014 	ldr.w	r1, [fp, #20]
+200117c0:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200117c4:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200117c8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200117cc:	f8db 0004 	ldr.w	r0, [fp, #4]
+200117d0:	f8db 1008 	ldr.w	r1, [fp, #8]
+200117d4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200117d8:	f04f 0008 	mov.w	r0, #8
+200117dc:	f8cb 001c 	str.w	r0, [fp, #28]
+200117e0:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200117e4:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200117e8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200117ec:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200117f0:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200117f4:	f8db 0010 	ldr.w	r0, [fp, #16]
+200117f8:	f8db 1014 	ldr.w	r1, [fp, #20]
+200117fc:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011800:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011804:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011808:	f8db 0004 	ldr.w	r0, [fp, #4]
+2001180c:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011810:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011814:	e7ff      	b.n	20011816 <Reset_Handler+0x180e>
+20011816:	f04f 0008 	mov.w	r0, #8
+2001181a:	f8cb 0024 	str.w	r0, [fp, #36]	@ 0x24
+2001181e:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011822:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011826:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001182a:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001182e:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011832:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011836:	f8db 1014 	ldr.w	r1, [fp, #20]
+2001183a:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001183e:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011842:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011846:	f8db 0004 	ldr.w	r0, [fp, #4]
+2001184a:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001184e:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011852:	f04f 0003 	mov.w	r0, #3
+20011856:	f8cb 002c 	str.w	r0, [fp, #44]	@ 0x2c
+2001185a:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001185e:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011862:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011866:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001186a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001186e:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011872:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011876:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001187a:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+2001187e:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011882:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011886:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001188a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001188e:	f44f 7080 	mov.w	r0, #256	@ 0x100
+20011892:	f8cb 0038 	str.w	r0, [fp, #56]	@ 0x38
+20011896:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001189a:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+2001189e:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200118a2:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200118a6:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200118aa:	f8db 0010 	ldr.w	r0, [fp, #16]
+200118ae:	f8db 1014 	ldr.w	r1, [fp, #20]
+200118b2:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200118b6:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200118ba:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200118be:	f8db 0004 	ldr.w	r0, [fp, #4]
+200118c2:	f8db 1008 	ldr.w	r1, [fp, #8]
+200118c6:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200118ca:	f44f 7080 	mov.w	r0, #256	@ 0x100
+200118ce:	f8cb 0040 	str.w	r0, [fp, #64]	@ 0x40
+200118d2:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200118d6:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200118da:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200118de:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200118e2:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200118e6:	f8db 0010 	ldr.w	r0, [fp, #16]
+200118ea:	f8db 1014 	ldr.w	r1, [fp, #20]
+200118ee:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200118f2:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200118f6:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200118fa:	f8db 0004 	ldr.w	r0, [fp, #4]
+200118fe:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011902:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011906:	e7ff      	b.n	20011908 <Reset_Handler+0x1900>
+20011908:	f04f 0003 	mov.w	r0, #3
+2001190c:	f8cb 0048 	str.w	r0, [fp, #72]	@ 0x48
+20011910:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011914:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011918:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+2001191c:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20011920:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011924:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011928:	f8db 1014 	ldr.w	r1, [fp, #20]
+2001192c:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011930:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011934:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011938:	f8db 0004 	ldr.w	r0, [fp, #4]
+2001193c:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011940:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011944:	f04f 0008 	mov.w	r0, #8
+20011948:	f8cb 003c 	str.w	r0, [fp, #60]	@ 0x3c
+2001194c:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011950:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011954:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011958:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+2001195c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011960:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011964:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011968:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+2001196c:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011970:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011974:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011978:	f8db 1008 	ldr.w	r1, [fp, #8]
+2001197c:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011980:	f04f 0008 	mov.w	r0, #8
+20011984:	f8cb 0044 	str.w	r0, [fp, #68]	@ 0x44
+20011988:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+2001198c:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011990:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011994:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20011998:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+2001199c:	f8db 0010 	ldr.w	r0, [fp, #16]
+200119a0:	f8db 1014 	ldr.w	r1, [fp, #20]
+200119a4:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200119a8:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200119ac:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200119b0:	f8db 0004 	ldr.w	r0, [fp, #4]
+200119b4:	f8db 1008 	ldr.w	r1, [fp, #8]
+200119b8:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200119bc:	f04f 0003 	mov.w	r0, #3
+200119c0:	f8cb 004c 	str.w	r0, [fp, #76]	@ 0x4c
+200119c4:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+200119c8:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+200119cc:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200119d0:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+200119d4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200119d8:	f8db 0010 	ldr.w	r0, [fp, #16]
+200119dc:	f8db 1014 	ldr.w	r1, [fp, #20]
+200119e0:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+200119e4:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+200119e8:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+200119ec:	f8db 0004 	ldr.w	r0, [fp, #4]
+200119f0:	f8db 1008 	ldr.w	r1, [fp, #8]
+200119f4:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+200119f8:	e7ff      	b.n	200119fa <Reset_Handler+0x19f2>
+200119fa:	f04f 0000 	mov.w	r0, #0
+200119fe:	f8cb 0010 	str.w	r0, [fp, #16]
+20011a02:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011a06:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011a0a:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011a0e:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20011a12:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011a16:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011a1a:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011a1e:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011a22:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011a26:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011a2a:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011a2e:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011a32:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011a36:	f04f 0000 	mov.w	r0, #0
+20011a3a:	f8cb 0014 	str.w	r0, [fp, #20]
+20011a3e:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011a42:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011a46:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011a4a:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20011a4e:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011a52:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011a56:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011a5a:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011a5e:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011a62:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011a66:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011a6a:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011a6e:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011a72:	f04f 0000 	mov.w	r0, #0
+20011a76:	f8cb 0030 	str.w	r0, [fp, #48]	@ 0x30
+20011a7a:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011a7e:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011a82:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011a86:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20011a8a:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011a8e:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011a92:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011a96:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011a9a:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011a9e:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011aa2:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011aa6:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011aaa:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011aae:	f04f 0000 	mov.w	r0, #0
+20011ab2:	f8cb 0034 	str.w	r0, [fp, #52]	@ 0x34
+20011ab6:	ec51 0000 	mrrc	0, 0, r0, r1, cr0
+20011aba:	ec53 2004 	mrrc	0, 0, r2, r3, cr4
+20011abe:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011ac2:	ec51 0008 	mrrc	0, 0, r0, r1, cr8
+20011ac6:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011aca:	f8db 0010 	ldr.w	r0, [fp, #16]
+20011ace:	f8db 1014 	ldr.w	r1, [fp, #20]
+20011ad2:	f8db 2030 	ldr.w	r2, [fp, #48]	@ 0x30
+20011ad6:	f8db 3034 	ldr.w	r3, [fp, #52]	@ 0x34
+20011ada:	e8aa 000f 	stmia.w	sl!, {r0, r1, r2, r3}
+20011ade:	f8db 0004 	ldr.w	r0, [fp, #4]
+20011ae2:	f8db 1008 	ldr.w	r1, [fp, #8]
+20011ae6:	e8aa 0003 	stmia.w	sl!, {r0, r1}
+20011aea:	e7ff      	b.n	20011aec <Reset_Handler+0x1ae4>
+20011aec:	f8db 0000 	ldr.w	r0, [fp]
+20011af0:	f84a 0b04 	str.w	r0, [sl], #4
+20011af4:	ee10 0430 			@ <UNDEFINED> instruction: 0xee100430
+20011af8:	f84a 0b04 	str.w	r0, [sl], #4
+20011afc:	ee10 0430 			@ <UNDEFINED> instruction: 0xee100430
+20011b00:	f84a 0b04 	str.w	r0, [sl], #4
+20011b04:	e7ff      	b.n	20011b06 <Reset_Handler+0x1afe>
+20011b06:	48aa      	ldr	r0, [pc, #680]	@ (20011db0 <Reset_Handler+0x1da8>)
+20011b08:	6801      	ldr	r1, [r0, #0]
+20011b0a:	f041 7180 	orr.w	r1, r1, #16777216	@ 0x1000000
+20011b0e:	6001      	str	r1, [r0, #0]
+20011b10:	48a8      	ldr	r0, [pc, #672]	@ (20011db4 <Reset_Handler+0x1dac>)
+20011b12:	6801      	ldr	r1, [r0, #0]
+20011b14:	f041 0101 	orr.w	r1, r1, #1
+20011b18:	6001      	str	r1, [r0, #0]
+20011b1a:	4ca7      	ldr	r4, [pc, #668]	@ (20011db8 <Reset_Handler+0x1db0>)
+20011b1c:	f04f 0714 	mov.w	r7, #20
+20011b20:	f04f 0801 	mov.w	r8, #1
+20011b24:	6825      	ldr	r5, [r4, #0]
+20011b26:	bf00      	nop
+20011b28:	6826      	ldr	r6, [r4, #0]
+20011b2a:	eba6 0605 	sub.w	r6, r6, r5
+20011b2e:	f84a 6b04 	str.w	r6, [sl], #4
+20011b32:	6825      	ldr	r5, [r4, #0]
+20011b34:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b38:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b3c:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b40:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b44:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b48:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b4c:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b50:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b54:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b58:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b5c:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b60:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b64:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b68:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b6c:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b70:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b74:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b78:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b7c:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b80:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b84:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b88:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b8c:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b90:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b94:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b98:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011b9c:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011ba0:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011ba4:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011ba8:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011bac:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011bb0:	ec48 7040 	mcrr	0, 4, r7, r8, cr0
+20011bb4:	6826      	ldr	r6, [r4, #0]
+20011bb6:	eba6 0605 	sub.w	r6, r6, r5
+20011bba:	f84a 6b04 	str.w	r6, [sl], #4
+20011bbe:	6825      	ldr	r5, [r4, #0]
+20011bc0:	f8cb 8018 	str.w	r8, [fp, #24]
+20011bc4:	f8cb 8018 	str.w	r8, [fp, #24]
+20011bc8:	f8cb 8018 	str.w	r8, [fp, #24]
+20011bcc:	f8cb 8018 	str.w	r8, [fp, #24]
+20011bd0:	f8cb 8018 	str.w	r8, [fp, #24]
+20011bd4:	f8cb 8018 	str.w	r8, [fp, #24]
+20011bd8:	f8cb 8018 	str.w	r8, [fp, #24]
+20011bdc:	f8cb 8018 	str.w	r8, [fp, #24]
+20011be0:	f8cb 8018 	str.w	r8, [fp, #24]
+20011be4:	f8cb 8018 	str.w	r8, [fp, #24]
+20011be8:	f8cb 8018 	str.w	r8, [fp, #24]
+20011bec:	f8cb 8018 	str.w	r8, [fp, #24]
+20011bf0:	f8cb 8018 	str.w	r8, [fp, #24]
+20011bf4:	f8cb 8018 	str.w	r8, [fp, #24]
+20011bf8:	f8cb 8018 	str.w	r8, [fp, #24]
+20011bfc:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c00:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c04:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c08:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c0c:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c10:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c14:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c18:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c1c:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c20:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c24:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c28:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c2c:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c30:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c34:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c38:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c3c:	f8cb 8018 	str.w	r8, [fp, #24]
+20011c40:	6826      	ldr	r6, [r4, #0]
+20011c42:	eba6 0605 	sub.w	r6, r6, r5
+20011c46:	f84a 6b04 	str.w	r6, [sl], #4
+20011c4a:	6825      	ldr	r5, [r4, #0]
+20011c4c:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c50:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c54:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c58:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c5c:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c60:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c64:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c68:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c6c:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c70:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c74:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c78:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c7c:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c80:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c84:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c88:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c8c:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c90:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c94:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c98:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011c9c:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011ca0:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011ca4:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011ca8:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011cac:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011cb0:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011cb4:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011cb8:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011cbc:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011cc0:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011cc4:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011cc8:	ee10 9018 			@ <UNDEFINED> instruction: 0xee109018
+20011ccc:	6826      	ldr	r6, [r4, #0]
+20011cce:	eba6 0605 	sub.w	r6, r6, r5
+20011cd2:	f84a 6b04 	str.w	r6, [sl], #4
+20011cd6:	6825      	ldr	r5, [r4, #0]
+20011cd8:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011cdc:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011ce0:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011ce4:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011ce8:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011cec:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011cf0:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011cf4:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011cf8:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011cfc:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d00:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d04:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d08:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d0c:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d10:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d14:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d18:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d1c:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d20:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d24:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d28:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d2c:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d30:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d34:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d38:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d3c:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d40:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d44:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d48:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d4c:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d50:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d54:	f8db 9004 	ldr.w	r9, [fp, #4]
+20011d58:	6826      	ldr	r6, [r4, #0]
+20011d5a:	eba6 0605 	sub.w	r6, r6, r5
+20011d5e:	f84a 6b04 	str.w	r6, [sl], #4
+20011d62:	6825      	ldr	r5, [r4, #0]
+20011d64:	bf00      	nop
+20011d66:	bf00      	nop
+20011d68:	bf00      	nop
+20011d6a:	bf00      	nop
+20011d6c:	bf00      	nop
+20011d6e:	bf00      	nop
+20011d70:	bf00      	nop
+20011d72:	bf00      	nop
+20011d74:	bf00      	nop
+20011d76:	bf00      	nop
+20011d78:	bf00      	nop
+20011d7a:	bf00      	nop
+20011d7c:	bf00      	nop
+20011d7e:	bf00      	nop
+20011d80:	bf00      	nop
+20011d82:	bf00      	nop
+20011d84:	bf00      	nop
+20011d86:	bf00      	nop
+20011d88:	bf00      	nop
+20011d8a:	bf00      	nop
+20011d8c:	bf00      	nop
+20011d8e:	bf00      	nop
+20011d90:	bf00      	nop
+20011d92:	bf00      	nop
+20011d94:	bf00      	nop
+20011d96:	bf00      	nop
+20011d98:	bf00      	nop
+20011d9a:	bf00      	nop
+20011d9c:	bf00      	nop
+20011d9e:	bf00      	nop
+20011da0:	bf00      	nop
+20011da2:	bf00      	nop
+20011da4:	6826      	ldr	r6, [r4, #0]
+20011da6:	eba6 0605 	sub.w	r6, r6, r5
+20011daa:	f84a 6b04 	str.w	r6, [sl], #4
+20011dae:	e005      	b.n	20011dbc <Reset_Handler+0x1db4>
+20011db0:	e000edfc 	.word	0xe000edfc
+20011db4:	e0001000 	.word	0xe0001000
+20011db8:	e0001004 	.word	0xe0001004
+20011dbc:	480f      	ldr	r0, [pc, #60]	@ (20011dfc <Reset_Handler+0x1df4>)
+20011dbe:	4910      	ldr	r1, [pc, #64]	@ (20011e00 <Reset_Handler+0x1df8>)
+20011dc0:	4a10      	ldr	r2, [pc, #64]	@ (20011e04 <Reset_Handler+0x1dfc>)
+20011dc2:	4b11      	ldr	r3, [pc, #68]	@ (20011e08 <Reset_Handler+0x1e00>)
+20011dc4:	f04f 0900 	mov.w	r9, #0
+20011dc8:	f812 4b01 	ldrb.w	r4, [r2], #1
+20011dcc:	f850 5b04 	ldr.w	r5, [r0], #4
+20011dd0:	f851 6b04 	ldr.w	r6, [r1], #4
+20011dd4:	b11c      	cbz	r4, 20011dde <Reset_Handler+0x1dd6>
+20011dd6:	42b5      	cmp	r5, r6
+20011dd8:	bf18      	it	ne
+20011dda:	f109 0901 	addne.w	r9, r9, #1
+20011dde:	3b01      	subs	r3, #1
+20011de0:	d1f2      	bne.n	20011dc8 <Reset_Handler+0x1dc0>
+20011de2:	490a      	ldr	r1, [pc, #40]	@ (20011e0c <Reset_Handler+0x1e04>)
+20011de4:	f1b9 0f00 	cmp.w	r9, #0
+20011de8:	bf18      	it	ne
+20011dea:	4909      	ldrne	r1, [pc, #36]	@ (20011e10 <Reset_Handler+0x1e08>)
+20011dec:	2004      	movs	r0, #4
+20011dee:	beab      	bkpt	0x00ab
+20011df0:	f04f 0018 	mov.w	r0, #24
+20011df4:	4907      	ldr	r1, [pc, #28]	@ (20011e14 <Reset_Handler+0x1e0c>)
+20011df6:	beab      	bkpt	0x00ab
+20011df8:	e7fe      	b.n	20011df8 <Reset_Handler+0x1df0>
+20011dfa:	0000      	.short	0x0000
+20011dfc:	20004000 	.word	0x20004000
+20011e00:	20011e18 	.word	0x20011e18
+20011e04:	200132ac 	.word	0x200132ac
+20011e08:	00000525 	.word	0x00000525
+20011e0c:	200137d1 	.word	0x200137d1
+20011e10:	200137e2 	.word	0x200137e2
+20011e14:	00020026 	.word	0x00020026
+
+20011e18 <expected>:
+	...
+20011e20:	02000040 	.word	0x02000040
+20011e24:	00000000 	.word	0x00000000
+20011e28:	0000301c 	.word	0x0000301c
+20011e2c:	c8000000 	.word	0xc8000000
+	...
+20011e38:	02000040 	.word	0x02000040
+20011e3c:	00000000 	.word	0x00000000
+20011e40:	0000301c 	.word	0x0000301c
+20011e44:	c8000000 	.word	0xc8000000
+	...
+20011e50:	02000040 	.word	0x02000040
+20011e54:	00000000 	.word	0x00000000
+20011e58:	0000303c 	.word	0x0000303c
+20011e5c:	c8000000 	.word	0xc8000000
+	...
+20011e68:	02000040 	.word	0x02000040
+20011e6c:	00000000 	.word	0x00000000
+20011e70:	0000303c 	.word	0x0000303c
+20011e74:	c8000000 	.word	0xc8000000
+	...
+20011e80:	02000040 	.word	0x02000040
+20011e84:	00000000 	.word	0x00000000
+20011e88:	0000301c 	.word	0x0000301c
+20011e8c:	c8000000 	.word	0xc8000000
+	...
+20011e98:	02000040 	.word	0x02000040
+20011e9c:	00000000 	.word	0x00000000
+20011ea0:	0000301c 	.word	0x0000301c
+20011ea4:	c8000000 	.word	0xc8000000
+	...
+20011eb8:	0000303c 	.word	0x0000303c
+20011ebc:	c8000000 	.word	0xc8000000
+	...
+20011ed0:	0000303c 	.word	0x0000303c
+20011ed4:	c8000000 	.word	0xc8000000
+	...
+20011ee8:	0000303e 	.word	0x0000303e
+20011eec:	c8000000 	.word	0xc8000000
+	...
+20011f00:	0000303e 	.word	0x0000303e
+20011f04:	c8000000 	.word	0xc8000000
+20011f08:	a5a5a5a5 	.word	0xa5a5a5a5
+	...
+20011f18:	0000301c 	.word	0x0000301c
+20011f1c:	c8000000 	.word	0xc8000000
+20011f20:	a5a5a5a5 	.word	0xa5a5a5a5
+	...
+20011f30:	0000301c 	.word	0x0000301c
+20011f34:	c8000000 	.word	0xc8000000
+20011f38:	a5a5a5a5 	.word	0xa5a5a5a5
+20011f3c:	ff00ffff 	.word	0xff00ffff
+	...
+20011f48:	0000303e 	.word	0x0000303e
+20011f4c:	c8000000 	.word	0xc8000000
+20011f50:	a5a5a5a5 	.word	0xa5a5a5a5
+20011f54:	ff00ffff 	.word	0xff00ffff
+	...
+20011f60:	0000303e 	.word	0x0000303e
+20011f64:	c8000000 	.word	0xc8000000
+20011f68:	5a5aa5a5 	.word	0x5a5aa5a5
+20011f6c:	ff00ffff 	.word	0xff00ffff
+	...
+20011f78:	0000301c 	.word	0x0000301c
+20011f7c:	c8000000 	.word	0xc8000000
+20011f80:	5a5aa5a5 	.word	0x5a5aa5a5
+20011f84:	ff00ffff 	.word	0xff00ffff
+	...
+20011f90:	0000301c 	.word	0x0000301c
+20011f94:	c8000000 	.word	0xc8000000
+20011f98:	5a5aa5af 	.word	0x5a5aa5af
+20011f9c:	ff00ffff 	.word	0xff00ffff
+	...
+20011fa8:	0000303e 	.word	0x0000303e
+20011fac:	c8000000 	.word	0xc8000000
+20011fb0:	5a5aa5af 	.word	0x5a5aa5af
+20011fb4:	ff00ffff 	.word	0xff00ffff
+	...
+20011fc0:	0000303e 	.word	0x0000303e
+20011fc4:	c8000000 	.word	0xc8000000
+20011fc8:	5a5aa50f 	.word	0x5a5aa50f
+20011fcc:	ff00ffff 	.word	0xff00ffff
+	...
+20011fd8:	0000303e 	.word	0x0000303e
+20011fdc:	c8000000 	.word	0xc8000000
+20011fe0:	5a5aa50f 	.word	0x5a5aa50f
+20011fe4:	ff00ffff 	.word	0xff00ffff
+	...
+20011ff0:	0000303e 	.word	0x0000303e
+20011ff4:	c8000000 	.word	0xc8000000
+20011ff8:	5a5aa50f 	.word	0x5a5aa50f
+20011ffc:	ff000000 	.word	0xff000000
+	...
+20012008:	0000303e 	.word	0x0000303e
+2001200c:	c8000000 	.word	0xc8000000
+20012010:	5a5aa50f 	.word	0x5a5aa50f
+20012014:	ff000000 	.word	0xff000000
+	...
+20012020:	0000303e 	.word	0x0000303e
+20012024:	c8000000 	.word	0xc8000000
+20012028:	5a5aa50f 	.word	0x5a5aa50f
+2001202c:	ff000001 	.word	0xff000001
+	...
+20012038:	0000301c 	.word	0x0000301c
+2001203c:	c8000000 	.word	0xc8000000
+20012040:	5a5aa50f 	.word	0x5a5aa50f
+20012044:	ff000001 	.word	0xff000001
+	...
+20012050:	0000301c 	.word	0x0000301c
+20012054:	c8000000 	.word	0xc8000000
+20012058:	5a5aa50f 	.word	0x5a5aa50f
+2001205c:	ff000001 	.word	0xff000001
+	...
+20012068:	0000303e 	.word	0x0000303e
+2001206c:	c8000000 	.word	0xc8000000
+20012070:	5a5aa50f 	.word	0x5a5aa50f
+20012074:	ff000001 	.word	0xff000001
+	...
+20012080:	0000303e 	.word	0x0000303e
+20012084:	c8000000 	.word	0xc8000000
+20012088:	12345678 	.word	0x12345678
+2001208c:	00005555 	.word	0x00005555
+	...
+20012098:	0000303e 	.word	0x0000303e
+2001209c:	c8000000 	.word	0xc8000000
+200120a0:	12345678 	.word	0x12345678
+200120a4:	00005555 	.word	0x00005555
+	...
+200120b0:	0000303e 	.word	0x0000303e
+200120b4:	c8000000 	.word	0xc8000000
+200120b8:	12345687 	.word	0x12345687
+200120bc:	00005556 	.word	0x00005556
+	...
+200120c8:	0000303e 	.word	0x0000303e
+200120cc:	c8000000 	.word	0xc8000000
+200120d0:	12345687 	.word	0x12345687
+200120d4:	00005556 	.word	0x00005556
+	...
+200120e0:	0000303e 	.word	0x0000303e
+200120e4:	c8000000 	.word	0xc8000000
+200120e8:	1f345687 	.word	0x1f345687
+200120ec:	00005556 	.word	0x00005556
+	...
+200120f8:	0000303e 	.word	0x0000303e
+200120fc:	c8000000 	.word	0xc8000000
+20012100:	1f345687 	.word	0x1f345687
+20012104:	00005556 	.word	0x00005556
+	...
+20012110:	0000303e 	.word	0x0000303e
+20012114:	c8000000 	.word	0xc8000000
+20012118:	1f345087 	.word	0x1f345087
+2001211c:	00005552 	.word	0x00005552
+	...
+20012128:	0000303e 	.word	0x0000303e
+2001212c:	c8000000 	.word	0xc8000000
+20012130:	1f345087 	.word	0x1f345087
+20012134:	00005552 	.word	0x00005552
+	...
+20012140:	0000303e 	.word	0x0000303e
+20012144:	c8000000 	.word	0xc8000000
+20012148:	1f3450c7 	.word	0x1f3450c7
+2001214c:	00005552 	.word	0x00005552
+	...
+20012158:	0000303e 	.word	0x0000303e
+2001215c:	c8000000 	.word	0xc8000000
+20012160:	1f3450c7 	.word	0x1f3450c7
+20012164:	00005552 	.word	0x00005552
+	...
+20012170:	0000303e 	.word	0x0000303e
+20012174:	c8000000 	.word	0xc8000000
+20012178:	1f345087 	.word	0x1f345087
+2001217c:	00005552 	.word	0x00005552
+	...
+20012188:	0000303e 	.word	0x0000303e
+2001218c:	c8000000 	.word	0xc8000000
+20012190:	1f345087 	.word	0x1f345087
+20012194:	00005552 	.word	0x00005552
+	...
+200121a0:	0000303e 	.word	0x0000303e
+200121a4:	c8000000 	.word	0xc8000000
+200121a8:	1f345087 	.word	0x1f345087
+200121ac:	00005552 	.word	0x00005552
+	...
+200121b8:	0000303e 	.word	0x0000303e
+200121bc:	c8000000 	.word	0xc8000000
+200121c0:	1f345087 	.word	0x1f345087
+200121c4:	00005552 	.word	0x00005552
+	...
+200121d0:	0000303e 	.word	0x0000303e
+200121d4:	c8000000 	.word	0xc8000000
+200121d8:	1f345087 	.word	0x1f345087
+200121dc:	00005552 	.word	0x00005552
+	...
+200121e8:	0000303e 	.word	0x0000303e
+200121ec:	c8000000 	.word	0xc8000000
+200121f0:	1f345087 	.word	0x1f345087
+200121f4:	00005552 	.word	0x00005552
+	...
+20012200:	0000303e 	.word	0x0000303e
+20012204:	c8000000 	.word	0xc8000000
+20012208:	1f345087 	.word	0x1f345087
+2001220c:	00005552 	.word	0x00005552
+	...
+20012218:	0000303c 	.word	0x0000303c
+2001221c:	c8000000 	.word	0xc8000000
+20012220:	1f345087 	.word	0x1f345087
+20012224:	00005552 	.word	0x00005552
+	...
+20012230:	0000303c 	.word	0x0000303c
+20012234:	c8000000 	.word	0xc8000000
+20012238:	1f345087 	.word	0x1f345087
+2001223c:	80005552 	.word	0x80005552
+	...
+20012248:	0000303e 	.word	0x0000303e
+2001224c:	c8000000 	.word	0xc8000000
+20012250:	1f345087 	.word	0x1f345087
+20012254:	80005552 	.word	0x80005552
+	...
+20012260:	0000303e 	.word	0x0000303e
+20012264:	c8000000 	.word	0xc8000000
+20012268:	1f345087 	.word	0x1f345087
+2001226c:	80005552 	.word	0x80005552
+	...
+20012278:	0000301c 	.word	0x0000301c
+2001227c:	c8000000 	.word	0xc8000000
+20012280:	1f345087 	.word	0x1f345087
+20012284:	80005552 	.word	0x80005552
+	...
+20012290:	0000301c 	.word	0x0000301c
+20012294:	c8000000 	.word	0xc8000000
+20012298:	1f3450c7 	.word	0x1f3450c7
+2001229c:	80005552 	.word	0x80005552
+	...
+200122a8:	0000303e 	.word	0x0000303e
+200122ac:	c8000000 	.word	0xc8000000
+200122b0:	1f3450c7 	.word	0x1f3450c7
+200122b4:	80005552 	.word	0x80005552
+	...
+200122c0:	0000303e 	.word	0x0000303e
+200122c4:	c8000000 	.word	0xc8000000
+200122c8:	1f3452c7 	.word	0x1f3452c7
+200122cc:	80005552 	.word	0x80005552
+	...
+200122d8:	0000303e 	.word	0x0000303e
+200122dc:	c8000000 	.word	0xc8000000
+200122e0:	1f3452c7 	.word	0x1f3452c7
+200122e4:	80005552 	.word	0x80005552
+	...
+200122f0:	0000303e 	.word	0x0000303e
+200122f4:	c8000000 	.word	0xc8000000
+200122f8:	1f3452c7 	.word	0x1f3452c7
+200122fc:	80005752 	.word	0x80005752
+	...
+20012308:	0000301c 	.word	0x0000301c
+2001230c:	c8000000 	.word	0xc8000000
+20012310:	1f3452c7 	.word	0x1f3452c7
+20012314:	80005752 	.word	0x80005752
+	...
+20012320:	0000301c 	.word	0x0000301c
+20012324:	c8000000 	.word	0xc8000000
+20012328:	1f3452c7 	.word	0x1f3452c7
+2001232c:	80005752 	.word	0x80005752
+	...
+20012338:	0000303c 	.word	0x0000303c
+2001233c:	c8000000 	.word	0xc8000000
+20012340:	1f3452c7 	.word	0x1f3452c7
+20012344:	80005752 	.word	0x80005752
+	...
+20012350:	0000303c 	.word	0x0000303c
+20012354:	c8000000 	.word	0xc8000000
+20012358:	1f3456c7 	.word	0x1f3456c7
+2001235c:	80005752 	.word	0x80005752
+	...
+20012368:	0000301c 	.word	0x0000301c
+2001236c:	c8000000 	.word	0xc8000000
+20012370:	1f3456c7 	.word	0x1f3456c7
+20012374:	80005752 	.word	0x80005752
+	...
+20012380:	0000301c 	.word	0x0000301c
+20012384:	c8000000 	.word	0xc8000000
+20012388:	1f3456c7 	.word	0x1f3456c7
+2001238c:	80005752 	.word	0x80005752
+	...
+20012398:	0000301c 	.word	0x0000301c
+2001239c:	c8000000 	.word	0xc8000000
+200123a0:	1f3456c7 	.word	0x1f3456c7
+200123a4:	80005752 	.word	0x80005752
+	...
+200123b0:	0000301c 	.word	0x0000301c
+200123b4:	c8000000 	.word	0xc8000000
+200123b8:	1f3456c7 	.word	0x1f3456c7
+200123bc:	80005752 	.word	0x80005752
+	...
+200123c8:	0000303e 	.word	0x0000303e
+200123cc:	c8000000 	.word	0xc8000000
+200123d0:	1f3456c7 	.word	0x1f3456c7
+200123d4:	80005752 	.word	0x80005752
+	...
+200123e0:	0000303e 	.word	0x0000303e
+200123e4:	c8000000 	.word	0xc8000000
+200123e8:	1f3456c7 	.word	0x1f3456c7
+200123ec:	80005752 	.word	0x80005752
+	...
+200123f8:	0000303e 	.word	0x0000303e
+200123fc:	c8000000 	.word	0xc8000000
+20012400:	1f3456c7 	.word	0x1f3456c7
+20012404:	80005752 	.word	0x80005752
+	...
+20012410:	0000303e 	.word	0x0000303e
+20012414:	c8000000 	.word	0xc8000000
+20012418:	1f3456c7 	.word	0x1f3456c7
+2001241c:	80005752 	.word	0x80005752
+	...
+20012428:	0000303e 	.word	0x0000303e
+2001242c:	c8000000 	.word	0xc8000000
+20012430:	1f3456c7 	.word	0x1f3456c7
+20012434:	80005752 	.word	0x80005752
+	...
+20012440:	0000303e 	.word	0x0000303e
+20012444:	c8000000 	.word	0xc8000000
+20012448:	1f3454c7 	.word	0x1f3454c7
+2001244c:	80005752 	.word	0x80005752
+	...
+20012458:	0000301c 	.word	0x0000301c
+2001245c:	c8000000 	.word	0xc8000000
+20012460:	1f3454c7 	.word	0x1f3454c7
+20012464:	80005752 	.word	0x80005752
+	...
+20012470:	0000301c 	.word	0x0000301c
+20012474:	c8000000 	.word	0xc8000000
+20012478:	1f3454c7 	.word	0x1f3454c7
+2001247c:	80005552 	.word	0x80005552
+	...
+20012488:	0000303c 	.word	0x0000303c
+2001248c:	c8000000 	.word	0xc8000000
+20012490:	1f3454c7 	.word	0x1f3454c7
+20012494:	80005552 	.word	0x80005552
+	...
+200124a0:	0000303c 	.word	0x0000303c
+200124a4:	c8000000 	.word	0xc8000000
+200124a8:	1f3454c7 	.word	0x1f3454c7
+200124ac:	80005552 	.word	0x80005552
+	...
+200124b8:	0000301c 	.word	0x0000301c
+200124bc:	c8000000 	.word	0xc8000000
+200124c0:	1f3454c7 	.word	0x1f3454c7
+200124c4:	80005552 	.word	0x80005552
+	...
+200124d0:	0000301c 	.word	0x0000301c
+200124d4:	c8000000 	.word	0xc8000000
+200124d8:	1f3450c7 	.word	0x1f3450c7
+200124dc:	80005552 	.word	0x80005552
+	...
+200124e8:	0000303c 	.word	0x0000303c
+200124ec:	c8000000 	.word	0xc8000000
+200124f0:	1f3450c7 	.word	0x1f3450c7
+200124f4:	80005552 	.word	0x80005552
+	...
+20012500:	0000303c 	.word	0x0000303c
+20012504:	c8000000 	.word	0xc8000000
+20012508:	1f3450c7 	.word	0x1f3450c7
+2001250c:	de00beef 	.word	0xde00beef
+	...
+20012518:	0000303c 	.word	0x0000303c
+2001251c:	c8000000 	.word	0xc8000000
+20012520:	1f3450c7 	.word	0x1f3450c7
+20012524:	de00beef 	.word	0xde00beef
+	...
+20012530:	0000303c 	.word	0x0000303c
+20012534:	c8000000 	.word	0xc8000000
+20012538:	1f3450c7 	.word	0x1f3450c7
+2001253c:	de00beef 	.word	0xde00beef
+	...
+20012548:	0000301c 	.word	0x0000301c
+2001254c:	c8000000 	.word	0xc8000000
+20012550:	1f3450c7 	.word	0x1f3450c7
+20012554:	de00beef 	.word	0xde00beef
+	...
+20012560:	0000301c 	.word	0x0000301c
+20012564:	c8000000 	.word	0xc8000000
+20012568:	1f3450c7 	.word	0x1f3450c7
+2001256c:	de00beef 	.word	0xde00beef
+	...
+20012578:	0000303c 	.word	0x0000303c
+2001257c:	c8000000 	.word	0xc8000000
+20012580:	1f3450c7 	.word	0x1f3450c7
+20012584:	de00beef 	.word	0xde00beef
+	...
+20012590:	0000303c 	.word	0x0000303c
+20012594:	c8000000 	.word	0xc8000000
+20012598:	1fc45037 	.word	0x1fc45037
+2001259c:	de00beef 	.word	0xde00beef
+	...
+200125a8:	0000301c 	.word	0x0000301c
+200125ac:	c8000000 	.word	0xc8000000
+200125b0:	1fc45037 	.word	0x1fc45037
+200125b4:	de00beef 	.word	0xde00beef
+	...
+200125c0:	0000301c 	.word	0x0000301c
+200125c4:	c8000000 	.word	0xc8000000
+200125c8:	1f3450c7 	.word	0x1f3450c7
+200125cc:	de00beef 	.word	0xde00beef
+	...
+200125d8:	0000301c 	.word	0x0000301c
+200125dc:	c8000000 	.word	0xc8000000
+200125e0:	1f3450c7 	.word	0x1f3450c7
+200125e4:	de00beef 	.word	0xde00beef
+	...
+200125f0:	0000301c 	.word	0x0000301c
+200125f4:	c8000000 	.word	0xc8000000
+200125f8:	1fc45037 	.word	0x1fc45037
+200125fc:	de00beef 	.word	0xde00beef
+	...
+20012608:	0000303e 	.word	0x0000303e
+2001260c:	c8000000 	.word	0xc8000000
+20012610:	1fc45037 	.word	0x1fc45037
+20012614:	de00beef 	.word	0xde00beef
+	...
+20012620:	0000303e 	.word	0x0000303e
+20012624:	c8000000 	.word	0xc8000000
+20012628:	1ff450f7 	.word	0x1ff450f7
+2001262c:	de00beef 	.word	0xde00beef
+	...
+20012638:	0000303c 	.word	0x0000303c
+2001263c:	c8000000 	.word	0xc8000000
+20012640:	1ff450f7 	.word	0x1ff450f7
+20012644:	de00beef 	.word	0xde00beef
+	...
+20012650:	0000303c 	.word	0x0000303c
+20012654:	c8000000 	.word	0xc8000000
+20012658:	1ff450f7 	.word	0x1ff450f7
+2001265c:	de00beef 	.word	0xde00beef
+	...
+20012668:	0000303e 	.word	0x0000303e
+2001266c:	c8000000 	.word	0xc8000000
+20012670:	1ff450f7 	.word	0x1ff450f7
+20012674:	de00beef 	.word	0xde00beef
+	...
+20012680:	0000303e 	.word	0x0000303e
+20012684:	c8000000 	.word	0xc8000000
+20012688:	1ff450f7 	.word	0x1ff450f7
+2001268c:	de00beef 	.word	0xde00beef
+	...
+20012698:	0000303e 	.word	0x0000303e
+2001269c:	c8000000 	.word	0xc8000000
+200126a0:	1ff450f7 	.word	0x1ff450f7
+200126a4:	de00beef 	.word	0xde00beef
+	...
+200126b0:	0000303e 	.word	0x0000303e
+200126b4:	c8000000 	.word	0xc8000000
+200126b8:	1f045007 	.word	0x1f045007
+200126bc:	de00beef 	.word	0xde00beef
+	...
+200126c8:	0000303e 	.word	0x0000303e
+200126cc:	c8000000 	.word	0xc8000000
+200126d0:	1f045007 	.word	0x1f045007
+200126d4:	de00beef 	.word	0xde00beef
+	...
+200126e0:	0000303e 	.word	0x0000303e
+200126e4:	c8000000 	.word	0xc8000000
+200126e8:	1f045007 	.word	0x1f045007
+200126ec:	de00beef 	.word	0xde00beef
+	...
+200126f8:	0000303e 	.word	0x0000303e
+200126fc:	c8000000 	.word	0xc8000000
+20012700:	1f045007 	.word	0x1f045007
+20012704:	de00beef 	.word	0xde00beef
+	...
+20012710:	0000303e 	.word	0x0000303e
+20012714:	c8000000 	.word	0xc8000000
+20012718:	1f045007 	.word	0x1f045007
+2001271c:	de00beef 	.word	0xde00beef
+	...
+20012728:	0000303e 	.word	0x0000303e
+2001272c:	c8000000 	.word	0xc8000000
+20012730:	1f045007 	.word	0x1f045007
+20012734:	de00beef 	.word	0xde00beef
+	...
+20012740:	0000303e 	.word	0x0000303e
+20012744:	c8000000 	.word	0xc8000000
+20012748:	1f045007 	.word	0x1f045007
+2001274c:	de00beef 	.word	0xde00beef
+20012750:	a5a5a5a5 	.word	0xa5a5a5a5
+20012754:	00000000 	.word	0x00000000
+20012758:	0000301c 	.word	0x0000301c
+2001275c:	c8000000 	.word	0xc8000000
+20012760:	1f045007 	.word	0x1f045007
+20012764:	de00beef 	.word	0xde00beef
+20012768:	a5a5a5a5 	.word	0xa5a5a5a5
+2001276c:	00000000 	.word	0x00000000
+20012770:	0000301c 	.word	0x0000301c
+20012774:	c8000000 	.word	0xc8000000
+20012778:	1f045007 	.word	0x1f045007
+2001277c:	de00beef 	.word	0xde00beef
+20012780:	a5a5a5a5 	.word	0xa5a5a5a5
+20012784:	ff00ffff 	.word	0xff00ffff
+20012788:	0000303c 	.word	0x0000303c
+2001278c:	c8000000 	.word	0xc8000000
+20012790:	1f045007 	.word	0x1f045007
+20012794:	de00beef 	.word	0xde00beef
+20012798:	a5a5a5a5 	.word	0xa5a5a5a5
+2001279c:	ff00ffff 	.word	0xff00ffff
+200127a0:	0000303c 	.word	0x0000303c
+200127a4:	c8000000 	.word	0xc8000000
+200127a8:	1f045007 	.word	0x1f045007
+200127ac:	de00beef 	.word	0xde00beef
+200127b0:	5a5aa5a5 	.word	0x5a5aa5a5
+200127b4:	ff00ffff 	.word	0xff00ffff
+200127b8:	0200303e 	.word	0x0200303e
+200127bc:	c8000000 	.word	0xc8000000
+200127c0:	1f045007 	.word	0x1f045007
+200127c4:	de00beef 	.word	0xde00beef
+200127c8:	5a5aa5a5 	.word	0x5a5aa5a5
+200127cc:	ff00ffff 	.word	0xff00ffff
+200127d0:	0200303e 	.word	0x0200303e
+200127d4:	c8000000 	.word	0xc8000000
+200127d8:	1f045007 	.word	0x1f045007
+200127dc:	de00beef 	.word	0xde00beef
+200127e0:	5a5aa5af 	.word	0x5a5aa5af
+200127e4:	ff00ffff 	.word	0xff00ffff
+200127e8:	0200303c 	.word	0x0200303c
+200127ec:	c8000000 	.word	0xc8000000
+200127f0:	1f045007 	.word	0x1f045007
+200127f4:	de00beef 	.word	0xde00beef
+200127f8:	5a5aa5af 	.word	0x5a5aa5af
+200127fc:	ff00ffff 	.word	0xff00ffff
+20012800:	0200303c 	.word	0x0200303c
+20012804:	c8000000 	.word	0xc8000000
+20012808:	1f045007 	.word	0x1f045007
+2001280c:	de00beef 	.word	0xde00beef
+20012810:	5a5aa50f 	.word	0x5a5aa50f
+20012814:	ff00ffff 	.word	0xff00ffff
+20012818:	0200303e 	.word	0x0200303e
+2001281c:	c8000000 	.word	0xc8000000
+20012820:	1f045007 	.word	0x1f045007
+20012824:	de00beef 	.word	0xde00beef
+20012828:	5a5aa50f 	.word	0x5a5aa50f
+2001282c:	ff00ffff 	.word	0xff00ffff
+20012830:	0200303e 	.word	0x0200303e
+20012834:	c8000000 	.word	0xc8000000
+20012838:	1f045007 	.word	0x1f045007
+2001283c:	de00beef 	.word	0xde00beef
+20012840:	5a5aa50f 	.word	0x5a5aa50f
+20012844:	ff000000 	.word	0xff000000
+20012848:	0200303c 	.word	0x0200303c
+2001284c:	c8000000 	.word	0xc8000000
+20012850:	1f045007 	.word	0x1f045007
+20012854:	de00beef 	.word	0xde00beef
+20012858:	5a5aa50f 	.word	0x5a5aa50f
+2001285c:	ff000000 	.word	0xff000000
+20012860:	0200303c 	.word	0x0200303c
+20012864:	c8000000 	.word	0xc8000000
+20012868:	1f045007 	.word	0x1f045007
+2001286c:	de00beef 	.word	0xde00beef
+20012870:	5a5aa50f 	.word	0x5a5aa50f
+20012874:	ff000001 	.word	0xff000001
+20012878:	0200301c 	.word	0x0200301c
+2001287c:	c8000000 	.word	0xc8000000
+20012880:	1f045007 	.word	0x1f045007
+20012884:	de00beef 	.word	0xde00beef
+20012888:	5a5aa50f 	.word	0x5a5aa50f
+2001288c:	ff000001 	.word	0xff000001
+20012890:	0200301c 	.word	0x0200301c
+20012894:	c8000000 	.word	0xc8000000
+20012898:	1f045007 	.word	0x1f045007
+2001289c:	de00beef 	.word	0xde00beef
+200128a0:	5a5aa50f 	.word	0x5a5aa50f
+200128a4:	ff000001 	.word	0xff000001
+200128a8:	0200303e 	.word	0x0200303e
+200128ac:	c8000000 	.word	0xc8000000
+200128b0:	1f045007 	.word	0x1f045007
+200128b4:	de00beef 	.word	0xde00beef
+200128b8:	5a5aa50f 	.word	0x5a5aa50f
+200128bc:	ff000001 	.word	0xff000001
+200128c0:	0200303e 	.word	0x0200303e
+200128c4:	c8000000 	.word	0xc8000000
+200128c8:	1f045007 	.word	0x1f045007
+200128cc:	de00beef 	.word	0xde00beef
+200128d0:	12345678 	.word	0x12345678
+200128d4:	00005555 	.word	0x00005555
+200128d8:	0200303e 	.word	0x0200303e
+200128dc:	c8000000 	.word	0xc8000000
+200128e0:	1f045007 	.word	0x1f045007
+200128e4:	de00beef 	.word	0xde00beef
+200128e8:	12345678 	.word	0x12345678
+200128ec:	00005555 	.word	0x00005555
+200128f0:	0200303e 	.word	0x0200303e
+200128f4:	c8000000 	.word	0xc8000000
+200128f8:	1f045007 	.word	0x1f045007
+200128fc:	de00beef 	.word	0xde00beef
+20012900:	12345687 	.word	0x12345687
+20012904:	00005556 	.word	0x00005556
+20012908:	0200303e 	.word	0x0200303e
+2001290c:	c8000000 	.word	0xc8000000
+20012910:	1f045007 	.word	0x1f045007
+20012914:	de00beef 	.word	0xde00beef
+20012918:	12345687 	.word	0x12345687
+2001291c:	00005556 	.word	0x00005556
+20012920:	0200303e 	.word	0x0200303e
+20012924:	c8000000 	.word	0xc8000000
+20012928:	1f045007 	.word	0x1f045007
+2001292c:	de00beef 	.word	0xde00beef
+20012930:	1f345687 	.word	0x1f345687
+20012934:	00005556 	.word	0x00005556
+20012938:	0200303e 	.word	0x0200303e
+2001293c:	c8000000 	.word	0xc8000000
+20012940:	1f045007 	.word	0x1f045007
+20012944:	de00beef 	.word	0xde00beef
+20012948:	1f345687 	.word	0x1f345687
+2001294c:	00005556 	.word	0x00005556
+20012950:	0200303e 	.word	0x0200303e
+20012954:	c8000000 	.word	0xc8000000
+20012958:	1f045007 	.word	0x1f045007
+2001295c:	de00beef 	.word	0xde00beef
+20012960:	1f345087 	.word	0x1f345087
+20012964:	00005552 	.word	0x00005552
+20012968:	0200303e 	.word	0x0200303e
+2001296c:	c8000000 	.word	0xc8000000
+20012970:	1f045007 	.word	0x1f045007
+20012974:	de00beef 	.word	0xde00beef
+20012978:	1f345087 	.word	0x1f345087
+2001297c:	00005552 	.word	0x00005552
+20012980:	0200303e 	.word	0x0200303e
+20012984:	c8000000 	.word	0xc8000000
+20012988:	1f045007 	.word	0x1f045007
+2001298c:	de00beef 	.word	0xde00beef
+20012990:	1f3450c7 	.word	0x1f3450c7
+20012994:	00005552 	.word	0x00005552
+20012998:	0200303e 	.word	0x0200303e
+2001299c:	c8000000 	.word	0xc8000000
+200129a0:	1f045007 	.word	0x1f045007
+200129a4:	de00beef 	.word	0xde00beef
+200129a8:	1f3450c7 	.word	0x1f3450c7
+200129ac:	00005552 	.word	0x00005552
+200129b0:	0200303e 	.word	0x0200303e
+200129b4:	c8000000 	.word	0xc8000000
+200129b8:	1f045007 	.word	0x1f045007
+200129bc:	de00beef 	.word	0xde00beef
+200129c0:	1f345087 	.word	0x1f345087
+200129c4:	00005552 	.word	0x00005552
+200129c8:	0200303c 	.word	0x0200303c
+200129cc:	c8000000 	.word	0xc8000000
+200129d0:	1f045007 	.word	0x1f045007
+200129d4:	de00beef 	.word	0xde00beef
+200129d8:	1f345087 	.word	0x1f345087
+200129dc:	00005552 	.word	0x00005552
+200129e0:	0200303c 	.word	0x0200303c
+200129e4:	c8000000 	.word	0xc8000000
+200129e8:	1f045007 	.word	0x1f045007
+200129ec:	de00beef 	.word	0xde00beef
+200129f0:	1f345087 	.word	0x1f345087
+200129f4:	00005552 	.word	0x00005552
+200129f8:	0200303e 	.word	0x0200303e
+200129fc:	c8000000 	.word	0xc8000000
+20012a00:	1f045007 	.word	0x1f045007
+20012a04:	de00beef 	.word	0xde00beef
+20012a08:	1f345087 	.word	0x1f345087
+20012a0c:	00005552 	.word	0x00005552
+20012a10:	0200303e 	.word	0x0200303e
+20012a14:	c8000000 	.word	0xc8000000
+20012a18:	1f045007 	.word	0x1f045007
+20012a1c:	de00beef 	.word	0xde00beef
+20012a20:	1f345087 	.word	0x1f345087
+20012a24:	00005552 	.word	0x00005552
+20012a28:	0200301c 	.word	0x0200301c
+20012a2c:	c8000000 	.word	0xc8000000
+20012a30:	1f045007 	.word	0x1f045007
+20012a34:	de00beef 	.word	0xde00beef
+20012a38:	1f345087 	.word	0x1f345087
+20012a3c:	00005552 	.word	0x00005552
+20012a40:	0200301c 	.word	0x0200301c
+20012a44:	c8000000 	.word	0xc8000000
+20012a48:	1f045007 	.word	0x1f045007
+20012a4c:	de00beef 	.word	0xde00beef
+20012a50:	1f345087 	.word	0x1f345087
+20012a54:	00005552 	.word	0x00005552
+20012a58:	0200303c 	.word	0x0200303c
+20012a5c:	c8000000 	.word	0xc8000000
+20012a60:	1f045007 	.word	0x1f045007
+20012a64:	de00beef 	.word	0xde00beef
+20012a68:	1f345087 	.word	0x1f345087
+20012a6c:	00005552 	.word	0x00005552
+20012a70:	0200303c 	.word	0x0200303c
+20012a74:	c8000000 	.word	0xc8000000
+20012a78:	1f045007 	.word	0x1f045007
+20012a7c:	de00beef 	.word	0xde00beef
+20012a80:	1f345087 	.word	0x1f345087
+20012a84:	80005552 	.word	0x80005552
+20012a88:	0200301c 	.word	0x0200301c
+20012a8c:	c8000000 	.word	0xc8000000
+20012a90:	1f045007 	.word	0x1f045007
+20012a94:	de00beef 	.word	0xde00beef
+20012a98:	1f345087 	.word	0x1f345087
+20012a9c:	80005552 	.word	0x80005552
+20012aa0:	0200301c 	.word	0x0200301c
+20012aa4:	c8000000 	.word	0xc8000000
+20012aa8:	1f045007 	.word	0x1f045007
+20012aac:	de00beef 	.word	0xde00beef
+20012ab0:	1f345087 	.word	0x1f345087
+20012ab4:	80005552 	.word	0x80005552
+20012ab8:	0200303c 	.word	0x0200303c
+20012abc:	c8000000 	.word	0xc8000000
+20012ac0:	1f045007 	.word	0x1f045007
+20012ac4:	de00beef 	.word	0xde00beef
+20012ac8:	1f345087 	.word	0x1f345087
+20012acc:	80005552 	.word	0x80005552
+20012ad0:	0200303c 	.word	0x0200303c
+20012ad4:	c8000000 	.word	0xc8000000
+20012ad8:	1f045007 	.word	0x1f045007
+20012adc:	de00beef 	.word	0xde00beef
+20012ae0:	1f3450c7 	.word	0x1f3450c7
+20012ae4:	80005552 	.word	0x80005552
+20012ae8:	0200301c 	.word	0x0200301c
+20012aec:	c8000000 	.word	0xc8000000
+20012af0:	1f045007 	.word	0x1f045007
+20012af4:	de00beef 	.word	0xde00beef
+20012af8:	1f3450c7 	.word	0x1f3450c7
+20012afc:	80005552 	.word	0x80005552
+20012b00:	0200301c 	.word	0x0200301c
+20012b04:	c8000000 	.word	0xc8000000
+20012b08:	1f045007 	.word	0x1f045007
+20012b0c:	de00beef 	.word	0xde00beef
+20012b10:	1f3452c7 	.word	0x1f3452c7
+20012b14:	80005552 	.word	0x80005552
+20012b18:	0200303e 	.word	0x0200303e
+20012b1c:	c8000000 	.word	0xc8000000
+20012b20:	1f045007 	.word	0x1f045007
+20012b24:	de00beef 	.word	0xde00beef
+20012b28:	1f3452c7 	.word	0x1f3452c7
+20012b2c:	80005552 	.word	0x80005552
+20012b30:	0200303e 	.word	0x0200303e
+20012b34:	c8000000 	.word	0xc8000000
+20012b38:	1f045007 	.word	0x1f045007
+20012b3c:	de00beef 	.word	0xde00beef
+20012b40:	1f3452c7 	.word	0x1f3452c7
+20012b44:	80005752 	.word	0x80005752
+20012b48:	0200303e 	.word	0x0200303e
+20012b4c:	c8000000 	.word	0xc8000000
+20012b50:	1f045007 	.word	0x1f045007
+20012b54:	de00beef 	.word	0xde00beef
+20012b58:	1f3452c7 	.word	0x1f3452c7
+20012b5c:	80005752 	.word	0x80005752
+20012b60:	0200303e 	.word	0x0200303e
+20012b64:	c8000000 	.word	0xc8000000
+20012b68:	1f045007 	.word	0x1f045007
+20012b6c:	de00beef 	.word	0xde00beef
+20012b70:	1f3452c7 	.word	0x1f3452c7
+20012b74:	80005752 	.word	0x80005752
+20012b78:	0200303e 	.word	0x0200303e
+20012b7c:	c8000000 	.word	0xc8000000
+20012b80:	1f045007 	.word	0x1f045007
+20012b84:	de00beef 	.word	0xde00beef
+20012b88:	1f3452c7 	.word	0x1f3452c7
+20012b8c:	80005752 	.word	0x80005752
+20012b90:	0200303e 	.word	0x0200303e
+20012b94:	c8000000 	.word	0xc8000000
+20012b98:	1f045007 	.word	0x1f045007
+20012b9c:	de00beef 	.word	0xde00beef
+20012ba0:	1f3456c7 	.word	0x1f3456c7
+20012ba4:	80005752 	.word	0x80005752
+20012ba8:	0200303e 	.word	0x0200303e
+20012bac:	c8000000 	.word	0xc8000000
+20012bb0:	1f045007 	.word	0x1f045007
+20012bb4:	de00beef 	.word	0xde00beef
+20012bb8:	1f3456c7 	.word	0x1f3456c7
+20012bbc:	80005752 	.word	0x80005752
+20012bc0:	0200303e 	.word	0x0200303e
+20012bc4:	c8000000 	.word	0xc8000000
+20012bc8:	1f045007 	.word	0x1f045007
+20012bcc:	de00beef 	.word	0xde00beef
+20012bd0:	1f3456c7 	.word	0x1f3456c7
+20012bd4:	80005752 	.word	0x80005752
+20012bd8:	0200303e 	.word	0x0200303e
+20012bdc:	c8000000 	.word	0xc8000000
+20012be0:	1f045007 	.word	0x1f045007
+20012be4:	de00beef 	.word	0xde00beef
+20012be8:	1f3456c7 	.word	0x1f3456c7
+20012bec:	80005752 	.word	0x80005752
+20012bf0:	0200303e 	.word	0x0200303e
+20012bf4:	c8000000 	.word	0xc8000000
+20012bf8:	1f045007 	.word	0x1f045007
+20012bfc:	de00beef 	.word	0xde00beef
+20012c00:	1f3456c7 	.word	0x1f3456c7
+20012c04:	80005752 	.word	0x80005752
+20012c08:	0200303c 	.word	0x0200303c
+20012c0c:	c8000000 	.word	0xc8000000
+20012c10:	1f045007 	.word	0x1f045007
+20012c14:	de00beef 	.word	0xde00beef
+20012c18:	1f3456c7 	.word	0x1f3456c7
+20012c1c:	80005752 	.word	0x80005752
+20012c20:	0200303c 	.word	0x0200303c
+20012c24:	c8000000 	.word	0xc8000000
+20012c28:	1f045007 	.word	0x1f045007
+20012c2c:	de00beef 	.word	0xde00beef
+20012c30:	1f3456c7 	.word	0x1f3456c7
+20012c34:	80005752 	.word	0x80005752
+20012c38:	0200301c 	.word	0x0200301c
+20012c3c:	c8000000 	.word	0xc8000000
+20012c40:	1f045007 	.word	0x1f045007
+20012c44:	de00beef 	.word	0xde00beef
+20012c48:	1f3456c7 	.word	0x1f3456c7
+20012c4c:	80005752 	.word	0x80005752
+20012c50:	0200301c 	.word	0x0200301c
+20012c54:	c8000000 	.word	0xc8000000
+20012c58:	1f045007 	.word	0x1f045007
+20012c5c:	de00beef 	.word	0xde00beef
+20012c60:	1f3456c7 	.word	0x1f3456c7
+20012c64:	80005752 	.word	0x80005752
+20012c68:	0200303c 	.word	0x0200303c
+20012c6c:	c8000000 	.word	0xc8000000
+20012c70:	1f045007 	.word	0x1f045007
+20012c74:	de00beef 	.word	0xde00beef
+20012c78:	1f3456c7 	.word	0x1f3456c7
+20012c7c:	80005752 	.word	0x80005752
+20012c80:	0200303c 	.word	0x0200303c
+20012c84:	c8000000 	.word	0xc8000000
+20012c88:	1f045007 	.word	0x1f045007
+20012c8c:	de00beef 	.word	0xde00beef
+20012c90:	1f3454c7 	.word	0x1f3454c7
+20012c94:	80005752 	.word	0x80005752
+20012c98:	0200303e 	.word	0x0200303e
+20012c9c:	c8000000 	.word	0xc8000000
+20012ca0:	1f045007 	.word	0x1f045007
+20012ca4:	de00beef 	.word	0xde00beef
+20012ca8:	1f3454c7 	.word	0x1f3454c7
+20012cac:	80005752 	.word	0x80005752
+20012cb0:	0200303e 	.word	0x0200303e
+20012cb4:	c8000000 	.word	0xc8000000
+20012cb8:	1f045007 	.word	0x1f045007
+20012cbc:	de00beef 	.word	0xde00beef
+20012cc0:	1f3454c7 	.word	0x1f3454c7
+20012cc4:	80005552 	.word	0x80005552
+20012cc8:	0200303c 	.word	0x0200303c
+20012ccc:	c8000000 	.word	0xc8000000
+20012cd0:	1f045007 	.word	0x1f045007
+20012cd4:	de00beef 	.word	0xde00beef
+20012cd8:	1f3454c7 	.word	0x1f3454c7
+20012cdc:	80005552 	.word	0x80005552
+20012ce0:	0200303c 	.word	0x0200303c
+20012ce4:	c8000000 	.word	0xc8000000
+20012ce8:	1f045007 	.word	0x1f045007
+20012cec:	de00beef 	.word	0xde00beef
+20012cf0:	1f3454c7 	.word	0x1f3454c7
+20012cf4:	80005552 	.word	0x80005552
+20012cf8:	0200303e 	.word	0x0200303e
+20012cfc:	c8000000 	.word	0xc8000000
+20012d00:	1f045007 	.word	0x1f045007
+20012d04:	de00beef 	.word	0xde00beef
+20012d08:	1f3454c7 	.word	0x1f3454c7
+20012d0c:	80005552 	.word	0x80005552
+20012d10:	0200303e 	.word	0x0200303e
+20012d14:	c8000000 	.word	0xc8000000
+20012d18:	1f045007 	.word	0x1f045007
+20012d1c:	de00beef 	.word	0xde00beef
+20012d20:	1f3450c7 	.word	0x1f3450c7
+20012d24:	80005552 	.word	0x80005552
+20012d28:	0200301c 	.word	0x0200301c
+20012d2c:	c8000000 	.word	0xc8000000
+20012d30:	1f045007 	.word	0x1f045007
+20012d34:	de00beef 	.word	0xde00beef
+20012d38:	1f3450c7 	.word	0x1f3450c7
+20012d3c:	80005552 	.word	0x80005552
+20012d40:	0200301c 	.word	0x0200301c
+20012d44:	c8000000 	.word	0xc8000000
+20012d48:	1f045007 	.word	0x1f045007
+20012d4c:	de00beef 	.word	0xde00beef
+20012d50:	1f3450c7 	.word	0x1f3450c7
+20012d54:	de00beef 	.word	0xde00beef
+20012d58:	0200303e 	.word	0x0200303e
+20012d5c:	c8000000 	.word	0xc8000000
+20012d60:	1f045007 	.word	0x1f045007
+20012d64:	de00beef 	.word	0xde00beef
+20012d68:	1f3450c7 	.word	0x1f3450c7
+20012d6c:	de00beef 	.word	0xde00beef
+20012d70:	0200303e 	.word	0x0200303e
+20012d74:	c8000000 	.word	0xc8000000
+20012d78:	1f045007 	.word	0x1f045007
+20012d7c:	de00beef 	.word	0xde00beef
+20012d80:	1f3450c7 	.word	0x1f3450c7
+20012d84:	de00beef 	.word	0xde00beef
+20012d88:	0200301c 	.word	0x0200301c
+20012d8c:	c8000000 	.word	0xc8000000
+20012d90:	1f045007 	.word	0x1f045007
+20012d94:	de00beef 	.word	0xde00beef
+20012d98:	1f3450c7 	.word	0x1f3450c7
+20012d9c:	de00beef 	.word	0xde00beef
+20012da0:	0200301c 	.word	0x0200301c
+20012da4:	c8000000 	.word	0xc8000000
+20012da8:	1f045007 	.word	0x1f045007
+20012dac:	de00beef 	.word	0xde00beef
+20012db0:	1f3450c7 	.word	0x1f3450c7
+20012db4:	de00beef 	.word	0xde00beef
+20012db8:	0200303e 	.word	0x0200303e
+20012dbc:	c8000000 	.word	0xc8000000
+20012dc0:	1f045007 	.word	0x1f045007
+20012dc4:	de00beef 	.word	0xde00beef
+20012dc8:	1f3450c7 	.word	0x1f3450c7
+20012dcc:	de00beef 	.word	0xde00beef
+20012dd0:	0200303e 	.word	0x0200303e
+20012dd4:	c8000000 	.word	0xc8000000
+20012dd8:	1f045007 	.word	0x1f045007
+20012ddc:	de00beef 	.word	0xde00beef
+20012de0:	1fc45037 	.word	0x1fc45037
+20012de4:	de00beef 	.word	0xde00beef
+20012de8:	0200303e 	.word	0x0200303e
+20012dec:	c8000000 	.word	0xc8000000
+20012df0:	1f045007 	.word	0x1f045007
+20012df4:	de00beef 	.word	0xde00beef
+20012df8:	1fc45037 	.word	0x1fc45037
+20012dfc:	de00beef 	.word	0xde00beef
+20012e00:	0200303e 	.word	0x0200303e
+20012e04:	c8000000 	.word	0xc8000000
+20012e08:	1f045007 	.word	0x1f045007
+20012e0c:	de00beef 	.word	0xde00beef
+20012e10:	1f3450c7 	.word	0x1f3450c7
+20012e14:	de00beef 	.word	0xde00beef
+20012e18:	0200303e 	.word	0x0200303e
+20012e1c:	c8000000 	.word	0xc8000000
+20012e20:	1f045007 	.word	0x1f045007
+20012e24:	de00beef 	.word	0xde00beef
+20012e28:	1f3450c7 	.word	0x1f3450c7
+20012e2c:	de00beef 	.word	0xde00beef
+20012e30:	0200303e 	.word	0x0200303e
+20012e34:	c8000000 	.word	0xc8000000
+20012e38:	1f045007 	.word	0x1f045007
+20012e3c:	de00beef 	.word	0xde00beef
+20012e40:	1fc45037 	.word	0x1fc45037
+20012e44:	de00beef 	.word	0xde00beef
+20012e48:	0200303e 	.word	0x0200303e
+20012e4c:	c8000000 	.word	0xc8000000
+20012e50:	1f045007 	.word	0x1f045007
+20012e54:	de00beef 	.word	0xde00beef
+20012e58:	1fc45037 	.word	0x1fc45037
+20012e5c:	de00beef 	.word	0xde00beef
+20012e60:	0200303e 	.word	0x0200303e
+20012e64:	c8000000 	.word	0xc8000000
+20012e68:	1f045007 	.word	0x1f045007
+20012e6c:	de00beef 	.word	0xde00beef
+20012e70:	1ff450f7 	.word	0x1ff450f7
+20012e74:	de00beef 	.word	0xde00beef
+20012e78:	0200303e 	.word	0x0200303e
+20012e7c:	c8000000 	.word	0xc8000000
+20012e80:	1f045007 	.word	0x1f045007
+20012e84:	de00beef 	.word	0xde00beef
+20012e88:	1ff450f7 	.word	0x1ff450f7
+20012e8c:	de00beef 	.word	0xde00beef
+20012e90:	0200303e 	.word	0x0200303e
+20012e94:	c8000000 	.word	0xc8000000
+20012e98:	1f045007 	.word	0x1f045007
+20012e9c:	de00beef 	.word	0xde00beef
+20012ea0:	1ff450f7 	.word	0x1ff450f7
+20012ea4:	de00beef 	.word	0xde00beef
+20012ea8:	0200303e 	.word	0x0200303e
+20012eac:	c8000000 	.word	0xc8000000
+20012eb0:	1f045007 	.word	0x1f045007
+20012eb4:	de00beef 	.word	0xde00beef
+20012eb8:	1ff450f7 	.word	0x1ff450f7
+20012ebc:	de00beef 	.word	0xde00beef
+20012ec0:	0200303e 	.word	0x0200303e
+20012ec4:	c8000000 	.word	0xc8000000
+20012ec8:	1f045007 	.word	0x1f045007
+20012ecc:	de00beef 	.word	0xde00beef
+20012ed0:	1ff450f7 	.word	0x1ff450f7
+20012ed4:	de00beef 	.word	0xde00beef
+20012ed8:	0200301c 	.word	0x0200301c
+20012edc:	c8000000 	.word	0xc8000000
+20012ee0:	1f045007 	.word	0x1f045007
+20012ee4:	de00beef 	.word	0xde00beef
+20012ee8:	1ff450f7 	.word	0x1ff450f7
+20012eec:	de00beef 	.word	0xde00beef
+20012ef0:	0200301c 	.word	0x0200301c
+20012ef4:	c8000000 	.word	0xc8000000
+20012ef8:	1f045007 	.word	0x1f045007
+20012efc:	de00beef 	.word	0xde00beef
+20012f00:	1f045007 	.word	0x1f045007
+20012f04:	de00beef 	.word	0xde00beef
+20012f08:	0200303c 	.word	0x0200303c
+20012f0c:	c8000000 	.word	0xc8000000
+20012f10:	1f045007 	.word	0x1f045007
+20012f14:	de00beef 	.word	0xde00beef
+20012f18:	1f045007 	.word	0x1f045007
+20012f1c:	de00beef 	.word	0xde00beef
+20012f20:	0200303c 	.word	0x0200303c
+20012f24:	c8000000 	.word	0xc8000000
+20012f28:	1f045007 	.word	0x1f045007
+20012f2c:	de00beef 	.word	0xde00beef
+20012f30:	1f045007 	.word	0x1f045007
+20012f34:	de00beef 	.word	0xde00beef
+20012f38:	0200301c 	.word	0x0200301c
+20012f3c:	c8000000 	.word	0xc8000000
+20012f40:	1f045007 	.word	0x1f045007
+20012f44:	de00beef 	.word	0xde00beef
+20012f48:	1f045007 	.word	0x1f045007
+20012f4c:	de00beef 	.word	0xde00beef
+20012f50:	0200301c 	.word	0x0200301c
+20012f54:	c8000000 	.word	0xc8000000
+20012f58:	1f045007 	.word	0x1f045007
+20012f5c:	de00beef 	.word	0xde00beef
+20012f60:	1f045007 	.word	0x1f045007
+20012f64:	de00beef 	.word	0xde00beef
+20012f68:	0200303c 	.word	0x0200303c
+20012f6c:	c8000000 	.word	0xc8000000
+20012f70:	1f045007 	.word	0x1f045007
+20012f74:	de00beef 	.word	0xde00beef
+20012f78:	1f045007 	.word	0x1f045007
+20012f7c:	de00beef 	.word	0xde00beef
+20012f80:	0200303c 	.word	0x0200303c
+20012f84:	c8000000 	.word	0xc8000000
+20012f88:	1f045107 	.word	0x1f045107
+20012f8c:	de00beef 	.word	0xde00beef
+20012f90:	1f045007 	.word	0x1f045007
+20012f94:	de00beef 	.word	0xde00beef
+20012f98:	0200303c 	.word	0x0200303c
+20012f9c:	c8000000 	.word	0xc8000000
+20012fa0:	1f045107 	.word	0x1f045107
+20012fa4:	de00beef 	.word	0xde00beef
+20012fa8:	1f045007 	.word	0x1f045007
+20012fac:	de00beef 	.word	0xde00beef
+20012fb0:	0200303c 	.word	0x0200303c
+20012fb4:	c8000000 	.word	0xc8000000
+20012fb8:	1f045007 	.word	0x1f045007
+20012fbc:	de00beef 	.word	0xde00beef
+20012fc0:	1f045007 	.word	0x1f045007
+20012fc4:	de00beef 	.word	0xde00beef
+20012fc8:	0200301c 	.word	0x0200301c
+20012fcc:	c8000000 	.word	0xc8000000
+20012fd0:	1f045007 	.word	0x1f045007
+20012fd4:	de00beef 	.word	0xde00beef
+20012fd8:	1f045007 	.word	0x1f045007
+20012fdc:	de00beef 	.word	0xde00beef
+20012fe0:	0200301c 	.word	0x0200301c
+20012fe4:	c8000000 	.word	0xc8000000
+20012fe8:	1f045004 	.word	0x1f045004
+20012fec:	de00beef 	.word	0xde00beef
+20012ff0:	1f045007 	.word	0x1f045007
+20012ff4:	de00beef 	.word	0xde00beef
+20012ff8:	0200303e 	.word	0x0200303e
+20012ffc:	c8000000 	.word	0xc8000000
+20013000:	1f045004 	.word	0x1f045004
+20013004:	de00beef 	.word	0xde00beef
+20013008:	1f045007 	.word	0x1f045007
+2001300c:	de00beef 	.word	0xde00beef
+20013010:	0200303e 	.word	0x0200303e
+20013014:	c8000000 	.word	0xc8000000
+20013018:	1f045004 	.word	0x1f045004
+2001301c:	de00beef 	.word	0xde00beef
+20013020:	1f045007 	.word	0x1f045007
+20013024:	de00beef 	.word	0xde00beef
+20013028:	0200303e 	.word	0x0200303e
+2001302c:	c8000000 	.word	0xc8000000
+20013030:	1f045004 	.word	0x1f045004
+20013034:	de00beef 	.word	0xde00beef
+20013038:	1f045007 	.word	0x1f045007
+2001303c:	de00beef 	.word	0xde00beef
+20013040:	0200303e 	.word	0x0200303e
+20013044:	c8000000 	.word	0xc8000000
+20013048:	1f045004 	.word	0x1f045004
+2001304c:	de00bee7 	.word	0xde00bee7
+20013050:	1f045007 	.word	0x1f045007
+20013054:	de00beef 	.word	0xde00beef
+20013058:	0200303c 	.word	0x0200303c
+2001305c:	c8000000 	.word	0xc8000000
+20013060:	1f045004 	.word	0x1f045004
+20013064:	de00bee7 	.word	0xde00bee7
+20013068:	1f045007 	.word	0x1f045007
+2001306c:	de00beef 	.word	0xde00beef
+20013070:	0200303c 	.word	0x0200303c
+20013074:	c8000000 	.word	0xc8000000
+20013078:	1f045004 	.word	0x1f045004
+2001307c:	de00bee4 	.word	0xde00bee4
+20013080:	1f045007 	.word	0x1f045007
+20013084:	de00beef 	.word	0xde00beef
+20013088:	0200301c 	.word	0x0200301c
+2001308c:	c8000000 	.word	0xc8000000
+20013090:	1f045004 	.word	0x1f045004
+20013094:	de00bee4 	.word	0xde00bee4
+20013098:	1f045007 	.word	0x1f045007
+2001309c:	de00beef 	.word	0xde00beef
+200130a0:	0200301c 	.word	0x0200301c
+200130a4:	c8000000 	.word	0xc8000000
+200130a8:	1f045004 	.word	0x1f045004
+200130ac:	de00bee4 	.word	0xde00bee4
+200130b0:	1f045107 	.word	0x1f045107
+200130b4:	de00beef 	.word	0xde00beef
+200130b8:	0200303c 	.word	0x0200303c
+200130bc:	c8000000 	.word	0xc8000000
+200130c0:	1f045004 	.word	0x1f045004
+200130c4:	de00bee4 	.word	0xde00bee4
+200130c8:	1f045107 	.word	0x1f045107
+200130cc:	de00beef 	.word	0xde00beef
+200130d0:	0200303c 	.word	0x0200303c
+200130d4:	c8000000 	.word	0xc8000000
+200130d8:	1f045004 	.word	0x1f045004
+200130dc:	de00bee4 	.word	0xde00bee4
+200130e0:	1f045007 	.word	0x1f045007
+200130e4:	de00beef 	.word	0xde00beef
+200130e8:	0200303e 	.word	0x0200303e
+200130ec:	c8000000 	.word	0xc8000000
+200130f0:	1f045004 	.word	0x1f045004
+200130f4:	de00bee4 	.word	0xde00bee4
+200130f8:	1f045007 	.word	0x1f045007
+200130fc:	de00beef 	.word	0xde00beef
+20013100:	0200303e 	.word	0x0200303e
+20013104:	c8000000 	.word	0xc8000000
+20013108:	1f045004 	.word	0x1f045004
+2001310c:	de00bee4 	.word	0xde00bee4
+20013110:	1f045004 	.word	0x1f045004
+20013114:	de00beef 	.word	0xde00beef
+20013118:	0200303e 	.word	0x0200303e
+2001311c:	c8000000 	.word	0xc8000000
+20013120:	1f045004 	.word	0x1f045004
+20013124:	de00bee4 	.word	0xde00bee4
+20013128:	1f045004 	.word	0x1f045004
+2001312c:	de00beef 	.word	0xde00beef
+20013130:	0200303e 	.word	0x0200303e
+20013134:	c8000000 	.word	0xc8000000
+20013138:	1f045004 	.word	0x1f045004
+2001313c:	de00bee4 	.word	0xde00bee4
+20013140:	1f045004 	.word	0x1f045004
+20013144:	de00beef 	.word	0xde00beef
+20013148:	0200303e 	.word	0x0200303e
+2001314c:	c8000000 	.word	0xc8000000
+20013150:	1f045004 	.word	0x1f045004
+20013154:	de00bee4 	.word	0xde00bee4
+20013158:	1f045004 	.word	0x1f045004
+2001315c:	de00beef 	.word	0xde00beef
+20013160:	0200303e 	.word	0x0200303e
+20013164:	c8000000 	.word	0xc8000000
+20013168:	1f045004 	.word	0x1f045004
+2001316c:	de00bee4 	.word	0xde00bee4
+20013170:	1f045004 	.word	0x1f045004
+20013174:	de00bee7 	.word	0xde00bee7
+20013178:	0200303e 	.word	0x0200303e
+2001317c:	c8000000 	.word	0xc8000000
+20013180:	1f045004 	.word	0x1f045004
+20013184:	de00bee4 	.word	0xde00bee4
+20013188:	1f045004 	.word	0x1f045004
+2001318c:	de00bee7 	.word	0xde00bee7
+20013190:	0200303e 	.word	0x0200303e
+20013194:	c8000000 	.word	0xc8000000
+20013198:	1f045004 	.word	0x1f045004
+2001319c:	de00bee4 	.word	0xde00bee4
+200131a0:	1f045004 	.word	0x1f045004
+200131a4:	de00bee4 	.word	0xde00bee4
+200131a8:	0200301c 	.word	0x0200301c
+200131ac:	c8000000 	.word	0xc8000000
+200131b0:	1f045004 	.word	0x1f045004
+200131b4:	de00bee4 	.word	0xde00bee4
+200131b8:	1f045004 	.word	0x1f045004
+200131bc:	de00bee4 	.word	0xde00bee4
+200131c0:	0200301c 	.word	0x0200301c
+200131c4:	c8000000 	.word	0xc8000000
+200131c8:	00000000 	.word	0x00000000
+200131cc:	de00bee4 	.word	0xde00bee4
+200131d0:	1f045004 	.word	0x1f045004
+200131d4:	de00bee4 	.word	0xde00bee4
+200131d8:	0000303e 	.word	0x0000303e
+200131dc:	c8000000 	.word	0xc8000000
+200131e0:	00000000 	.word	0x00000000
+200131e4:	de00bee4 	.word	0xde00bee4
+200131e8:	1f045004 	.word	0x1f045004
+200131ec:	de00bee4 	.word	0xde00bee4
+200131f0:	0000303e 	.word	0x0000303e
+200131f4:	c8000000 	.word	0xc8000000
+	...
+20013200:	1f045004 	.word	0x1f045004
+20013204:	de00bee4 	.word	0xde00bee4
+20013208:	0000303e 	.word	0x0000303e
+2001320c:	c8000000 	.word	0xc8000000
+	...
+20013218:	1f045004 	.word	0x1f045004
+2001321c:	de00bee4 	.word	0xde00bee4
+20013220:	0000303e 	.word	0x0000303e
+20013224:	c8000000 	.word	0xc8000000
+	...
+20013234:	de00bee4 	.word	0xde00bee4
+20013238:	0000303e 	.word	0x0000303e
+2001323c:	c8000000 	.word	0xc8000000
+	...
+2001324c:	de00bee4 	.word	0xde00bee4
+20013250:	0000303e 	.word	0x0000303e
+20013254:	c8000000 	.word	0xc8000000
+	...
+20013268:	0000303e 	.word	0x0000303e
+2001326c:	c8000000 	.word	0xc8000000
+	...
+20013280:	0000303e 	.word	0x0000303e
+20013284:	c8000000 	.word	0xc8000000
+	...
+20013294:	00000001 	.word	0x00000001
+20013298:	00000022 	.word	0x00000022
+2001329c:	00000023 	.word	0x00000023
+200132a0:	00000022 	.word	0x00000022
+200132a4:	00000023 	.word	0x00000023
+200132a8:	00000011 	.word	0x00000011
+
+200132ac <compare>:
+	...
+200132dc:	01010101 	.word	0x01010101
+200132e0:	01010000 	.word	0x01010000
+200132e4:	00000101 	.word	0x00000101
+200132e8:	01010101 	.word	0x01010101
+200132ec:	01010000 	.word	0x01010000
+200132f0:	00000101 	.word	0x00000101
+200132f4:	01010101 	.word	0x01010101
+200132f8:	01010000 	.word	0x01010000
+200132fc:	00000101 	.word	0x00000101
+20013300:	01010101 	.word	0x01010101
+20013304:	01010000 	.word	0x01010000
+20013308:	00000101 	.word	0x00000101
+2001330c:	01010101 	.word	0x01010101
+20013310:	01010000 	.word	0x01010000
+20013314:	00000101 	.word	0x00000101
+20013318:	01010101 	.word	0x01010101
+2001331c:	01010000 	.word	0x01010000
+20013320:	00000101 	.word	0x00000101
+20013324:	01010101 	.word	0x01010101
+20013328:	01010000 	.word	0x01010000
+2001332c:	00000101 	.word	0x00000101
+20013330:	01010101 	.word	0x01010101
+20013334:	01010000 	.word	0x01010000
+20013338:	00000101 	.word	0x00000101
+2001333c:	01010101 	.word	0x01010101
+20013340:	01010000 	.word	0x01010000
+20013344:	00000101 	.word	0x00000101
+20013348:	01010101 	.word	0x01010101
+2001334c:	01010000 	.word	0x01010000
+20013350:	00000101 	.word	0x00000101
+20013354:	01010101 	.word	0x01010101
+20013358:	01010000 	.word	0x01010000
+2001335c:	00000101 	.word	0x00000101
+20013360:	01010101 	.word	0x01010101
+20013364:	01010000 	.word	0x01010000
+20013368:	00000101 	.word	0x00000101
+2001336c:	01010101 	.word	0x01010101
+20013370:	01010000 	.word	0x01010000
+20013374:	00000101 	.word	0x00000101
+20013378:	01010101 	.word	0x01010101
+2001337c:	01010000 	.word	0x01010000
+20013380:	00000101 	.word	0x00000101
+20013384:	01010101 	.word	0x01010101
+20013388:	01010000 	.word	0x01010000
+2001338c:	00000101 	.word	0x00000101
+20013390:	01010101 	.word	0x01010101
+20013394:	01010000 	.word	0x01010000
+20013398:	00000101 	.word	0x00000101
+2001339c:	01010101 	.word	0x01010101
+200133a0:	01010000 	.word	0x01010000
+200133a4:	00000101 	.word	0x00000101
+200133a8:	01010101 	.word	0x01010101
+200133ac:	01010000 	.word	0x01010000
+200133b0:	00000101 	.word	0x00000101
+200133b4:	01010101 	.word	0x01010101
+200133b8:	01010000 	.word	0x01010000
+200133bc:	00000101 	.word	0x00000101
+200133c0:	01010101 	.word	0x01010101
+200133c4:	01010000 	.word	0x01010000
+200133c8:	00000101 	.word	0x00000101
+200133cc:	01010101 	.word	0x01010101
+200133d0:	01010000 	.word	0x01010000
+200133d4:	00000101 	.word	0x00000101
+200133d8:	01010101 	.word	0x01010101
+200133dc:	01010000 	.word	0x01010000
+200133e0:	00000101 	.word	0x00000101
+200133e4:	01010101 	.word	0x01010101
+200133e8:	01010000 	.word	0x01010000
+200133ec:	00000101 	.word	0x00000101
+200133f0:	01010101 	.word	0x01010101
+200133f4:	01010000 	.word	0x01010000
+200133f8:	00000101 	.word	0x00000101
+200133fc:	01010101 	.word	0x01010101
+20013400:	01010000 	.word	0x01010000
+20013404:	00000101 	.word	0x00000101
+20013408:	01010101 	.word	0x01010101
+2001340c:	01010000 	.word	0x01010000
+20013410:	00000101 	.word	0x00000101
+20013414:	01010101 	.word	0x01010101
+20013418:	01010000 	.word	0x01010000
+2001341c:	00000101 	.word	0x00000101
+20013420:	01010101 	.word	0x01010101
+20013424:	01010000 	.word	0x01010000
+20013428:	00000101 	.word	0x00000101
+2001342c:	01010101 	.word	0x01010101
+20013430:	01010000 	.word	0x01010000
+20013434:	00000101 	.word	0x00000101
+20013438:	01010101 	.word	0x01010101
+2001343c:	01010000 	.word	0x01010000
+20013440:	00000101 	.word	0x00000101
+20013444:	01010101 	.word	0x01010101
+20013448:	01010000 	.word	0x01010000
+2001344c:	00000101 	.word	0x00000101
+20013450:	01010101 	.word	0x01010101
+20013454:	01010000 	.word	0x01010000
+20013458:	00000101 	.word	0x00000101
+2001345c:	01010101 	.word	0x01010101
+20013460:	01010000 	.word	0x01010000
+20013464:	00000101 	.word	0x00000101
+20013468:	01010101 	.word	0x01010101
+2001346c:	01010000 	.word	0x01010000
+20013470:	00000101 	.word	0x00000101
+20013474:	01010101 	.word	0x01010101
+20013478:	01010000 	.word	0x01010000
+2001347c:	00000101 	.word	0x00000101
+20013480:	01010101 	.word	0x01010101
+20013484:	01010000 	.word	0x01010000
+20013488:	00000101 	.word	0x00000101
+2001348c:	01010101 	.word	0x01010101
+20013490:	01010000 	.word	0x01010000
+20013494:	00000101 	.word	0x00000101
+20013498:	01010101 	.word	0x01010101
+2001349c:	01010000 	.word	0x01010000
+200134a0:	00000101 	.word	0x00000101
+200134a4:	01010101 	.word	0x01010101
+200134a8:	01010000 	.word	0x01010000
+200134ac:	00000101 	.word	0x00000101
+200134b0:	01010101 	.word	0x01010101
+200134b4:	01010000 	.word	0x01010000
+200134b8:	00000101 	.word	0x00000101
+200134bc:	01010101 	.word	0x01010101
+200134c0:	01010000 	.word	0x01010000
+200134c4:	00000101 	.word	0x00000101
+200134c8:	01010101 	.word	0x01010101
+200134cc:	01010000 	.word	0x01010000
+200134d0:	00000101 	.word	0x00000101
+200134d4:	01010101 	.word	0x01010101
+200134d8:	01010000 	.word	0x01010000
+200134dc:	00000101 	.word	0x00000101
+200134e0:	01010101 	.word	0x01010101
+200134e4:	01010000 	.word	0x01010000
+200134e8:	00000101 	.word	0x00000101
+200134ec:	01010101 	.word	0x01010101
+200134f0:	01010000 	.word	0x01010000
+200134f4:	00000101 	.word	0x00000101
+200134f8:	01010101 	.word	0x01010101
+200134fc:	01010000 	.word	0x01010000
+20013500:	00000101 	.word	0x00000101
+20013504:	01010101 	.word	0x01010101
+20013508:	01010000 	.word	0x01010000
+2001350c:	00000101 	.word	0x00000101
+20013510:	01010101 	.word	0x01010101
+20013514:	01010000 	.word	0x01010000
+20013518:	00000101 	.word	0x00000101
+2001351c:	01010101 	.word	0x01010101
+20013520:	01010000 	.word	0x01010000
+20013524:	00000101 	.word	0x00000101
+20013528:	01010101 	.word	0x01010101
+2001352c:	01010000 	.word	0x01010000
+20013530:	00000101 	.word	0x00000101
+20013534:	01010101 	.word	0x01010101
+20013538:	01010000 	.word	0x01010000
+2001353c:	00000101 	.word	0x00000101
+20013540:	01010101 	.word	0x01010101
+20013544:	01010000 	.word	0x01010000
+20013548:	00000101 	.word	0x00000101
+2001354c:	01010101 	.word	0x01010101
+20013550:	01010000 	.word	0x01010000
+20013554:	00000101 	.word	0x00000101
+20013558:	01010101 	.word	0x01010101
+2001355c:	01010000 	.word	0x01010000
+20013560:	00000101 	.word	0x00000101
+20013564:	01010101 	.word	0x01010101
+20013568:	01010000 	.word	0x01010000
+2001356c:	00000101 	.word	0x00000101
+20013570:	01010101 	.word	0x01010101
+20013574:	01010000 	.word	0x01010000
+20013578:	00000101 	.word	0x00000101
+2001357c:	01010101 	.word	0x01010101
+20013580:	01010000 	.word	0x01010000
+20013584:	00000101 	.word	0x00000101
+20013588:	01010101 	.word	0x01010101
+2001358c:	01010000 	.word	0x01010000
+20013590:	00000101 	.word	0x00000101
+20013594:	01010101 	.word	0x01010101
+20013598:	01010000 	.word	0x01010000
+2001359c:	00000101 	.word	0x00000101
+200135a0:	01010101 	.word	0x01010101
+200135a4:	01010000 	.word	0x01010000
+200135a8:	00000101 	.word	0x00000101
+200135ac:	01010101 	.word	0x01010101
+200135b0:	01010000 	.word	0x01010000
+200135b4:	00000101 	.word	0x00000101
+200135b8:	01010101 	.word	0x01010101
+200135bc:	01010000 	.word	0x01010000
+200135c0:	00000101 	.word	0x00000101
+200135c4:	01010101 	.word	0x01010101
+200135c8:	01010000 	.word	0x01010000
+200135cc:	00000101 	.word	0x00000101
+200135d0:	01010101 	.word	0x01010101
+200135d4:	01010000 	.word	0x01010000
+200135d8:	00000101 	.word	0x00000101
+200135dc:	01010101 	.word	0x01010101
+200135e0:	01010000 	.word	0x01010000
+200135e4:	00000101 	.word	0x00000101
+200135e8:	01010101 	.word	0x01010101
+200135ec:	01010000 	.word	0x01010000
+200135f0:	00000101 	.word	0x00000101
+200135f4:	01010101 	.word	0x01010101
+200135f8:	01010000 	.word	0x01010000
+200135fc:	00000101 	.word	0x00000101
+20013600:	01010101 	.word	0x01010101
+20013604:	01010000 	.word	0x01010000
+20013608:	00000101 	.word	0x00000101
+2001360c:	01010101 	.word	0x01010101
+20013610:	01010000 	.word	0x01010000
+20013614:	00000101 	.word	0x00000101
+20013618:	01010101 	.word	0x01010101
+2001361c:	01010000 	.word	0x01010000
+20013620:	00000101 	.word	0x00000101
+20013624:	01010101 	.word	0x01010101
+20013628:	01010000 	.word	0x01010000
+2001362c:	00000101 	.word	0x00000101
+20013630:	01010101 	.word	0x01010101
+20013634:	01010000 	.word	0x01010000
+20013638:	00000101 	.word	0x00000101
+2001363c:	01010101 	.word	0x01010101
+20013640:	01010000 	.word	0x01010000
+20013644:	00000101 	.word	0x00000101
+20013648:	01010101 	.word	0x01010101
+2001364c:	01010000 	.word	0x01010000
+20013650:	00000101 	.word	0x00000101
+20013654:	01010101 	.word	0x01010101
+20013658:	01010000 	.word	0x01010000
+2001365c:	00000101 	.word	0x00000101
+20013660:	01010101 	.word	0x01010101
+20013664:	01010000 	.word	0x01010000
+20013668:	00000101 	.word	0x00000101
+2001366c:	01010101 	.word	0x01010101
+20013670:	01010000 	.word	0x01010000
+20013674:	00000101 	.word	0x00000101
+20013678:	01010101 	.word	0x01010101
+2001367c:	01010000 	.word	0x01010000
+20013680:	00000101 	.word	0x00000101
+20013684:	01010101 	.word	0x01010101
+20013688:	01010000 	.word	0x01010000
+2001368c:	00000101 	.word	0x00000101
+20013690:	01010101 	.word	0x01010101
+20013694:	01010000 	.word	0x01010000
+20013698:	00000101 	.word	0x00000101
+2001369c:	01010101 	.word	0x01010101
+200136a0:	01010000 	.word	0x01010000
+200136a4:	00000101 	.word	0x00000101
+200136a8:	01010101 	.word	0x01010101
+200136ac:	01010000 	.word	0x01010000
+200136b0:	00000101 	.word	0x00000101
+200136b4:	01010101 	.word	0x01010101
+200136b8:	01010000 	.word	0x01010000
+200136bc:	00000101 	.word	0x00000101
+200136c0:	01010101 	.word	0x01010101
+200136c4:	01010000 	.word	0x01010000
+200136c8:	00000101 	.word	0x00000101
+200136cc:	01010101 	.word	0x01010101
+200136d0:	01010000 	.word	0x01010000
+200136d4:	00000101 	.word	0x00000101
+200136d8:	01010101 	.word	0x01010101
+200136dc:	01010000 	.word	0x01010000
+200136e0:	00000101 	.word	0x00000101
+200136e4:	01010101 	.word	0x01010101
+200136e8:	01010000 	.word	0x01010000
+200136ec:	00000101 	.word	0x00000101
+200136f0:	01010101 	.word	0x01010101
+200136f4:	01010000 	.word	0x01010000
+200136f8:	00000101 	.word	0x00000101
+200136fc:	01010101 	.word	0x01010101
+20013700:	01010000 	.word	0x01010000
+20013704:	00000101 	.word	0x00000101
+20013708:	01010101 	.word	0x01010101
+2001370c:	01010000 	.word	0x01010000
+20013710:	00000101 	.word	0x00000101
+20013714:	01010101 	.word	0x01010101
+20013718:	01010000 	.word	0x01010000
+2001371c:	00000101 	.word	0x00000101
+20013720:	01010101 	.word	0x01010101
+20013724:	01010000 	.word	0x01010000
+20013728:	00000101 	.word	0x00000101
+2001372c:	01010101 	.word	0x01010101
+20013730:	01010000 	.word	0x01010000
+20013734:	00000101 	.word	0x00000101
+20013738:	01010101 	.word	0x01010101
+2001373c:	01010000 	.word	0x01010000
+20013740:	00000101 	.word	0x00000101
+20013744:	01010101 	.word	0x01010101
+20013748:	01010000 	.word	0x01010000
+2001374c:	00000101 	.word	0x00000101
+20013750:	01010101 	.word	0x01010101
+20013754:	01010000 	.word	0x01010000
+20013758:	00000101 	.word	0x00000101
+2001375c:	01010101 	.word	0x01010101
+20013760:	01010000 	.word	0x01010000
+20013764:	00000101 	.word	0x00000101
+20013768:	01010101 	.word	0x01010101
+2001376c:	01010000 	.word	0x01010000
+20013770:	00000101 	.word	0x00000101
+20013774:	01010101 	.word	0x01010101
+20013778:	01010000 	.word	0x01010000
+2001377c:	00000101 	.word	0x00000101
+20013780:	01010101 	.word	0x01010101
+20013784:	01010000 	.word	0x01010000
+20013788:	00000101 	.word	0x00000101
+2001378c:	01010101 	.word	0x01010101
+20013790:	01010000 	.word	0x01010000
+20013794:	00000101 	.word	0x00000101
+20013798:	01010101 	.word	0x01010101
+2001379c:	01010000 	.word	0x01010000
+200137a0:	00000101 	.word	0x00000101
+200137a4:	01010101 	.word	0x01010101
+200137a8:	01010000 	.word	0x01010000
+200137ac:	00000101 	.word	0x00000101
+200137b0:	01010101 	.word	0x01010101
+200137b4:	01010000 	.word	0x01010000
+200137b8:	00000101 	.word	0x00000101
+200137bc:	01010101 	.word	0x01010101
+200137c0:	01010000 	.word	0x01010000
+200137c4:	00000101 	.word	0x00000101
+200137c8:	00010101 	.word	0x00010101
+200137cc:	00000000 	.word	0x00000000
+	...
+
+200137d1 <ok_message>:
+200137d1:	52          	.byte	0x52
+200137d2:	3250      	.short	0x3250
+200137d4:	5f303533 	.word	0x5f303533
+200137d8:	4f495047 	.word	0x4f495047
+200137dc:	4b4f5f43 	.word	0x4b4f5f43
+200137e0:	000a      	.short	0x000a
+
+200137e2 <fail_message>:
+200137e2:	5052      	.short	0x5052
+200137e4:	30353332 	.word	0x30353332
+200137e8:	4950475f 	.word	0x4950475f
+200137ec:	465f434f 	.word	0x465f434f
+200137f0:	0a4c4941 	.word	0x0a4c4941
+200137f4:	00          	.byte	0x00
+200137f5:	00          	.byte	0x00
+200137f6:	bf00      	nop
