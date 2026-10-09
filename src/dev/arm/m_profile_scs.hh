@@ -249,6 +249,13 @@ class MProfileSCS : public BasicPioDevice
     // -- CPU-side interface (called by MProfileInterrupts) --
 
     bool hasDeliverableIRQ();
+
+    /**
+     * Whether any enabled exception is pending, whatever PRIMASK, BASEPRI
+     * and FAULTMASK say: what wakes WFI (Armv8-M, WFI wakeup events).
+     * Unlike hasDeliverableIRQ(), it changes no state.
+     */
+    bool hasPendingEnabledIRQ() const;
     int acknowledgeIRQ();
     bool activateIRQ(int exc_num);
     void deactivateIRQ(int exc_num);

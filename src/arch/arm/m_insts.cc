@@ -497,6 +497,12 @@ WfiMProfile::execute(ExecContext *xc,
     // is false. ARM ARM A6.1.4: a predicated-false instruction has
     // no effect. ITSTATE advancement still happens via pc.advance().
     if (!mProfilePredicateHolds(tc, condCode)) return NoFault;
+    // An exception already pending wakes WFI at once, even one PRIMASK masks
+    // (Armv8-M): quiescing anyway would sleep through it, since no new post
+    // comes to wake the thread.
+    auto *msys = dynamic_cast<ArmMSystem *>(tc->getSystemPtr());
+    if (msys && msys->getSCS() && msys->getSCS()->hasPendingEnabledIRQ())
+        return NoFault;
     tc->quiesce();
     return NoFault;
 }

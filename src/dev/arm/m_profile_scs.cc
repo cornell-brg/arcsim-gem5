@@ -889,6 +889,15 @@ MProfileSCS::hasDeliverableIRQ()
     return updatePending();
 }
 
+bool
+MProfileSCS::hasPendingEnabledIRQ() const
+{
+    for (const auto &intr : interrupts)
+        if (intr.pending && intr.enabled)
+            return true;
+    return false;
+}
+
 int
 MProfileSCS::acknowledgeIRQ()
 {
