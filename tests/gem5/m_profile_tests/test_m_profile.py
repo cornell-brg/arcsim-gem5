@@ -188,6 +188,11 @@ for cpu_type in ("atomic", "timing", "minor"):
         "test_v8m_exclusive.elf",
         extra_args=["--cpu-type", cpu_type, "--release", "m33"],
     )
+    m_profile_test(
+        f"it_fp_load_store_{cpu_type}",
+        "test_it_fp_load_store.elf",
+        extra_args=["--cpu-type", cpu_type],
+    )
 m_profile_test(
     "v8m_exclusive_undefined",
     "test_v8m_exclusive_undefined.elf",

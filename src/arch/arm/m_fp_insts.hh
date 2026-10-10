@@ -1006,7 +1006,7 @@ class MFpMsr : public MFpOp
 class MFpLdrS : public MFpOp
 {
   private:
-    RegId srcRegIdxArr[1];
+    RegId srcRegIdxArr[4];
     RegId destRegIdxArr[1];
 
   protected:
@@ -1032,6 +1032,13 @@ class MFpLdrS : public MFpOp
                 &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
 
         setSrcRegIdx(_numSrcRegs++, intRegClass[rn]);
+        // The flags an IT condition tests are sources, so the Minor
+        // CPU does not start the access before they are committed
+        if (condCode != COND_AL && condCode != COND_UC) {
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::Nz]);
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::C]);
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::V]);
+        }
         setDestRegIdx(_numDestRegs++, vfpSRegId(sd));
         _numTypedDestRegs[vecElemClass.type()]++;
 
@@ -1057,7 +1064,7 @@ class MFpLdrS : public MFpOp
 class MFpStrS : public MFpOp
 {
   private:
-    RegId srcRegIdxArr[2];
+    RegId srcRegIdxArr[5];
     RegId destRegIdxArr[1];
 
   protected:
@@ -1083,6 +1090,13 @@ class MFpStrS : public MFpOp
 
         setSrcRegIdx(_numSrcRegs++, intRegClass[rn]);
         setSrcRegIdx(_numSrcRegs++, vfpSRegId(sd));
+        // The flags an IT condition tests are sources, so the Minor
+        // CPU does not start the access before they are committed
+        if (condCode != COND_AL && condCode != COND_UC) {
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::Nz]);
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::C]);
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::V]);
+        }
 
         flags[IsStore] = true;
     }
@@ -1108,7 +1122,7 @@ class MFpStrS : public MFpOp
 class MFpLdrD : public MFpOp
 {
   private:
-    RegId srcRegIdxArr[1];
+    RegId srcRegIdxArr[4];
     RegId destRegIdxArr[2];
 
   protected:
@@ -1133,6 +1147,13 @@ class MFpLdrD : public MFpOp
                 &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
 
         setSrcRegIdx(_numSrcRegs++, intRegClass[rn]);
+        // The flags an IT condition tests are sources, so the Minor
+        // CPU does not start the access before they are committed
+        if (condCode != COND_AL && condCode != COND_UC) {
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::Nz]);
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::C]);
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::V]);
+        }
         setDestRegIdx(_numDestRegs++, vfpSRegId(dd * 2));
         _numTypedDestRegs[vecElemClass.type()]++;
         setDestRegIdx(_numDestRegs++, vfpSRegId(dd * 2 + 1));
@@ -1160,7 +1181,7 @@ class MFpLdrD : public MFpOp
 class MFpStrD : public MFpOp
 {
   private:
-    RegId srcRegIdxArr[3];
+    RegId srcRegIdxArr[6];
     RegId destRegIdxArr[1];
 
   protected:
@@ -1187,6 +1208,13 @@ class MFpStrD : public MFpOp
         setSrcRegIdx(_numSrcRegs++, intRegClass[rn]);
         setSrcRegIdx(_numSrcRegs++, vfpSRegId(dd * 2));
         setSrcRegIdx(_numSrcRegs++, vfpSRegId(dd * 2 + 1));
+        // The flags an IT condition tests are sources, so the Minor
+        // CPU does not start the access before they are committed
+        if (condCode != COND_AL && condCode != COND_UC) {
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::Nz]);
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::C]);
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::V]);
+        }
 
         flags[IsStore] = true;
     }
