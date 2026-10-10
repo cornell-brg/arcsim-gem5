@@ -193,6 +193,12 @@ for cpu_type in ("atomic", "timing", "minor"):
         "test_it_fp_load_store.elf",
         extra_args=["--cpu-type", cpu_type],
     )
+for cpu_type in ("timing", "minor"):
+    m_profile_test(
+        f"nvic_pend_enable_{cpu_type}",
+        "test_nvic_pend_enable.elf",
+        extra_args=["--cpu-type", cpu_type],
+    )
 m_profile_test(
     "v8m_exclusive_undefined",
     "test_v8m_exclusive_undefined.elf",
@@ -280,6 +286,46 @@ for sram_model in ("legacy", "banked"):
     m_profile_rp2350_sdk_test(
         "rp2350_sdk_locks", "sdk_locks.elf", r"RP2350_SDK_LOCKS_OK",
         sram_model,
+    )
+
+
+def m_profile_rp2350_dma_test(name, firmware_name, ok_message, run_config,
+                              sram_model):
+    """Register a test that runs firmware on the RP2350 board's Arm proxy
+    with its DMA, through configs/<run_config>, and passes when it prints
+    ok_message."""
+    firmware_path = joinpath(
+        config.base_dir, "tests", "gem5", "m_profile_tests", "programs",
+        firmware_name,
+    )
+    if not os.path.exists(firmware_path):
+        return
+    run_args = ["--firmware", firmware_path, "--sram-model", sram_model]
+    if run_config == "run_rp2350_sdk.py":
+        run_args.append("--dma")
+    gem5_verify_config(
+        name=f"m_profile_{name}_{sram_model}",
+        verifiers=[verifier.MatchRegex(re.compile(ok_message))],
+        fixtures=(),
+        config=joinpath(
+            config.base_dir, "tests", "gem5", "m_profile_tests", "configs",
+            run_config,
+        ),
+        config_args=run_args,
+        valid_isas=(constants.all_compiled_tag,),
+        valid_hosts=constants.supported_hosts,
+        length=constants.quick_tag,
+    )
+
+
+for sram_model in ("legacy", "banked"):
+    m_profile_rp2350_dma_test(
+        "rp2350_dma", "test_rp2350_dma.elf", r"RP2350_DMA_OK",
+        "run_rp2350_sdk.py", sram_model,
+    )
+    m_profile_rp2350_dma_test(
+        "rp2350_dma_dreq", "test_rp2350_dma_dreq.elf",
+        r"RP2350_DMA_DREQ_OK", "run_rp2350_dma_dreq.py", sram_model,
     )
 # GPIO coprocessor instructions stay in program order with SIO accesses on
 # the Minor-based Arm proxy

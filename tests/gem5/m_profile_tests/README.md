@@ -146,10 +146,14 @@ arm-none-eabi-ld -T rp2350_sram.ld --no-warn-rwx-segments \
 
 With Raspberry Pi's OpenOCD and a Debug Probe (`interface/cmsis-dap.cfg`,
 `target/rp2350.cfg`): `reset halt`, `load_image` the ELF, set `msp` to
-0x20020000, `xpsr` to 0x01000000 and `pc` to 0x20010000, `resume`, and after
-the core halts at the test's `bkpt` read the result with `mdw 0x20000100 2`.
-Nothing is written to flash. A Pico 2 (Cortex-M33 r1p0) passes all
-18 subtests.
+0x20020000, `xpsr` to 0x01000000 and `pc` to the ELF's `Reset_Handler`,
+write 0 to 0x20000100 (SRAM keeps an earlier run's result), `resume`, and
+after the core halts at the test's `bkpt` read the result with
+`mdw 0x20000100 2`. Nothing is written to flash. A Pico 2 (Cortex-M33 r1p0)
+passes all 18 subtests.
+
+`test_rp2350_dma.elf` is already linked for SRAM and runs the same way; a
+Pico 2 passes all 16 subtests.
 
 ## Pico SDK firmware
 

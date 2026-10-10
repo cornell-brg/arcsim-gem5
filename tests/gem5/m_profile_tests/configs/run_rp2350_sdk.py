@@ -1,11 +1,13 @@
 """Run Pico SDK firmware on the RP2350 board's Arm proxy.
 
     gem5.opt run_rp2350_sdk.py --firmware <elf> [--sram-model legacy|banked]
+                               [--dma]
 
-The board has no APB or AHB peripherals. The SDK's start-up still writes a
-few of their registers (the boot locks, pads), so both regions get
-stand-ins that read 0 and ignore writes, as arcsim-bench's runner gives
-them. The firmware's semihosting output is this run's output.
+The board has no APB peripherals and, of the AHB ones, at most the DMA
+(--dma). The SDK's start-up still writes a few of their registers (the boot
+locks, pads), so both regions get stand-ins that read 0 and ignore writes,
+as arcsim-bench's runner gives them. The firmware's semihosting output is
+this run's output.
 """
 
 import argparse
@@ -23,6 +25,7 @@ parser.add_argument("--firmware", required=True)
 parser.add_argument(
     "--sram-model", choices=("legacy", "banked"), default="legacy"
 )
+parser.add_argument("--dma", action="store_true")
 parser.add_argument("--tick-limit", type=int, default=10**12)
 args = parser.parse_args()
 
@@ -36,13 +39,18 @@ sys.path.insert(
 from board import make_board  # noqa: E402
 
 board = make_board(
-    "arm-m4-proxy", args.firmware, sram_model=args.sram_model
+    "arm-m4-proxy", args.firmware, sram_model=args.sram_model, dma=args.dma
 )
+# The DMA and its atomic aliases take the AHB's first 16 KiB.
+ahb_start = 0x50004000 if args.dma else 0x50000000
 board.stand_in_apb = IsaFake(
     pio_addr=0x40000000, pio_size=0x10000000, ret_data32=0, pio_latency="1ns"
 )
 board.stand_in_ahb = IsaFake(
-    pio_addr=0x50000000, pio_size=0x10000000, ret_data32=0, pio_latency="1ns"
+    pio_addr=ahb_start,
+    pio_size=0x60000000 - ahb_start,
+    ret_data32=0,
+    pio_latency="1ns",
 )
 for stand_in in (board.stand_in_apb, board.stand_in_ahb):
     stand_in.pio = board.sram_bus.mem_side_ports

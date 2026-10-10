@@ -52,7 +52,10 @@ TESTS = cortexm4_basic test_cps test_mrs_msr test_bx_exc_return \
         test_rp2350_order \
         test_v8m_exclusive \
         test_v8m_exclusive_undefined \
-        test_it_fp_load_store
+        test_it_fp_load_store \
+        test_rp2350_dma \
+        test_rp2350_dma_dreq \
+        test_nvic_pend_enable
 
 all: $(addsuffix .elf, $(TESTS)) freertos-tests
 
@@ -76,6 +79,9 @@ test_rp2350_gpioc.elf: rp2350_sram.ld
 test_rp2350_order.o: ASFLAGS = -mcpu=cortex-m33 -mthumb
 test_rp2350_order.elf: LDFLAGS = -T rp2350_sram.ld --no-warn-rwx-segments
 test_rp2350_order.elf: rp2350_sram.ld
+test_rp2350_dma.o test_rp2350_dma_dreq.o: ASFLAGS = -mcpu=cortex-m33 -mthumb
+test_rp2350_dma.elf test_rp2350_dma_dreq.elf: LDFLAGS = -T rp2350_sram.ld --no-warn-rwx-segments
+test_rp2350_dma.elf test_rp2350_dma_dreq.elf: rp2350_sram.ld
 
 %.o: %.S
 	$(AS) $(ASFLAGS) $< -o $@
