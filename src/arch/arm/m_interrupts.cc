@@ -441,6 +441,10 @@ MProfileInterrupts::excReturn(ThreadContext *tc, uint32_t exc_return)
             "excReturn: exc_return=%#x returningExcNum=%d\n",
             exc_return, returningExcNum);
 
+    // Exception return opens the local exclusive monitor (DDI0403E
+    // A3.4.4).
+    tc->getIsaPtr()->globalClearExclusive();
+
     // Do NOT deactivate here — the exception stays active during
     // unstacking.  Deactivation happens in removeStackReadPending()
     // when the MMU signals that all unstacking reads have completed.

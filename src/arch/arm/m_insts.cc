@@ -860,6 +860,23 @@ BarrierMProfile::generateDisassembly(
 // static_cast<ISA*> on MISA*, causing undefined behavior.  This version
 // performs the same LLSC memory read but skips the SelfDebug call.
 
+// Request::LLSC triggers handleLockedRead() on the ISA (MISA), which
+// records the exclusive address in the local monitor. The low bits
+// encode alignment requirements (matching the ISA-generated code:
+// 2=word, 1=half, 0=byte).
+Request::Flags
+LdrexMProfile::memFlags() const
+{
+    Request::Flags mem_flags = Request::LLSC;
+    if (accessSize == 4)
+        mem_flags = Request::Flags(2 | Request::LLSC);
+    else if (accessSize == 2)
+        mem_flags = Request::Flags(1 | Request::LLSC);
+    if (acquire)
+        mem_flags.set(Request::ACQUIRE);
+    return mem_flags;
+}
+
 Fault
 LdrexMProfile::execute(ExecContext *xc,
                        trace::InstRecord *traceData) const
@@ -872,15 +889,7 @@ LdrexMProfile::execute(ExecContext *xc,
     Addr addr = tc->getReg(RegId(intRegClass, base)) + imm;
 
     // Perform the exclusive load via the standard memory interface.
-    // Request::LLSC triggers handleLockedRead() on the ISA (MISA),
-    // which records the exclusive address in the local monitor.
-    // The low bits of memAccessFlags encode alignment requirements
-    // (matching the ISA-generated code: 2=word, 1=half, 0=byte).
-    Request::Flags memFlags = Request::LLSC;
-    if (accessSize == 4)
-        memFlags = Request::Flags(2 | Request::LLSC);
-    else if (accessSize == 2)
-        memFlags = Request::Flags(1 | Request::LLSC);
+    const Request::Flags memFlags = this->memFlags();
 
     RegVal result = 0;
     if (accessSize == 4) {
@@ -916,12 +925,12 @@ LdrexMProfile::generateDisassembly(Addr pc,
     const loader::SymbolTable *symtab) const
 {
     std::stringstream ss;
+    ss << "  " << mnemonic;
     if (accessSize == 1)
-        ss << "  ldrexb  ";
+        ss << "b";
     else if (accessSize == 2)
-        ss << "  ldrexh  ";
-    else
-        ss << "  ldrex   ";
+        ss << "h";
+    ss << "  ";
     printIntReg(ss, dest);
     ss << ", [";
     printIntReg(ss, base);
@@ -943,11 +952,7 @@ LdrexMProfile::initiateAcc(ExecContext *xc,
 
     Addr addr = tc->getReg(RegId(intRegClass, base)) + imm;
 
-    Request::Flags memFlags = Request::LLSC;
-    if (accessSize == 4)
-        memFlags = Request::Flags(2 | Request::LLSC);
-    else if (accessSize == 2)
-        memFlags = Request::Flags(1 | Request::LLSC);
+    const Request::Flags memFlags = this->memFlags();
 
     // initiateMemRead is templated on the dummy operand's type to pick
     // the access width.  Use the matching size variant.
@@ -1004,6 +1009,22 @@ LdrexMProfile::completeAcc(PacketPtr pkt, ExecContext *xc,
 // On failure: Rd <- 1,    store NOT committed (monitor was lost since
 //                         the most recent LDREX from this CPU).
 
+// Alignment requirements (matching LdrexMProfile + ISA-generated
+// code: 2 = word, 1 = half, 0 = byte) plus LLSC for the
+// exclusive-monitor check.
+Request::Flags
+StrexMProfile::memFlags() const
+{
+    Request::Flags mem_flags = Request::LLSC;
+    if (accessSize == 4)
+        mem_flags = Request::Flags(2 | Request::LLSC);
+    else if (accessSize == 2)
+        mem_flags = Request::Flags(1 | Request::LLSC);
+    if (release)
+        mem_flags.set(Request::RELEASE);
+    return mem_flags;
+}
+
 Fault
 StrexMProfile::execute(ExecContext *xc,
                        trace::InstRecord *traceData) const
@@ -1018,18 +1039,12 @@ StrexMProfile::execute(ExecContext *xc,
     Addr addr = tc->getReg(RegId(intRegClass, base)) + imm;
     RegVal val = tc->getReg(RegId(intRegClass, src));
 
-    // Alignment requirements (matching LdrexMProfile + ISA-generated
-    // code: 2 = word, 1 = half, 0 = byte) plus LLSC for the
-    // exclusive-monitor check.
-    Request::Flags memFlags = Request::LLSC;
-    if (accessSize == 4)
-        memFlags = Request::Flags(2 | Request::LLSC);
-    else if (accessSize == 2)
-        memFlags = Request::Flags(1 | Request::LLSC);
+    const Request::Flags memFlags = this->memFlags();
 
     // writeMemAtomicLE writes back the exclusive-monitor result via
-    // its `res` out-param: 0 on success, 1 on failure (matches the
-    // ARM ARM convention for STREX).
+    // its `res` out-param, the request's extra data: non-zero when
+    // the store was done, 0 when the monitor was lost (as completeAcc
+    // reads it).
     uint64_t monitor_result = 0;
     Fault fault = NoFault;
     if (accessSize == 4) {
@@ -1048,11 +1063,12 @@ StrexMProfile::execute(ExecContext *xc,
     if (fault != NoFault)
         return fault;
 
-    // ARM ARM A7.7.221: Rd takes the monitor pass/fail result.
-    tc->setReg(RegId(intRegClass, result_reg), (RegVal)monitor_result);
+    // ARM ARM A7.7.221: Rd is 0 when the store was done, 1 when not.
+    const RegVal result = !monitor_result;
+    tc->setReg(RegId(intRegClass, result_reg), result);
 
     if (traceData)
-        traceData->setData(monitor_result);
+        traceData->setData(result);
 
     return NoFault;
 }
@@ -1062,12 +1078,12 @@ StrexMProfile::generateDisassembly(Addr pc,
     const loader::SymbolTable *symtab) const
 {
     std::stringstream ss;
+    ss << "  " << mnemonic;
     if (accessSize == 1)
-        ss << "  strexb  ";
+        ss << "b";
     else if (accessSize == 2)
-        ss << "  strexh  ";
-    else
-        ss << "  strex   ";
+        ss << "h";
+    ss << "  ";
     printIntReg(ss, result_reg);
     ss << ", ";
     printIntReg(ss, src);
@@ -1097,11 +1113,7 @@ StrexMProfile::initiateAcc(ExecContext *xc,
     Addr addr = tc->getReg(RegId(intRegClass, base)) + imm;
     RegVal val = tc->getReg(RegId(intRegClass, src));
 
-    Request::Flags memFlags = Request::LLSC;
-    if (accessSize == 4)
-        memFlags = Request::Flags(2 | Request::LLSC);
-    else if (accessSize == 2)
-        memFlags = Request::Flags(1 | Request::LLSC);
+    const Request::Flags memFlags = this->memFlags();
 
     if (accessSize == 4) {
         uint32_t data = (uint32_t)val;

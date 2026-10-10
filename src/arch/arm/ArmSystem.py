@@ -157,6 +157,10 @@ class ArmExtension(ScopedEnum):
         "M_PROFILE_FPU_DP",  # Double-precision FPU (Cortex-M7 only)
         # FPv5 additions to the FPU: VSEL, VMAXNM/VMINNM, VRINT, VCVTA/N/P/M
         "M_PROFILE_FPV5",
+        # ARMv8-M additions to ARMv7-M (DDI0553): the load-acquire and
+        # store-release instructions (LDA, STL, LDAEX, STLEX and their
+        # byte and halfword forms). Cortex-M33.
+        "M_PROFILE_ARMV8M",
     ]
 
 

@@ -367,6 +367,13 @@ MISA::setMiscReg(RegIndex idx, RegVal val)
           return;
       }
 
+      case MISCREG_LOCKFLAG:
+          // CLREX (the A-profile class, insts/misc.isa) writes 0 here
+          // to open the local monitor.  DDI0403E A7.7.25.
+          if (!val)
+              globalClearExclusive();
+          return;
+
       case MISCREG_CPSR: {
           // Full CPSR write — should NOT happen after MDecoder
           // intercepts all CPSR-writing instructions.

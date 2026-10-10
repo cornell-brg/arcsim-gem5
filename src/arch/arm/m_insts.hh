@@ -636,12 +636,15 @@ class BarrierMProfile : public PredOp
  *   2 = LDREXH (halfword) DDI0403E A7.7.51
  *   1 = LDREXB (byte)     DDI0403E A7.7.50
  *
+ * With acquire set it is ARMv8-M's LDAEX / LDAEXH / LDAEXB (DDI0553
+ * C2.4), the same load with load-acquire ordering.
+ *
  * Reference: DDI0403E A3.4.5 (Exclusive monitors)
  */
 class LdrexMProfile : public PredOp
 {
   private:
-    RegId srcRegIdxArr[1];
+    RegId srcRegIdxArr[4];
     RegId destRegIdxArr[1];
 
   protected:
@@ -649,12 +652,17 @@ class LdrexMProfile : public PredOp
     RegIndex base;     // Rn
     uint32_t imm;      // offset in bytes (already shifted for LDREX)
     unsigned accessSize; // 1, 2, or 4
+    bool acquire;      // LDAEX rather than LDREX
+
+    /** LLSC, the alignment the access width needs, and the ordering. */
+    Request::Flags memFlags() const;
 
   public:
     LdrexMProfile(ExtMachInst mach_inst, RegIndex _dest, RegIndex _base,
-                  uint32_t _imm, unsigned _size)
-        : PredOp("ldrex", mach_inst, MemReadOp),
-          dest(_dest), base(_base), imm(_imm), accessSize(_size)
+                  uint32_t _imm, unsigned _size, bool _acquire = false)
+        : PredOp(_acquire ? "ldaex" : "ldrex", mach_inst, MemReadOp),
+          dest(_dest), base(_base), imm(_imm), accessSize(_size),
+          acquire(_acquire)
     {
         setRegIdxArrays(
             reinterpret_cast<RegIdArrayPtr>(
@@ -663,10 +671,22 @@ class LdrexMProfile : public PredOp
                 &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
 
         setSrcRegIdx(_numSrcRegs++, intRegClass[base]);
+        // The flags an IT condition tests are sources, so the Minor
+        // CPU does not start the access before they are committed
+        if (condCode != COND_AL && condCode != COND_UC) {
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::Nz]);
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::C]);
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::V]);
+        }
         setDestRegIdx(_numDestRegs++, intRegClass[dest]);
         _numTypedDestRegs[intRegClass.type()]++;
 
         flags[IsLoad] = true;
+        // As the ISA-generated load-acquire classes are (insts/ldr.isa)
+        if (acquire) {
+            flags[IsReadBarrier] = true;
+            flags[IsWriteBarrier] = true;
+        }
     }
 
     Fault execute(ExecContext *xc,
@@ -707,12 +727,15 @@ class LdrexMProfile : public PredOp
  *   2 = STREXH (halfword) DDI0403E A7.7.223
  *   1 = STREXB (byte)     DDI0403E A7.7.222
  *
+ * With release set it is ARMv8-M's STLEX / STLEXH / STLEXB (DDI0553
+ * C2.4), the same store with store-release ordering.
+ *
  * Reference: DDI0403E A3.4.5 (Exclusive monitors)
  */
 class StrexMProfile : public PredOp
 {
   private:
-    RegId srcRegIdxArr[2];
+    RegId srcRegIdxArr[5];
     RegId destRegIdxArr[1];
 
   protected:
@@ -721,13 +744,18 @@ class StrexMProfile : public PredOp
     RegIndex base;        // Rn — address base
     uint32_t imm;         // byte offset
     unsigned accessSize;  // 1, 2, or 4
+    bool release;         // STLEX rather than STREX
+
+    /** LLSC, the alignment the access width needs, and the ordering. */
+    Request::Flags memFlags() const;
 
   public:
     StrexMProfile(ExtMachInst mach_inst, RegIndex _result, RegIndex _src,
-                  RegIndex _base, uint32_t _imm, unsigned _size)
-        : PredOp("strex", mach_inst, MemWriteOp),
+                  RegIndex _base, uint32_t _imm, unsigned _size,
+                  bool _release = false)
+        : PredOp(_release ? "stlex" : "strex", mach_inst, MemWriteOp),
           result_reg(_result), src(_src), base(_base),
-          imm(_imm), accessSize(_size)
+          imm(_imm), accessSize(_size), release(_release)
     {
         setRegIdxArrays(
             reinterpret_cast<RegIdArrayPtr>(
@@ -739,10 +767,22 @@ class StrexMProfile : public PredOp
         // value (Rt). The destination is the success/fail flag (Rd).
         setSrcRegIdx(_numSrcRegs++, intRegClass[base]);
         setSrcRegIdx(_numSrcRegs++, intRegClass[src]);
+        // The flags an IT condition tests are sources, so the Minor
+        // CPU does not start the access before they are committed
+        if (condCode != COND_AL && condCode != COND_UC) {
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::Nz]);
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::C]);
+            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::V]);
+        }
         setDestRegIdx(_numDestRegs++, intRegClass[result_reg]);
         _numTypedDestRegs[intRegClass.type()]++;
 
         flags[IsStore] = true;
+        // As the ISA-generated store-release classes are (insts/str.isa)
+        if (release) {
+            flags[IsReadBarrier] = true;
+            flags[IsWriteBarrier] = true;
+        }
     }
 
     Fault execute(ExecContext *xc,
