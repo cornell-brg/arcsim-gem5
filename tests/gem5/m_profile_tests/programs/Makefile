@@ -49,7 +49,9 @@ TESTS = cortexm4_basic test_cps test_mrs_msr test_bx_exc_return \
         test_coproc_nocp \
         test_coproc_rp2350 \
         test_rp2350_gpioc \
-        test_rp2350_order
+        test_rp2350_order \
+        test_v8m_exclusive \
+        test_v8m_exclusive_undefined
 
 all: $(addsuffix .elf, $(TESTS)) freertos-tests
 
@@ -60,6 +62,9 @@ freertos-tests:
 
 # FPv5 and coprocessor tests use Cortex-M33 instructions
 test_fpv5.o test_fpv5_undefined.o test_coproc_nocp.o test_coproc_rp2350.o: ASFLAGS = -mcpu=cortex-m33 -mfpu=fpv5-sp-d16 -mthumb
+
+# The load-acquire and store-release instructions are ARMv8-M's
+test_v8m_exclusive.o test_v8m_exclusive_undefined.o: ASFLAGS = -mcpu=cortex-m33 -mthumb
 
 # The RP2350 GPIO test runs from SRAM on the RP2350 board and checks itself
 test_rp2350_gpioc.o: ASFLAGS = -mcpu=cortex-m33 -mthumb --defsym CHECK=1

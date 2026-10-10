@@ -132,3 +132,28 @@ In the trace, look for the final STR instruction:
 | 0x20000108 | Test result: Final (0xCAFECAFE = all pass) |
 | 0xE000E010 | SysTick CSR (SCS device) |
 | 0xE000ED08 | SCB VTOR (SCS device) |
+
+## Running a test on a Pico 2
+
+`test_v8m_exclusive.S` also links for the RP2350's SRAM, to check on silicon
+what the test expects of gem5:
+
+```bash
+cd tests/gem5/m_profile_tests/programs
+arm-none-eabi-ld -T rp2350_sram.ld --no-warn-rwx-segments \
+    test_v8m_exclusive.o -o test_v8m_exclusive_sram.elf
+```
+
+With Raspberry Pi's OpenOCD and a Debug Probe (`interface/cmsis-dap.cfg`,
+`target/rp2350.cfg`): `reset halt`, `load_image` the ELF, set `msp` to
+0x20020000, `xpsr` to 0x01000000 and `pc` to 0x20010000, `resume`, and after
+the core halts at the test's `bkpt` read the result with `mdw 0x20000100 2`.
+Nothing is written to flash. A Pico 2 (Cortex-M33 r1p0) passes all
+18 subtests.
+
+## Pico SDK firmware
+
+`programs/rp2350_sdk/` holds firmware built with the Pico SDK (its
+`CMakeLists.txt` says how). `configs/run_rp2350_sdk.py` runs it on the RP2350
+board (`configs/example/rp2350/board.py`), with stand-ins for the APB and AHB
+peripherals the board lacks.

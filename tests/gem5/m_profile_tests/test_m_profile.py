@@ -182,6 +182,17 @@ m_profile_test(
     "test_coproc_nocp.elf",
     extra_args=["--cpu-type", "timing"],
 )
+for cpu_type in ("atomic", "timing", "minor"):
+    m_profile_test(
+        f"v8m_exclusive_{cpu_type}",
+        "test_v8m_exclusive.elf",
+        extra_args=["--cpu-type", cpu_type, "--release", "m33"],
+    )
+m_profile_test(
+    "v8m_exclusive_undefined",
+    "test_v8m_exclusive_undefined.elf",
+    extra_args=["--cpu-type", "timing"],
+)
 m_profile_test(
     "coproc_rp2350",
     "test_coproc_rp2350.elf",
@@ -231,6 +242,40 @@ def m_profile_rp2350_test(name, firmware_name, ok_message, slow_sio=False):
 m_profile_rp2350_test(
     "rp2350_gpioc", "test_rp2350_gpioc.elf", r"RP2350_GPIOC_OK"
 )
+
+
+def m_profile_rp2350_sdk_test(name, firmware_name, ok_message, sram_model):
+    """Register a test that runs Pico SDK firmware (programs/rp2350_sdk) on
+    the RP2350 board's Arm proxy (configs/run_rp2350_sdk.py) and passes when
+    it prints ok_message."""
+    firmware_path = joinpath(
+        config.base_dir, "tests", "gem5", "m_profile_tests", "programs",
+        "rp2350_sdk", firmware_name,
+    )
+    if not os.path.exists(firmware_path):
+        return
+    gem5_verify_config(
+        name=f"m_profile_{name}_{sram_model}",
+        verifiers=[verifier.MatchRegex(re.compile(ok_message))],
+        fixtures=(),
+        config=joinpath(
+            config.base_dir, "tests", "gem5", "m_profile_tests", "configs",
+            "run_rp2350_sdk.py",
+        ),
+        config_args=[
+            "--firmware", firmware_path, "--sram-model", sram_model,
+        ],
+        valid_isas=(constants.all_compiled_tag,),
+        valid_hosts=constants.supported_hosts,
+        length=constants.quick_tag,
+    )
+
+
+for sram_model in ("legacy", "banked"):
+    m_profile_rp2350_sdk_test(
+        "rp2350_sdk_locks", "sdk_locks.elf", r"RP2350_SDK_LOCKS_OK",
+        sram_model,
+    )
 # GPIO coprocessor instructions stay in program order with SIO accesses on
 # the Minor-based Arm proxy
 m_profile_rp2350_test(
