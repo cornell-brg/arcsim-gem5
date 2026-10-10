@@ -37,7 +37,8 @@ RP2350SRAMTest::TestPort::recvReqRetry()
 }
 
 RP2350SRAMTest::RP2350SRAMTest(const RP2350SRAMTestParams &p)
-    : ClockedObject(p), scenario(p.scenario),
+    : ClockedObject(p), scenario(p.scenario), sramWindow(p.sram_window),
+      sramLatency(p.sram_latency),
       requestor(p.system->getRequestorId(this)),
       stepEvent([this] { step(); }, name() + ".step"),
       retryEvent([this] { ports[0]->sendRetryResp(); }, name() + ".retry")
@@ -91,15 +92,18 @@ RP2350SRAMTest::step()
                 if (scenario == "byte") size = 1;
                 if (scenario == "half") size = 2;
                 Addr addr = 0x20000000 + (scenario == "different" ? id * 4 : 0);
-                unsigned cycles = 0;
+                // The cycle, counted from this one, in which the packet's
+                // last beat is granted; its response follows within it.
+                int cycle = -1;
                 if (scenario == "same" || scenario == "byte" || scenario == "half")
-                    cycles = 2 + 2 * i + id;
-                if (scenario == "different") cycles = 2 + i;
-                if (scenario == "priority") cycles = 2 + i + (id == 0 ? 4 : 0);
-                if (scenario == "split") cycles = 3 + 2 * i;
+                    cycle = 2 * i + id;
+                if (scenario == "different") cycle = i;
+                if (scenario == "priority") cycle = i + (id == 0 ? 4 : 0);
+                if (scenario == "split") cycle = i;
                 ports[id]->pending.push_back(packet(addr, size, false,
                     std::vector<uint8_t>(size, 0),
-                    cycles ? start + cycles * clockPeriod() : 0));
+                    cycle >= 0 ? start + cycle * clockPeriod() + sramWindow +
+                                 sramLatency : 0));
             }
         }
         // Reverse callback order to ensure arbitration does not depend on
@@ -147,7 +151,7 @@ RP2350SRAMTest::step()
         delete init;
         auto atomic = packet(0x20000003, 8, false, {});
         Tick latency = ports[0]->sendAtomic(atomic);
-        panic_if(latency != 3 * clockPeriod(), "Wrong atomic-mode beat latency");
+        panic_if(latency != sramLatency, "Wrong atomic-mode latency");
         for (unsigned i = 0; i < 8; ++i)
             panic_if(atomic->getConstPtr<uint8_t>()[i] != i + 3, "Atomic read mismatch");
         delete atomic->senderState;

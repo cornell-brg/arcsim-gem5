@@ -69,7 +69,7 @@ print(f"XIP cache tag/data latency={args.xip_hit_latency_cycles} cycles; "
       f"replacement={args.xip_replacement}; QMI delay={args.xip_miss_ns} ns")
 print("SRAM=0x20000000+512KiB group windows, 0x20080000/0x20081000+4KiB")
 if args.sram_model == "banked":
-    print("SRAM model=banked: ten banks, 32-bit grants at 150MHz, one-cycle response")
+    print("SRAM model=banked: ten banks, 32-bit grants at 150MHz, zero wait states")
 else:
     print(f"SRAM model=legacy; scratch bank effective bandwidth={args.scratch_bank_bandwidth}")
 roi_start = None

@@ -170,6 +170,7 @@ DebugFlag('SerialLink')
 DebugFlag('TokenPort')
 
 DebugFlag('PipelinedMem')
+DebugFlag('RP2350SRAM')
 DebugFlag("MemChecker")
 DebugFlag("MemCheckerMonitor")
 DebugFlag("QOS")

@@ -58,11 +58,17 @@ class RP2350SRAM : public AbstractMemory
 
     std::vector<std::unique_ptr<MemoryPort>> ports;
     std::array<PortID, 10> lastWinner;
+    // When each bank can grant its next beat: one per cycle
+    std::array<Tick, 10> bankFree;
     std::deque<Beat> beats;
     std::list<TransactionPtr> active;
-    const Cycles responseCycles;
+    const Tick window;
+    const Tick latency;
     const unsigned queueDepth;
-    EventFunctionWrapper tickEvent;
+    // Runs after everything else of its tick, so that every request of a
+    // cycle is in before the banks choose.
+    EventFunctionWrapper arbitrateEvent;
+    EventFunctionWrapper completeEvent;
     // Defer destruction of no-response requests until their sender has
     // returned from sendTimingReq (the standard gem5 ownership convention).
     std::unique_ptr<Packet> pendingDelete;
@@ -87,8 +93,9 @@ class RP2350SRAM : public AbstractMemory
     void complete(const Beat &beat);
     void sendResponses(MemoryPort &port);
     void retire(const TransactionPtr &txn);
-    void tick();
-    void wake();
+    void arbitrate();
+    void arbitrateAt(Tick when);
+    void completeBeats();
     bool idle() const;
 
   public:
