@@ -59,7 +59,8 @@
  *     SCS re-evaluates masks and priorities on every query.
  *
  *   getInterrupt():
- *     Asks SCS for the exception number, wraps it in ArmMFault.
+ *     Has the SCS promote the exception from pending to active, and
+ *     wraps its number in ArmMFault.
  *
  *   updateIntrInfo():
  *     Tells SCS to transition the interrupt pending->active.
@@ -205,12 +206,17 @@ MProfileInterrupts::getInterrupt()
 {
     assert(scs);
 
+    // The exception to take stays pending until it is certain to be
+    // taken: checkInterrupts() only looks.
+    const int pendingExc = scs->deliverableIRQ();
+    if (pendingExc < 0)
+        return NoFault;
+
     if (stackOperating) {
         // Stacking or unstacking is in progress.  Only allow a
         // strictly higher priority exception to preempt.
         // Same or lower priority must wait until the operation
         // completes (DDI0403E B1.5.14).
-        int pendingExc = scs->acknowledgeIRQ();
         int16_t pendingPri = scs->getExcPriority(pendingExc);
 
         DPRINTF(MProfileStacking,
@@ -233,7 +239,8 @@ MProfileInterrupts::getInterrupt()
         mmu->abandonUnstacking();
     }
 
-    // Ask the SCS which exception won priority resolution.
+    // Promote it to active and take it.
+    scs->updatePending();
     lastAckedExcNum = scs->acknowledgeIRQ();
     return std::make_shared<ArmMFault>(lastAckedExcNum);
 }

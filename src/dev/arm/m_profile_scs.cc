@@ -582,8 +582,14 @@ MProfileSCS::write(PacketPtr pkt)
 
     } else if (daddr >= 0x100 && daddr <= 0x11F) {
         // -- ISER: write-1-to-set enable --
+        // An interrupt that became pending while disabled is taken
+        // once enabled, so it goes back on the pending queue.
         writeNvicW1S(daddr, 0x100, data,
-            [](Interrupt &i) { i.enabled = true; });
+            [this](Interrupt &i) {
+                i.enabled = true;
+                if (i.pending)
+                    pendInterrupt(i);
+            });
 
     } else if (daddr >= 0x180 && daddr <= 0x19F) {
         // -- ICER: write-1-to-clear enable --
@@ -877,16 +883,41 @@ MProfileSCS::clearInt(uint32_t irq)
     interrupts[excNum].pending = false;
 }
 
+void
+MProfileSCS::setIrqLevel(uint32_t irq, bool level)
+{
+    uint32_t excNum = irq + 16;
+    panic_if(excNum >= interrupts.size(),
+             "MProfileSCS::setIrqLevel: irq %u out of range (numIrqs=%u)",
+             irq, numIrqs);
+    Interrupt &intr = interrupts[excNum];
+    const bool rose = level && !intr.level;
+    intr.level = level;
+    if (rose)
+        pendInterrupt(intr);
+}
+
 // -- CPU-side interface --
 
 bool
 MProfileSCS::hasDeliverableIRQ()
 {
-    // updatePending() returns true only if it promoted a NEW pending
-    // exception to active — meaning the CPU should take it now.
-    // It does NOT return true just because active exceptions exist
-    // (that would cause re-entry into the current handler).
-    return updatePending();
+    return deliverableIRQ() >= 0;
+}
+
+int
+MProfileSCS::deliverableIRQ()
+{
+    // Drop stale entries (disabled or no longer pending), then look at
+    // the highest-priority pending exception without promoting it.
+    while (!pendingInterrupts.empty()) {
+        Interrupt *top = pendingInterrupts.top();
+        if (top->enabled && top->pending)
+            return canActivate(*top) ? top->interruptNum : -1;
+        top->inPendingQueue = false;
+        pendingInterrupts.pop();
+    }
+    return -1;
 }
 
 bool
@@ -995,6 +1026,10 @@ MProfileSCS::deactivateIRQ(int exc_num)
     top->active = false;
     top->inActiveQueue = false;
     activeInterrupts.pop();
+
+    // A line still high when its handler returns interrupts again.
+    if (top->level)
+        pendInterrupt(*top);
 
     // DDI0403E B1.5.8 DeActivate(): FAULTMASK is automatically
     // cleared to 0 on exception return, except when returning
@@ -1154,6 +1189,7 @@ MProfileSCS::serialize(CheckpointOut &cp) const
         SERIALIZE_SCALAR(intr.pending);
         SERIALIZE_SCALAR(intr.priority);
         SERIALIZE_SCALAR(intr.interruptNum);
+        SERIALIZE_SCALAR(intr.level);
     }
 
     // -- Mask state --
@@ -1211,6 +1247,7 @@ MProfileSCS::unserialize(CheckpointIn &cp)
         UNSERIALIZE_SCALAR(intr.pending);
         UNSERIALIZE_SCALAR(intr.priority);
         UNSERIALIZE_SCALAR(intr.interruptNum);
+        UNSERIALIZE_OPT_SCALAR(intr.level);
         intr.inPendingQueue = false;
         intr.inActiveQueue = false;
     }
