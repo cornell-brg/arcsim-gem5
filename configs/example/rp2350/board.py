@@ -49,7 +49,7 @@ def _router(clock_domain):
 
 
 def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
-                   scratch_bank_bandwidth, sram_model):
+                   scratch_bank_bandwidth, sram_model, dma):
     """Wire both CPU ports to one shared XIP cache or the SRAM bus.
 
     The legacy path uses lumped SimpleMemory windows. The banked path uses
@@ -128,10 +128,28 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
     # The firmware loader needs a path to both XIP and SRAM addresses.
     board.system_port = board.dcode_router.cpu_side_ports
 
+    if dma:
+        # The DMA's read and write managers, each routed like a core's data
+        # port: flash through the XIP cache, the SRAM (on the banked model
+        # as a manager of its own, competing bank by bank), the rest through
+        # the peripheral router.
+        from m5.objects import RP2350DMA
+        board.dma = RP2350DMA(pio_latency="1ns")
+        board.dma.pio = board.sram_bus.mem_side_ports
+        board.dma_read_router = _router(board.fast_clock)
+        board.dma_write_router = _router(board.fast_clock)
+        for router in (board.dma_read_router, board.dma_write_router):
+            router.default = board.sram_bus.cpu_side_ports
+            router.mem_side_ports = board.xip_front.cpu_side_ports
+            if board._banked_sram:
+                router.mem_side_ports = board.sram.port
+        board.dma.read_port = board.dma_read_router.cpu_side_ports
+        board.dma.write_port = board.dma_write_router.cpu_side_ports
+
 
 def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
               scratch_bank_bandwidth, arm_predictor, arm_divider, sram_model,
-              arm_timing):
+              arm_timing, dma):
     from m5.objects import ArmMSystem, ArmSemihosting
     from m5.objects.ArmMSystem import ArmMReleaseCortexM33
     from m5.objects.ArmMFsWorkload import ArmMFsWorkload
@@ -159,7 +177,7 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     _attach_memory(board, xip_miss_ns=xip_miss_ns,
                    sram_latency_ns=sram_latency_ns,
                    scratch_bank_bandwidth=scratch_bank_bandwidth,
-                   sram_model=sram_model)
+                   sram_model=sram_model, dma=dma)
 
     # Decouple in-flight ICode responses on SRAM branch redirects. Direct
     # xbar-to-memory fetch crashes this gem5 branch; this adds no SRAM cache.
@@ -230,6 +248,15 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
         RP2350DcpCoprocessor,
         RP2350GpioCoprocessor,
     )
+    if dma:
+        # DMA_IRQ_0 to DMA_IRQ_3 are the NVIC's IRQs 10 to 13.
+        from m5.objects import MProfileIrqLine
+        board.dma_irq_lines = [
+            MProfileIrqLine(scs=board.platform.scs, irq_num=10 + n)
+            for n in range(4)
+        ]
+        for line in board.dma_irq_lines:
+            board.dma.irq = line.pin
     board.gpio_coprocessor = RP2350GpioCoprocessor(sio=board.sio)
     board.dcp = RP2350DcpCoprocessor()
     board.rcp = MProfileCoprocessor(numbers=[7])
@@ -239,7 +266,7 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
 
 
 def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
-                scratch_bank_bandwidth, sram_model):
+                scratch_bank_bandwidth, sram_model, dma):
     from m5.objects import RiscvSystem
     from m5.objects.RiscvCPU import RiscvMinorCPU
     from m5.objects.RiscvFsWorkload import RiscvBareMetal
@@ -256,7 +283,7 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     _attach_memory(board, xip_miss_ns=xip_miss_ns,
                    sram_latency_ns=sram_latency_ns,
                    scratch_bank_bandwidth=scratch_bank_bandwidth,
-                   sram_model=sram_model)
+                   sram_model=sram_model, dma=dma)
     if board._banked_sram:
         board.icode_router.mem_side_ports = board.sram.port
     board.mem_mode = "timing"
@@ -300,8 +327,11 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
 def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                scratch_bank_bandwidth=SCRATCH_BANK_BANDWIDTH,
                arm_predictor="m4", arm_divider="rp2350-m33",
-               sram_model="legacy", arm_timing="tuned"):
-    """Return exactly one active core with the RP2350 memory baseline."""
+               sram_model="legacy", arm_timing="tuned", dma=False):
+    """Return exactly one active core with the RP2350 memory baseline.
+
+    dma adds the DMA controller (RP2350DMA) at 0x50000000-0x50003fff; on the
+    Hazard3 proxy its interrupt outputs are left unconnected."""
     if sram_model not in ("legacy", "banked"):
         raise ValueError(f"Unknown SRAM model: {sram_model}")
     if core == "arm-m4-proxy":
@@ -310,10 +340,10 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                          scratch_bank_bandwidth=scratch_bank_bandwidth,
                          arm_predictor=arm_predictor,
                          arm_divider=arm_divider, sram_model=sram_model,
-                         arm_timing=arm_timing)
+                         arm_timing=arm_timing, dma=dma)
     if core == "hazard3-proxy":
         return _make_riscv(firmware, xip_miss_ns=xip_miss_ns,
                            sram_latency_ns=sram_latency_ns,
                            scratch_bank_bandwidth=scratch_bank_bandwidth,
-                           sram_model=sram_model)
+                           sram_model=sram_model, dma=dma)
     raise ValueError(f"Unknown RP2350 core selector: {core}")  

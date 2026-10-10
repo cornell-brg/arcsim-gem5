@@ -34,6 +34,8 @@ parser.add_argument("--arm-timing", choices=("tuned", "pre-tuning"),
                     default="tuned",
                     help="CortexM4CPU timing as tuned against the STM32G474, or as "
                     "it was before that tuning")
+parser.add_argument("--dma", action="store_true",
+                    help="Add the DMA controller")
 parser.add_argument("--tick-limit", type=int, default=10_000_000_000)
 args = parser.parse_args()
 if not args.firmware.is_file():
@@ -51,6 +53,7 @@ board = make_board(
     arm_divider=args.arm_divider,
     sram_model=args.sram_model,
     arm_timing=args.arm_timing,
+    dma=args.dma,
 )
 board.xip_cache.tag_latency = args.xip_hit_latency_cycles
 board.xip_cache.data_latency = args.xip_hit_latency_cycles
