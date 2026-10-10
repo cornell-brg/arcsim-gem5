@@ -11,10 +11,10 @@ class RP2350SRAM(AbstractMemory):
     This models SRAM service, not an AHB signal-level implementation.
 
     The banks have zero wait states, as the RP2350's (datasheet 2.1.1): a
-    bank serves one beat per clock cycle. A beat is granted in the cycle it
-    is requested and answered within that cycle, unless the bank has served
-    another beat, when it waits a cycle. Without contention an access costs
-    what it does on a plain memory of the same latency.
+    bank serves one manager per clock cycle. A beat is granted in the cycle
+    it is requested and answered within that cycle, unless the bank has
+    served another manager, when it waits a cycle. Without contention an
+    access costs what it does on a plain memory of the same latency.
 
     Managers that ask in the same cycle are chosen between as if at once:
     the banks choose `window` after the clock edge, by when a request

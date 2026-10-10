@@ -97,9 +97,11 @@ RP2350SRAMTest::step()
                 int cycle = -1;
                 if (scenario == "same" || scenario == "byte" || scenario == "half")
                     cycle = 2 * i + id;
-                if (scenario == "different") cycle = i;
+                // Alone on its bank, a manager's four requests of one
+                // cycle are all served in it.
+                if (scenario == "different") cycle = 0;
                 if (scenario == "priority") cycle = i + (id == 0 ? 4 : 0);
-                if (scenario == "split") cycle = i;
+                if (scenario == "split") cycle = 0;
                 ports[id]->pending.push_back(packet(addr, size, false,
                     std::vector<uint8_t>(size, 0),
                     cycle >= 0 ? start + cycle * clockPeriod() + sramWindow +

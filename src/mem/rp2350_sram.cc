@@ -89,6 +89,8 @@ RP2350SRAM::RP2350SRAM(const RP2350SRAMParams &p)
              "Invalid RP2350 SRAM queue parameters");
     lastWinner.fill(InvalidPortID);
     bankFree.fill(0);
+    bankOwner.fill(InvalidPortID);
+    bankOwnerPrompt.fill(false);
     for (unsigned id = 0; id < p.port_port_connection_count; ++id) {
         unsigned priority = p.port_priority[
             std::min<size_t>(id, p.port_priority.size() - 1)];
@@ -192,8 +194,8 @@ RP2350SRAM::receive(PacketPtr pkt, PortID id)
     // The banks choose `window` into the cycle, or at once for a request
     // that arrives later in it.
     const Tick edge = clockEdge();
-    const Tick cycle_start = edge == curTick() ? edge : edge - clockPeriod();
-    arbitrateAt(std::max(curTick(), cycle_start + window));
+    txn->cycle = edge == curTick() ? edge : edge - clockPeriod();
+    arbitrateAt(std::max(curTick(), txn->cycle + window));
     return true;
 }
 
@@ -333,53 +335,67 @@ RP2350SRAM::arbitrate()
     Tick again = MaxTick;
 
     // Each manager presents its head beat. The delays a packet has picked
-    // up on its way place its answer, not its turn. Selection is per bank,
-    // with strict two-level priority and round robin among equal
-    // priorities. A manager whose beat is granted presents its next one at
-    // once, so a packet over several banks, or a second packet, completes
-    // in the cycle if those banks are free: how many beats a manager makes
-    // in a cycle is its own model's business.
+    // up on its way place its answer, not its turn. A bank serves one
+    // manager per cycle, chosen with strict two-level priority and round
+    // robin among equal priorities. A manager served without having waited
+    // may make further beats on the bank in the cycle they arrive in, while
+    // no other manager asks for it: a core model that issues two accesses
+    // in a cycle pays for that in its own timing, as on a plain memory. A
+    // manager that has waited gets one beat a cycle, and stays behind.
     bool granted = true;
     while (granted) {
         granted = false;
         again = MaxTick;
-        std::array<std::vector<PortID>, 10> candidates;
+        std::array<std::vector<PortID>, 10> asking;
         for (PortID id = 0; static_cast<size_t>(id) < ports.size(); ++id) {
-            auto &port = *ports[id];
-            if (port.requests.empty())
+            const auto &requests = ports[id]->requests;
+            if (requests.empty())
                 continue;
-            auto txn = port.requests.front();
-            const unsigned bank = bankFor(txn->pkt->getAddr() + txn->granted);
-            if (bankFree[bank] > now) {
-                // The bank has served its beat for this cycle.
-                again = std::min(again, bankFree[bank] + window);
-                continue;
-            }
-            candidates[bank].push_back(id);
+            auto txn = requests.front();
+            asking[bankFor(txn->pkt->getAddr() + txn->granted)].push_back(id);
         }
         for (unsigned bank = 0; bank < 10; ++bank) {
-            const auto &ready = candidates[bank];
+            const auto &ready = asking[bank];
             if (ready.empty())
                 continue;
-            if (ready.size() > 1)
-                ++sramStats.contested[bank];
             PortID winner = ready.front();
-            auto distance = [&](PortID id) {
-                const unsigned count = ports.size();
-                const unsigned start = lastWinner[bank] == InvalidPortID ? 0 :
-                                       (lastWinner[bank] + 1) % count;
-                return (id + count - start) % count;
-            };
-            for (PortID id : ready) {
-                if (ports[id]->priority > ports[winner]->priority ||
-                    (ports[id]->priority == ports[winner]->priority &&
-                     distance(id) < distance(winner)))
-                    winner = id;
+            const bool prompt =
+                ports[winner]->requests.front()->cycle + clockPeriod() ==
+                    nextEdge;
+            if (bankFree[bank] > now) {
+                // The bank has served its beat for this cycle.
+                const bool own = ready.size() == 1 &&
+                    winner == bankOwner[bank] && bankOwnerPrompt[bank] &&
+                    prompt;
+                if (!own) {
+                    again = std::min(again, bankFree[bank] + window);
+                    continue;
+                }
+            } else {
+                if (ready.size() > 1)
+                    ++sramStats.contested[bank];
+                auto distance = [&](PortID id) {
+                    const unsigned count = ports.size();
+                    const unsigned start =
+                        lastWinner[bank] == InvalidPortID ? 0 :
+                        (lastWinner[bank] + 1) % count;
+                    return (id + count - start) % count;
+                };
+                for (PortID id : ready) {
+                    if (ports[id]->priority > ports[winner]->priority ||
+                        (ports[id]->priority == ports[winner]->priority &&
+                         distance(id) < distance(winner)))
+                        winner = id;
+                }
+                lastWinner[bank] = winner;
+                bankOwnerPrompt[bank] =
+                    ports[winner]->requests.front()->cycle + clockPeriod() ==
+                        nextEdge;
             }
             DPRINTF(RP2350SRAM, "bank %d to manager %d of %d asking\n",
                     bank, winner, ready.size());
-            lastWinner[bank] = winner;
             bankFree[bank] = nextEdge;
+            bankOwner[bank] = winner;
             auto &port = *ports[winner];
             auto txn = port.requests.front();
             unsigned size = beatSize(txn->pkt->getAddr() + txn->granted,
