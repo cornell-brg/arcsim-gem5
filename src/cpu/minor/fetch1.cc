@@ -950,7 +950,9 @@ SingleStageFetch1::fetchBranchTarget(ThreadID tid, Addr target_addr)
         cpu.instRequestorId(), target_addr);
     request->request->setStreamId(thread.streamSeqNum);
 
-    request->fault = cpu.threads[tid]->mmu->translateAtomic(
+    /* The branch may not be taken, or not to here: a translation with
+     *  no effect on the thread's state */
+    request->fault = cpu.threads[tid]->mmu->translateFunctional(
         request->request, cpu.getContext(tid), BaseMMU::Execute);
 
     if (request->fault != NoFault) {
