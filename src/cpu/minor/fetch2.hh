@@ -303,6 +303,12 @@ class SingleStageFetch2 : public Fetch2
      *  32-bit fetch word during decode [DDI0439D §3.3]. */
     bool scanNextForBranch();
 
+    /** If the instructions being decoded are of the stream and prediction
+     *  given, set addr to the address of the next to decode and return
+     *  true */
+    bool decodeAddr(ThreadID tid, InstSeqNum stream_seq_num,
+        InstSeqNum prediction_seq_num, Addr &addr) const;
+
     /** Check if the next stage (Decode) is blocked. */
     bool isNextStageBlocked(ThreadID tid) const {
         return !nextStageReserve[tid].canReserve();

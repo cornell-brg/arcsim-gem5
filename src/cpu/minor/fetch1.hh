@@ -471,6 +471,15 @@ class SingleStageFetch1 : public Fetch1
      *  nothing more may be sent until the port's retry arrives */
     bool targetRefused = false;
 
+    /** No sequential fetch starts while this many bytes of the stream, or
+     *  more, are fetched or on their way and not yet decoded (0: no
+     *  limit) */
+    unsigned int readAheadLimit;
+
+    /** Is the stream fetched as far ahead of decode as readAheadLimit
+     *  allows? */
+    bool readAheadFull();
+
     /** Fetch the line holding target beside the sequential stream */
     void fetchBranchTarget(ThreadID tid, const PCStateBase &target);
 

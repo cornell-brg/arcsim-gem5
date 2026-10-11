@@ -332,6 +332,12 @@ for sram_model in ("legacy", "banked"):
         "rp2350_xip", "test_rp2350_xip.elf", r"RP2350_XIP_OK",
         "run_rp2350_sdk.py", sram_model, xip_model="qmi",
     )
+    # The core fetches only a few words past a branch, as a Pico 2
+    m_profile_rp2350_dma_test(
+        "rp2350_fetch_ahead", "test_rp2350_fetch_ahead.elf",
+        r"RP2350_FETCH_AHEAD_OK", "run_rp2350_sdk.py", sram_model,
+        xip_model="qmi",
+    )
 # A store that loses its bank holds the core, with the cycles a Pico 2 gives;
 # only the banked SRAM has banks to lose
 m_profile_rp2350_dma_test(

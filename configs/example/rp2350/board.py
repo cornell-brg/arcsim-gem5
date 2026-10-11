@@ -238,6 +238,12 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     # lose; the legacy memories keep the store buffer's timing.
     board.cpu.executeWaitedStoreHoldsInsts = board._banked_sram
 
+    # The Cortex-M33's prefetch holds a few bytes: it has fetched a word or
+    # two past a branch when the branch takes effect. 8 bytes are what
+    # decode can take in the two cycles a fetch needs here, so it waits for
+    # no line it did not wait for before.
+    board.cpu.fetchReadAheadLimit = 8
+
     board.cpu.clk_domain = board.clk_domain
     board.mem_mode = board.cpu.memory_mode()
     board.cpu.createThreads()

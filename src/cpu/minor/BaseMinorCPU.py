@@ -352,6 +352,15 @@ class BaseMinorCPU(BaseCPU):
         " stream, and starts the new stream if Execute takes the branch, as"
         " on cores that compute direct targets in decode",
     )
+    fetchReadAheadLimit = Param.Unsigned(
+        0,
+        "With singleFetchStage: no sequential fetch starts while this many"
+        " bytes of the stream, or more, are fetched or on their way and not"
+        " yet decoded (0: no limit), as a core whose prefetch buffer holds"
+        " a few bytes.  Decode never waits for a line it would not have"
+        " waited for without the limit if this is at least the bytes it"
+        " can take in the cycles a fetch needs",
+    )
     fetch1FetchLimit = Param.Unsigned(
         1, "Number of line fetches allowable in flight at once"
     )

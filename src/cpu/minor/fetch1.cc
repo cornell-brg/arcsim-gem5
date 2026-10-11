@@ -1058,8 +1058,31 @@ SingleStageFetch1::SingleStageFetch1(const std::string &name_,
         next_stage_input_buffer),
     fetch2(fetch2_),
     eToF1Input(eToF1Input_),
-    targetRequest(NULL)
+    targetRequest(NULL),
+    readAheadLimit(params.fetchReadAheadLimit)
 {
+}
+
+bool
+SingleStageFetch1::readAheadFull()
+{
+    /* Only single-threaded M-profile */
+    ThreadID tid = 0;
+    Fetch1ThreadInfo &thread = fetchInfo[tid];
+
+    if (readAheadLimit == 0 || thread.state != FetchRunning)
+        return false;
+
+    /* Decode has got to here in the stream, or not yet to its start */
+    Addr decode_to = thread.pc->instAddr();
+    fetch2->decodeAddr(tid, thread.streamSeqNum, thread.predictionSeqNum,
+        decode_to);
+
+    /* With nothing waiting or on its way there is nothing to wait for */
+    bool waiting = numInFlightFetches() != 0 ||
+        !fetch2->inputBuffer[tid].empty();
+
+    return waiting && thread.fetchAddr >= decode_to + readAheadLimit;
 }
 
 void
@@ -1160,7 +1183,8 @@ SingleStageFetch1::evaluate()
      * prefetch. */
     if (!prediction.isBubble() || !fetch2->scanNextForBranch()) {
     // if (!prediction.isBubble()) {
-        tryToFetch();
+        if (!readAheadFull())
+            tryToFetch();
     }
 
     /* --- Post-evaluate --- */

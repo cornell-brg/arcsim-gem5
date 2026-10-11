@@ -57,6 +57,7 @@ TESTS = cortexm4_basic test_cps test_mrs_msr test_bx_exc_return \
         test_rp2350_dma_dreq \
         test_rp2350_xip \
         test_rp2350_store_wait \
+        test_rp2350_fetch_ahead \
         test_nvic_pend_enable
 
 all: $(addsuffix .elf, $(TESTS)) freertos-tests
@@ -86,6 +87,10 @@ RP2350_DMA_TESTS = test_rp2350_dma test_rp2350_dma_dreq test_rp2350_xip \
 $(addsuffix .o, $(RP2350_DMA_TESTS)): ASFLAGS = -mcpu=cortex-m33 -mthumb
 $(addsuffix .elf, $(RP2350_DMA_TESTS)): LDFLAGS = -T rp2350_sram.ld --no-warn-rwx-segments
 $(addsuffix .elf, $(RP2350_DMA_TESTS)): rp2350_sram.ld
+# Runs from SRAM and calls stubs in flash
+test_rp2350_fetch_ahead.o: ASFLAGS = -mcpu=cortex-m33 -mthumb
+test_rp2350_fetch_ahead.elf: LDFLAGS = -T rp2350_sram_flash.ld --no-warn-rwx-segments
+test_rp2350_fetch_ahead.elf: rp2350_sram_flash.ld
 
 %.o: %.S
 	$(AS) $(ASFLAGS) $< -o $@

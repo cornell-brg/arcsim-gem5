@@ -827,6 +827,23 @@ SingleStageFetch2::runDecodeCore(BranchData &prediction_out,
 }
 
 bool
+SingleStageFetch2::decodeAddr(ThreadID tid, InstSeqNum stream_seq_num,
+    InstSeqNum prediction_seq_num, Addr &addr) const
+{
+    const Fetch2ThreadInfo &fetch_info = fetchInfo[tid];
+
+    if (!fetch_info.havePC ||
+        fetch_info.lastStreamSeqNum != stream_seq_num ||
+        fetch_info.predictionSeqNum != prediction_seq_num)
+    {
+        return false;
+    }
+
+    addr = fetch_info.pc->instAddr();
+    return true;
+}
+
+bool
 SingleStageFetch2::scanNextForBranch()
 {
     /* Only single-threaded M-profile */
