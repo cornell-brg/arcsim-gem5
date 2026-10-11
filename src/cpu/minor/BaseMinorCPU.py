@@ -97,6 +97,13 @@ class MinorFUTiming(SimObject):
         " functional unit.  For mem refs, if this is 0, the result's time"
         " is marked as unpredictable and no forwarding can take place.",
     )
+    resultUsePenalty = Param.Cycles(
+        0,
+        "cycles an inst. that reads this inst.'s results is held back,"
+        " counted from when this inst. completes, however long that took"
+        " (0: none).  A reader whose srcRegsRelativeLats entry for that"
+        " register is larger than its others by as much is not held back",
+    )
     srcRegsRelativeLats = VectorParam.Cycles(
         "the maximum number of cycles"
         " after inst. issue that each src reg can be available for this"

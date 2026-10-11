@@ -1147,11 +1147,14 @@ SingleStageFetch1::evaluate()
 
         if (fetchInfo[tid].state == FetchRunning &&
             icacheState == IcacheRunning &&
-            !execute.regWritePending(tid, reg))
+            !execute.regWritePending(tid, reg,
+                fetch2->decodedRegisterBranch))
         {
             fetchBranchTarget(tid, cpu.getContext(tid)->getReg(reg));
+            fetch2->decodedRegisterBranch = nullptr;
+        } else if (--fetch2->decodedRegisterTries == 0) {
+            fetch2->decodedRegisterBranch = nullptr;
         }
-        fetch2->decodedRegisterBranch = nullptr;
     }
 
     /* Step I-cache queues */

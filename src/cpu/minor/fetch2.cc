@@ -734,7 +734,10 @@ SingleStageFetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
             !static_inst->isMicroop() && static_inst->numSrcRegs() == 1 &&
             static_inst->srcRegIdx(0).is(IntRegClass))
         {
+            /* Its Decode cycle, and two more should it wait in Execute
+             *  for its register */
             decodedRegisterBranch = inst;
+            decodedRegisterTries = 3;
             decodedBranchTid = inst->id.threadId;
         }
         return;

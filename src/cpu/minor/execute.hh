@@ -361,9 +361,9 @@ class Execute : public Named
     bool canAccessAtIssue(ThreadID thread_id);
 
   public:
-    /** Is an instruction that may write reg waiting to be issued, or its
-     *  result still to come */
-    bool regWritePending(ThreadID thread_id, const RegId &reg);
+    /** Has an instruction ahead of inst that writes reg yet to complete */
+    bool regWritePending(ThreadID thread_id, const RegId &reg,
+        const MinorDynInstPtr &inst);
 
   protected:
     /** Set the drain state (with useful debugging messages) */

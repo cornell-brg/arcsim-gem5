@@ -24,7 +24,33 @@ from m5.params import NULL
 
 # ---------------------------------------------------------------------------
 # Functional units
+#
+# Some results have one cycle of result delay: an instruction that uses one
+# as a source operand waits a cycle [RP2350 datasheet 3.7.4.9.1]. That is a
+# timing's resultUsePenalty.
 # ---------------------------------------------------------------------------
+
+# A 32-bit Thumb instruction in an ExtMachInst: the thumb and bigThumb bits,
+# with the instruction's first halfword in bits 31:16 and its second below.
+_T32 = (1 << 36) | (1 << 35)
+
+
+def _t32(mask, match):
+    return dict(mask=_T32 | mask, match=_T32 | match)
+
+
+# Data processing with a shifted register operand (first halfword 1110 101x
+# xxxS nnnn; second 0 imm3 dddd imm2 type mmmm)
+_SHIFTED_REG = _t32(0xFE000000, 0xEA000000)
+# ... whose shift is LSL #0 to #3
+_SHIFTED_REG_SMALL = _t32(0xFE007030, 0xEA000000)
+# ... that set the flags
+_SHIFTED_REG_FLAGS = _t32(0xFE100000, 0xEA100000)
+# ... that are the shift instructions LSL, LSR, ASR, ROR and RRX themselves
+# (MOV with a shifted register)
+_SHIFT_INSTS = _t32(0xFFEF0000, 0xEA4F0000)
+# VMOV from a single-precision register to a core register
+_VMOV_TO_CORE = _t32(0xFFF00F7F, 0xEE100A10)
 
 
 class M33IntAluFU(MinorFU):
@@ -33,27 +59,67 @@ class M33IntAluFU(MinorFU):
     opClasses = minorMakeOpClassSet(["IntAlu"])
     opLat = 1
     issueLat = 1
-    timings = [MinorFUTiming(description="M33Int", srcRegsRelativeLats=[1])]
+    # An operand shifted by other than LSL #0 to #3 gives its result a
+    # cycle later, and with the flags set the instruction takes that cycle
+    # whatever follows it; the shift instructions themselves do not
+    # [RP2350 datasheet 3.7.4.9.2].
+    timings = [
+        MinorFUTiming(
+            description="M33Shift", srcRegsRelativeLats=[1], **_SHIFT_INSTS
+        ),
+        MinorFUTiming(
+            description="M33ShiftedSmall",
+            srcRegsRelativeLats=[1],
+            **_SHIFTED_REG_SMALL,
+        ),
+        MinorFUTiming(
+            description="M33ShiftedFlags",
+            srcRegsRelativeLats=[1],
+            extraCommitLat=1,
+            **_SHIFTED_REG_FLAGS,
+        ),
+        MinorFUTiming(
+            description="M33Shifted",
+            srcRegsRelativeLats=[1],
+            resultUsePenalty=1,
+            **_SHIFTED_REG,
+        ),
+        MinorFUTiming(description="M33Int", srcRegsRelativeLats=[1]),
+    ]
 
 
 class M33IntMulFU(MinorFU):
-    """MUL, MLA, MLS, SMULL, UMULL, SMLAL, UMLAL: one cycle."""
+    """MUL, MLA, MLS, SMULL, UMULL, SMLAL, UMLAL: one cycle, with a cycle
+    of result delay that a following multiply-accumulate's accumulator
+    does not wait for [RP2350 datasheet 3.7.4.9.3]."""
 
     opClasses = minorMakeOpClassSet(["IntMult"])
     opLat = 1
     issueLat = 1
-    timings = [MinorFUTiming(description="M33Mul", srcRegsRelativeLats=[0])]
+    timings = [
+        MinorFUTiming(
+            description="M33Mul",
+            srcRegsRelativeLats=[1, 1, 2],
+            resultUsePenalty=1,
+        )
+    ]
 
 
 class M33IntDivFU(DynamicLatencyIntDivFU):
     """SDIV, UDIV: cycles that depend on the operands, as the RP2350's
-    Cortex-M33 takes them. opLat is the minimum; the rest is computed at
-    commit, and the unit stays busy until then."""
+    Cortex-M33 takes them, with a cycle of result delay [RP2350 datasheet
+    3.7.4.9.4]. opLat is the minimum; the rest is computed at commit, and
+    the unit stays busy until then."""
 
     opClasses = minorMakeOpClassSet(["IntDiv"])
     opLat = 2
     issueLat = 2
     rp2350_m33_timing = True
+    timings = [
+        MinorFUTiming(
+            description="M33Div", srcRegsRelativeLats=[0], resultUsePenalty=1
+        )
+    ]
 
 
 class M33FloatFU(MinorFU):
@@ -86,7 +152,25 @@ class M33FloatFU(MinorFU):
     )
     opLat = 1
     issueLat = 1
-    timings = [MinorFUTiming(description="M33Float", srcRegsRelativeLats=[1])]
+    # VADD, VSUB and VMUL have a cycle of result delay, as has a move to a
+    # core register [RP2350 datasheet 3.7.4.9.10].
+    timings = [
+        MinorFUTiming(
+            description="M33FToCore",
+            srcRegsRelativeLats=[1],
+            resultUsePenalty=1,
+            **_VMOV_TO_CORE,
+        ),
+        MinorFUTiming(
+            description="M33FArith",
+            srcRegsRelativeLats=[1],
+            resultUsePenalty=1,
+            opClasses=minorMakeOpClassSet(
+                ["FloatAdd", "FloatMult", "SimdFloatAdd", "SimdFloatMult"]
+            ),
+        ),
+        MinorFUTiming(description="M33Float", srcRegsRelativeLats=[1]),
+    ]
 
 
 class M33FloatMacFU(MinorFU):
@@ -105,8 +189,9 @@ class M33FloatDivFU(MinorFU):
 
     The divider works beside the pipeline: the instruction leaves the
     execute stage after one cycle, later instructions that do not read
-    its result go ahead, and its result is ready 14 cycles after issue.
-    A second divide waits for the first (issueLat)."""
+    its result go ahead, and its result comes 14 cycles after issue, with
+    a cycle of result delay [RP2350 datasheet 3.7.4.9.10]. A second divide
+    waits for the first (issueLat)."""
 
     opClasses = minorMakeOpClassSet(
         ["FloatDiv", "FloatSqrt", "SimdFloatDiv", "SimdFloatSqrt"]
@@ -116,7 +201,7 @@ class M33FloatDivFU(MinorFU):
     resultAfterCommit = True
     timings = [
         MinorFUTiming(
-            description="M33FDiv", srcRegsRelativeLats=[0], extraAssumedLat=14
+            description="M33FDiv", srcRegsRelativeLats=[0], extraAssumedLat=15
         )
     ]
 
@@ -128,13 +213,19 @@ class M33MemFU(MinorFU):
     opClasses = minorMakeOpClassSet(["MemRead", "MemWrite"])
     opLat = 1
     issueLat = 1
-    # A loaded register has one cycle of result delay: an instruction
-    # that uses it, a load's or store's address included, waits a cycle
-    # [RP2350 datasheet 3.7.4.9.1].
+    # A loaded register has one cycle of result delay. The registers a
+    # load's or store's address is made from are source operands; the
+    # register a store writes to memory is not, and can come a cycle later
+    # [RP2350 datasheet 3.7.4.9.5, 3.7.4.9.6].
     timings = [
         MinorFUTiming(
-            description="M33Mem", srcRegsRelativeLats=[1], extraAssumedLat=2
-        )
+            description="M33Store",
+            srcRegsRelativeLats=[1, 2],
+            opClasses=minorMakeOpClassSet(["MemWrite"]),
+        ),
+        MinorFUTiming(
+            description="M33Load", srcRegsRelativeLats=[1], resultUsePenalty=1
+        ),
     ]
 
 

@@ -218,12 +218,11 @@ Scoreboard::clearInstDests(MinorDynInstPtr inst, bool clear_unpredictable,
 }
 
 bool
-Scoreboard::resultPending(const RegId &flat_reg, Cycles now)
+Scoreboard::writePending(const RegId &flat_reg)
 {
     Index index;
 
-    return findIndex(flat_reg, index) &&
-        (numResults[index] != 0 || returnCycle[index] > now);
+    return findIndex(flat_reg, index) && numResults[index] != 0;
 }
 
 void

@@ -128,6 +128,10 @@ class MinorFUTiming: public SimObject
      *  blocking following dependent instructions from issuing */
     Cycles extraAssumedLat;
 
+    /** Cycles a reader of this instruction's results is held back, from
+     *  when this instruction completes */
+    Cycles resultUsePenalty;
+
     /** Cycle offsets from the scoreboard delivery times of register values
      *  for each of this instruction's source registers (in srcRegs order).
      *  The offsets are subtracted from the scoreboard returnCycle times.

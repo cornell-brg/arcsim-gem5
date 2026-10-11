@@ -73,6 +73,7 @@ MinorFUTiming::MinorFUTiming(
     extraCommitLat(params.extraCommitLat),
     extraCommitLatExpr(params.extraCommitLatExpr),
     extraAssumedLat(params.extraAssumedLat),
+    resultUsePenalty(params.resultUsePenalty),
     srcRegsRelativeLats(params.srcRegsRelativeLats),
     opClasses(params.opClasses)
 { }

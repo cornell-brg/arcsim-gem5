@@ -264,9 +264,10 @@ class SingleStageFetch2 : public Fetch2
     std::unique_ptr<PCStateBase> decodedBranchTarget;
     ThreadID decodedBranchTid;
 
-    /** The branch to a register's value decoded this cycle, whose target
-     *  is to be fetched next cycle; null if none */
+    /** The branch to a register's value decoded last, whose target is
+     *  still to be fetched, and the cycles left to try in; null if none */
     MinorDynInstPtr decodedRegisterBranch;
+    unsigned int decodedRegisterTries = 0;
 
     bool targetAtDecode() const { return branchTargetAtDecode; }
     bool registerAtDecode() const { return registerTargetAtDecode; }

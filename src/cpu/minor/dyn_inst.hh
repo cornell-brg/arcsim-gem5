@@ -235,8 +235,8 @@ class MinorDynInst : public RefCounted
      *  (executeFreeUpdateMicroops) */
     bool freeMicroop = false;
 
-    /** For a load under executeLoadAccessAtIssue: cycles from its commit
-     *  until its result is available (0: at its commit) */
+    /** With a resultUsePenalty: cycles from this instruction's commit
+     *  to the return cycle of its results (0: none) */
     Cycles resultDelay{0};
 
     /** Flat register indices so that, when clearing the scoreboard, we

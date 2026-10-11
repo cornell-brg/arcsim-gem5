@@ -715,17 +715,16 @@ Execute::issue(ThreadID thread_id)
                                 timing->extraCommitLatExpr;
                             extra_assumed_lat =
                                 timing->extraAssumedLat;
+
+                            /* A reader issues one cycle before a source's
+                             *  return cycle at the earliest */
+                            if (timing->resultUsePenalty != Cycles(0)) {
+                                inst->resultDelay =
+                                    timing->resultUsePenalty + Cycles(1);
+                            }
                         }
 
                         issued_mem_ref = inst->isMemRef();
-
-                        /* A one-cycle load's result follows its data by
-                         *  the cycles the FU assumes beyond its own */
-                        if (loadAccessAtIssue && issued_mem_ref &&
-                            inst->staticInst->isLoad())
-                        {
-                            inst->resultDelay = extra_assumed_lat;
-                        }
 
                         QueuedInst fu_inst(inst);
 
@@ -816,12 +815,14 @@ Execute::issue(ThreadID thread_id)
                         Cycles result_cycle = cpu.curCycle() +
                             fu->description.opLat +
                             extra_dest_retire_lat +
-                            extra_assumed_lat;
+                            extra_assumed_lat +
+                            inst->resultDelay;
 
                         scoreboard[thread_id].markupInstDests(inst,
                             result_cycle,
                             cpu.getContext(thread_id),
-                            issued_mem_ref && extra_assumed_lat == Cycles(0));
+                            issued_mem_ref && extra_assumed_lat == Cycles(0) &&
+                            inst->resultDelay == Cycles(0));
 
                         if (fu->description.resultAfterCommit &&
                             result_cycle > lastBackgroundResult)
@@ -1242,17 +1243,50 @@ Execute::canCommitAtIssue(ThreadID thread_id, const MinorDynInstPtr &inst)
 }
 
 bool
-Execute::regWritePending(ThreadID thread_id, const RegId &reg)
+Execute::regWritePending(ThreadID thread_id, const RegId &reg,
+    const MinorDynInstPtr &inst)
 {
-    /* What an instruction not yet issued writes is not on the
-     *  scoreboard */
-    if (!inputBuffer[thread_id].empty())
+    auto *isa = cpu.getContext(thread_id)->getIsaPtr();
+    RegId flat_reg = reg.flatten(*isa);
+
+    if (scoreboard[thread_id].writePending(flat_reg))
         return true;
 
-    ThreadContext *thread = cpu.getContext(thread_id);
+    /* What an instruction not yet issued writes is not on the scoreboard */
+    bool pending = false;
+    bool reached_inst = false;
+    /* The input's first element may be part issued */
+    unsigned int first = executeInfo[thread_id].inputIndex;
 
-    return scoreboard[thread_id].resultPending(
-        reg.flatten(*thread->getIsaPtr()), cpu.curCycle());
+    inputBuffer[thread_id].forEach(
+        [&](const ForwardInstData &insts) {
+            unsigned int i = first;
+
+            first = 0;
+            for (; i < insts.width(); i++) {
+                const MinorDynInstPtr &waiting = insts.insts[i];
+
+                if (waiting == inst)
+                    reached_inst = true;
+
+                if (reached_inst || pending || !waiting->isInst())
+                    continue;
+
+                const StaticInstPtr &static_inst = waiting->staticInst;
+
+                for (unsigned int dest = 0;
+                    dest < static_inst->numDestRegs(); dest++)
+                {
+                    if (static_inst->destRegIdx(dest).flatten(*isa) ==
+                        flat_reg)
+                    {
+                        pending = true;
+                    }
+                }
+            }
+        });
+
+    return pending;
 }
 
 bool
@@ -1680,8 +1714,8 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
                 Cycles result_cycle = cpu.curCycle() + inst->resultDelay;
 
                 scoreboard[thread_id].setReturnCycle(inst, result_cycle);
-                scoreboard[thread_id].clearInstDests(inst,
-                    inst->isMemRef(), cpu.curCycle());
+                scoreboard[thread_id].clearInstDests(inst, false,
+                    cpu.curCycle());
 
                 if (result_cycle > lastBackgroundResult)
                     lastBackgroundResult = result_cycle;
