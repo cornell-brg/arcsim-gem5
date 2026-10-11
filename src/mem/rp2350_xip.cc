@@ -103,6 +103,13 @@ RP2350XIP::nextCycle() const
     return edge == curTick() ? edge + clockPeriod() : edge;
 }
 
+Tick
+RP2350XIP::thisCycle() const
+{
+    const Tick edge = clockEdge();
+    return edge == curTick() ? edge : edge - clockPeriod();
+}
+
 RP2350XIP::Way *
 RP2350XIP::lookup(Addr line)
 {
@@ -162,8 +169,6 @@ RP2350XIP::receive(PacketPtr pkt)
 
     auto access = std::make_shared<Access>();
     access->pkt = pkt;
-    // A hit answers at the next clock edge.
-    access->due = nextCycle();
     ++outstanding;
 
     if (maintenanceRange.contains(pkt->getAddr())) {
@@ -217,7 +222,7 @@ RP2350XIP::startMiss(unsigned index, const AccessPtr &access, Addr line)
     bank.missLine = line;
     qmiQueue.push_back(index);
     if (!qmiBusy)
-        startQmi(nextCycle());
+        startQmi(thisCycle());
 }
 
 void
@@ -229,9 +234,9 @@ RP2350XIP::advance(const AccessPtr &access)
         Bank &bank = banks[index];
         // A bank that waits for flash, or is working through the accesses
         // that waited with it, takes this one in its turn.
-        const Tick edge = clockEdge();
-        const Tick cycle = edge == curTick() ? edge : edge - clockPeriod();
-        if (bank.busy || !bank.waiting.empty() || bank.servedCycle == cycle) {
+        if (bank.busy || !bank.waiting.empty() ||
+            bank.servedCycle == thisCycle())
+        {
             DPRINTF(RP2350XIP, "line %#x waits for bank %d\n", line, index);
             markWaited(access);
             access->beatsLeft = 0;
@@ -261,15 +266,16 @@ RP2350XIP::respond(const AccessPtr &access)
         maintain(pkt);
     else
         this->access(pkt);
+    // A hit that has not waited is answered in the cycle it is asked.
     if (needs_response)
-        port.schedTimingResp(pkt, std::max(access->due, curTick()));
+        port.schedTimingResp(pkt, curTick());
     else
         pendingDelete.reset(pkt);
     if (access->waited) {
-        // Its manager's next access follows its answer.
+        // Its manager's next access follows in the cycle after its answer.
         Manager &manager = managers[access->requestor];
         manager.waiting = false;
-        manager.freeAt = std::max(access->due, curTick());
+        manager.freeAt = nextCycle();
         if (!manager.held.empty() && !releaseEvent.scheduled())
             schedule(releaseEvent, manager.freeAt);
     }
@@ -292,7 +298,6 @@ RP2350XIP::release()
             }
             AccessPtr access = manager.held.front();
             manager.held.pop_front();
-            access->due = std::max(access->due, nextCycle());
             advance(access);
             // One a cycle
             if (!manager.waiting)
@@ -349,7 +354,8 @@ RP2350XIP::finishQmi()
     bank.lastRequestor = owner->requestor;
     if (!qmiQueue.empty())
         startQmi(curTick());
-    owner->due = std::max(owner->due, curTick());
+    // The line's first word is this cycle's.
+    bank.servedCycle = curTick();
     const unsigned words = wordsIn(*owner, bank.missLine);
     if (words > 1 && !bank.waiting.empty()) {
         // The line's first word has come; the rest take their turns with
@@ -360,9 +366,10 @@ RP2350XIP::finishQmi()
         owner->nextLine += LineBytes;
         advance(owner);
     }
-    // The accesses that waited follow from this cycle.
-    if (!bank.busy)
-        serve(index);
+    // The accesses that waited follow from the next cycle.
+    if (!bank.busy && !bank.waiting.empty() &&
+        !serveEvents[index].scheduled())
+        schedule(serveEvents[index], curTick() + clockPeriod());
 }
 
 // One word a cycle to those waiting, the managers taking turns.
@@ -395,7 +402,6 @@ RP2350XIP::serve(unsigned index)
     }
     if (--access->beatsLeft == 0) {
         bank.waiting.erase(chosen);
-        access->due = std::max(access->due, curTick() + clockPeriod());
         access->nextLine += LineBytes;
         advance(access);
     }

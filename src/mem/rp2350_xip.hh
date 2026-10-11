@@ -25,14 +25,13 @@ class RP2350XIP : public AbstractMemory
     static constexpr unsigned NumWays = 2;
     static constexpr unsigned NumBanks = 2;
 
-    // An access on its way through the cache: the lines it still needs,
-    // and the earliest tick its answer may leave.
+    // An access on its way through the cache: the lines it still needs.
+    // Its answer leaves when it has the last of them.
     struct Access
     {
         PacketPtr pkt;
         Addr nextLine = 0;
         Addr endLine = 0;
-        Tick due = 0;
         // A write to the cache maintenance window
         bool maintenance = false;
         // The bus manager it came from
@@ -76,8 +75,8 @@ class RP2350XIP : public AbstractMemory
         Addr missLine = 0;
         // Accesses that found the bank busy, oldest first
         std::deque<AccessPtr> waiting;
-        // The cycle in which the bank last served a waiting access, and
-        // the manager that access came from
+        // The cycle in which the bank last gave a word to an access that
+        // waited, and the manager that access came from
         Tick servedCycle = MaxTick;
         RequestorID lastRequestor = 0;
     };
@@ -148,8 +147,9 @@ class RP2350XIP : public AbstractMemory
     void release();
     void startQmi(Tick start);
     void finishQmi();
-    // The clock edge after now
+    // The clock edge after now, and the one the present cycle began at
     Tick nextCycle() const;
+    Tick thisCycle() const;
     void serve(unsigned bank);
 
   public:

@@ -7,7 +7,7 @@ class RP2350XIP(AbstractMemory):
     the QSPI memory interface (QMI), holding the flash contents.
 
     The cache is 16 KiB, two-way, of 8-byte lines (datasheet 4.4.1). A hit
-    answers at the next clock edge. A miss reads its whole line from flash
+    answers in the cycle it is asked, as an SRAM read does. A miss reads its whole line from flash
     as one serial transfer and takes a way at random. The lines of even and
     odd line addresses are two banks: while a bank waits for a line from
     flash, every other access to that bank waits with it, and the other

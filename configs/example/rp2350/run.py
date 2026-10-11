@@ -17,7 +17,8 @@ parser.add_argument("--core", choices=("arm-m4-proxy", "hazard3-proxy"),
 parser.add_argument("--firmware", type=Path, required=True)
 parser.add_argument("--xip-miss-ns", type=int, default=50)
 parser.add_argument("--xip-hit-latency-cycles", type=int, default=1,
-                    help="Set both parallel XIP cache tag and data latency")
+                    help="Set both parallel XIP cache tag and data latency, "
+                    "in cycles of the cache's 10 GHz clock")
 parser.add_argument("--xip-replacement", choices=("lru", "random"),
                     default="lru")
 parser.add_argument("--sram-latency-ns", type=int, default=1)
