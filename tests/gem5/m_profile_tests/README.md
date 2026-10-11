@@ -152,8 +152,9 @@ after the core halts at the test's `bkpt` read the result with
 `mdw 0x20000100 2`. Nothing is written to flash. A Pico 2 (Cortex-M33 r1p0)
 passes all 18 subtests.
 
-`test_rp2350_dma.elf` is already linked for SRAM and runs the same way; a
-Pico 2 passes all 16 subtests.
+`test_rp2350_dma.elf` and `test_rp2350_store_wait.elf` are already linked
+for SRAM and run the same way; a Pico 2 passes all 16 subtests of the first
+and all 5 of the second.
 
 ## Pico SDK firmware
 

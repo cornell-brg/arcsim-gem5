@@ -88,7 +88,8 @@ Execute::Execute(const std::string &name_, MinorCPU &cpu_,
           params.executeLSQRequestsQueueSize,
           params.executeLSQTransfersQueueSize,
           params.executeLSQStoreBufferSize,
-          params.executeLSQMaxStoreBufferStoresPerCycle),
+          params.executeLSQMaxStoreBufferStoresPerCycle,
+          params.executeWaitedStoreHoldsInsts),
       executeInfo(params.numThreads,
                   ExecuteThreadInfo(params.executeCommitLimit)),
       interruptPriority(0),
@@ -1661,6 +1662,7 @@ Execute::evaluate()
     BranchData &branch = *out.inputWire;
 
     unsigned int num_issued = 0;
+    bool store_holds_insts = false;
 
     /* Do all the cycle-wise activities for dcachePort here to potentially
      *  free up input spaces in the LSQ's requests queue */
@@ -1678,6 +1680,10 @@ Execute::evaluate()
          *  without overwriting them */
         DPRINTF(MinorInterrupt, "Execute skipping a cycle to allow old"
             " branch to complete\n");
+    } else if (lsq.storeHoldsInsts()) {
+        DPRINTF(MinorExecute, "Holding instructions while the bus makes a"
+            " store wait\n");
+        store_holds_insts = true;
     } else {
         ThreadID commit_tid = getCommittingThread();
 
@@ -1746,6 +1752,10 @@ Execute::evaluate()
             }
         }
 
+        /* A store's address phase is in the cycle it commits, and a load
+         *  that waited behind it for the store buffer follows it out */
+        if (lsq.waitedStoreHoldsInsts)
+            lsq.step();
     }
 
     /* Run logic to step functional units + decide if we are active on the next
@@ -1832,6 +1842,7 @@ Execute::evaluate()
        head_inst_might_commit || /* Could possible commit the next inst */
        lsq.needsToTick() || /* Must step the dcache port */
        cpu.curCycle() < lastBackgroundResult || /* A result to wait for */
+       store_holds_insts || /* Held this cycle, try again */
        interrupted; /* There are pending interrupts */
 
     if (!need_to_tick) {

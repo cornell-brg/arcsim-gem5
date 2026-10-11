@@ -479,6 +479,15 @@ class BaseMinorCPU(BaseCPU):
         " pipeline.  Micro-ops after the first of a macro-op follow it",
     )
 
+    executeWaitedStoreHoldsInsts = Param.Bool(
+        False,
+        "A store sent to memory that is not answered within its cycle keeps"
+        " Execute from committing or issuing until it is, as on a core with"
+        " no write buffer, whose pipeline stalls while its bus makes a store"
+        " wait.  The store buffer then sends a store in the cycle the store"
+        " commits, the cycle of its address phase",
+    )
+
     executeDynamicLatencyHoldsInst = Param.Bool(
         False,
         "An FU's data-dependent extra latency (dynamicExtraLatency, e.g. an"

@@ -327,6 +327,12 @@ for sram_model in ("legacy", "banked"):
         "rp2350_dma_dreq", "test_rp2350_dma_dreq.elf",
         r"RP2350_DMA_DREQ_OK", "run_rp2350_dma_dreq.py", sram_model,
     )
+# A store that loses its bank holds the core, with the cycles a Pico 2 gives;
+# only the banked SRAM has banks to lose
+m_profile_rp2350_dma_test(
+    "rp2350_store_wait", "test_rp2350_store_wait.elf",
+    r"RP2350_STORE_WAIT_OK", "run_rp2350_sdk.py", "banked",
+)
 # GPIO coprocessor instructions stay in program order with SIO accesses on
 # the Minor-based Arm proxy
 m_profile_rp2350_test(
