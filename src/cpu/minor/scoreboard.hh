@@ -151,6 +151,10 @@ class Scoreboard : public Named
     void clearInstDests(MinorDynInstPtr inst, bool clear_unpredictable,
         Cycles now);
 
+    /** Set the return cycle of the destinations inst is the latest to
+     *  write */
+    void setReturnCycle(MinorDynInstPtr inst, Cycles return_cycle);
+
     /** Returns the exec sequence number of the most recent inst on
      *  which the given inst depends.  Useful for determining which
      *  inst must actually be committed before a dependent inst

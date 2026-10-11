@@ -243,11 +243,16 @@ class CortexM33CPU(ArmMMinorCPU):
     # A branch drives its target address in its execute cycle, so the
     # refill starts there rather than a cycle later at commit.
     executeBranchAtIssue = True
-    # One execute stage: a multi-cycle instruction (a load's data phase,
-    # SDIV, VMLA, LDM) holds up the next one, except that loads and stores
-    # pipeline behind each other and VDIV/VSQRT complete beside the
+    # One execute stage: a multi-cycle instruction (SDIV, VMLA, LDM, a load
+    # the bus makes wait) holds up the next one, except that loads and
+    # stores pipeline behind each other and VDIV/VSQRT complete beside the
     # pipeline (M33FloatDivFU).
     executeInOrderCompletion = True
+    # A load takes one cycle: its address phase is its execute cycle, and
+    # the instruction behind it executes in its data phase [RP2350
+    # datasheet 3.7.4.9.5]. One that uses the loaded value waits a cycle
+    # more (M33MemFU).
+    executeLoadAccessAtIssue = True
     # SDIV/UDIV's data-dependent cycles (M33IntDivFU) stall the pipeline
     # like any other multi-cycle instruction.
     executeDynamicLatencyHoldsInst = True

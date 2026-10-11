@@ -119,6 +119,9 @@ class Execute : public Named
      *  effect in the cycle it issues when nothing older is in flight */
     bool branchAtIssue;
 
+    /** See executeLoadAccessAtIssue in BaseMinorCPU.py */
+    bool loadAccessAtIssue;
+
     /** See executeInOrderCompletion in BaseMinorCPU.py */
     bool inOrderCompletion;
 
@@ -352,6 +355,10 @@ class Execute : public Named
     /** Can inst, issued this cycle, be committed in the same cycle
      *  under branchAtIssue */
     bool canCommitAtIssue(ThreadID thread_id, const MinorDynInstPtr &inst);
+
+    /** Can the load issued this cycle go to memory in the same cycle
+     *  under loadAccessAtIssue */
+    bool canAccessAtIssue(ThreadID thread_id);
 
     /** Set the drain state (with useful debugging messages) */
     void setDrainState(ThreadID thread_id, DrainState state);

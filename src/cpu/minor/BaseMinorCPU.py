@@ -514,6 +514,14 @@ class BaseMinorCPU(BaseCPU):
         " the execute cycle",
     )
 
+    executeLoadAccessAtIssue = Param.Bool(
+        False,
+        "A load issued to a single-cycle FU goes to memory in its issue"
+        " cycle rather than one cycle later, when nothing it has to wait"
+        " for is still in flight: answered within that cycle, it completes"
+        " in the next, as on cores whose load takes one cycle",
+    )
+
     enableIdling = Param.Bool(
         True, "Enable cycle skipping when the processor is idle\n"
     )

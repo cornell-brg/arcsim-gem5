@@ -79,6 +79,7 @@ Execute::Execute(const std::string &name_, MinorCPU &cpu_,
       setTraceTimeOnIssue(params.executeSetTraceTimeOnIssue),
       allowEarlyMemIssue(params.executeAllowEarlyMemoryIssue),
       branchAtIssue(params.executeBranchAtIssue),
+      loadAccessAtIssue(params.executeLoadAccessAtIssue),
       inOrderCompletion(params.executeInOrderCompletion),
       dynamicLatencyHoldsInst(params.executeDynamicLatencyHoldsInst),
       lastBackgroundResult(0),
@@ -718,6 +719,14 @@ Execute::issue(ThreadID thread_id)
 
                         issued_mem_ref = inst->isMemRef();
 
+                        /* A one-cycle load's result follows its data by
+                         *  the cycles the FU assumes beyond its own */
+                        if (loadAccessAtIssue && issued_mem_ref &&
+                            inst->staticInst->isLoad())
+                        {
+                            inst->resultDelay = extra_assumed_lat;
+                        }
+
                         QueuedInst fu_inst(inst);
 
                         /* Decorate the inst with FU details */
@@ -1228,6 +1237,40 @@ Execute::canCommitAtIssue(ThreadID thread_id, const MinorDynInstPtr &inst)
         !inst->extraCommitDelayExpr;
 }
 
+bool
+Execute::canAccessAtIssue(ThreadID thread_id)
+{
+    const ExecuteThreadInfo &ex_info = executeInfo[thread_id];
+
+    if (ex_info.inFUMemInsts->empty() || ex_info.inFlightInsts->empty() ||
+        !lsq.canRequest())
+    {
+        return false;
+    }
+
+    /* Memory references go to the LSQ in order */
+    const MinorDynInstPtr &inst = ex_info.inFUMemInsts->front().inst;
+
+    if (inst->isBubble() || inst->isFault() || inst->inLSQ ||
+        !inst->canEarlyIssue || !inst->staticInst->isLoad() ||
+        inst->id.streamSeqNum != ex_info.streamSeqNum ||
+        inst->fuIndex >= numFuncUnits)
+    {
+        return false;
+    }
+
+    /* Only a load pushed into a single-cycle FU this cycle, with the
+     *  instructions its address depends on complete */
+    FUPipeline *fu = funcUnits[inst->fuIndex];
+
+    return fu->description.opLat == Cycles(1) &&
+        fu->alreadyPushed() && fu->back().inst == inst &&
+        inst->extraCommitDelay == Cycles(0) &&
+        !inst->extraCommitDelayExpr &&
+        ex_info.inFlightInsts->front().inst->id.execSeqNum >
+            inst->instToWaitFor;
+}
+
 void
 Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
     BranchData &branch, bool at_issue)
@@ -1330,7 +1373,7 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
             /* Branch as there was a change in PC */
             updateBranchData(thread_id, BranchData::UnpredictedBranch,
                 MinorDynInst::bubble(), thread->pcState(), branch);
-        } else if (mem_response &&
+        } else if (mem_response && !at_issue &&
             num_mem_refs_committed < memoryCommitLimit)
         {
             /* Try to commit from the memory responses next */
@@ -1414,6 +1457,18 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
                     DPRINTF(MinorExecute, "Committing inst at issue: %s\n",
                         *inst);
                     try_to_commit = true;
+                    completed_inst = true;
+                } else if (loadAccessAtIssue &&
+                    canAccessAtIssue(thread_id))
+                {
+                    /* Use this, possibly out of order, load as the one
+                     *  to send to the LSQ */
+                    inst = ex_info.inFUMemInsts->front().inst;
+
+                    DPRINTF(MinorExecute, "Issuing mem ref at issue"
+                        " inst: %s\n", *inst);
+                    try_to_commit = true;
+                    early_memory_issue = true;
                     completed_inst = true;
                 }
             }
@@ -1601,6 +1656,17 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
             if (result_after_commit) {
                 scoreboard[thread_id].clearInstDests(inst, false,
                     cpu.curCycle());
+            } else if (!inst->isFault() &&
+                inst->resultDelay != Cycles(0))
+            {
+                Cycles result_cycle = cpu.curCycle() + inst->resultDelay;
+
+                scoreboard[thread_id].setReturnCycle(inst, result_cycle);
+                scoreboard[thread_id].clearInstDests(inst,
+                    inst->isMemRef(), cpu.curCycle());
+
+                if (result_cycle > lastBackgroundResult)
+                    lastBackgroundResult = result_cycle;
             } else {
                 scoreboard[thread_id].clearInstDests(inst,
                     inst->isMemRef());
@@ -1741,12 +1807,12 @@ Execute::evaluate()
 
             ExecuteThreadInfo &issue_info = executeInfo[issue_tid];
 
-            if (branchAtIssue && num_issued != 0 && !interrupted &&
-                branch.isBubble() &&
+            if (num_issued != 0 && !interrupted && branch.isBubble() &&
                 issue_info.drainState == NotDraining &&
                 !issue_info.inFlightInsts->empty() &&
-                canCommitAtIssue(issue_tid,
-                    issue_info.inFlightInsts->front().inst))
+                ((branchAtIssue && canCommitAtIssue(issue_tid,
+                    issue_info.inFlightInsts->front().inst)) ||
+                 (loadAccessAtIssue && canAccessAtIssue(issue_tid))))
             {
                 commit(issue_tid, false, false, branch, true);
             }

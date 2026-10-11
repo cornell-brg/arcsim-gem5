@@ -231,6 +231,10 @@ class MinorDynInst : public RefCounted
      *  to account for delay in absolute time */
     Cycles minimumCommitCycle{0};
 
+    /** For a load under executeLoadAccessAtIssue: cycles from its commit
+     *  until its result is available (0: at its commit) */
+    Cycles resultDelay{0};
+
     /** Flat register indices so that, when clearing the scoreboard, we
      *  have the same register indices as when the instruction was marked
      *  up */

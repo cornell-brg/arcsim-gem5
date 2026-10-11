@@ -217,6 +217,28 @@ Scoreboard::clearInstDests(MinorDynInstPtr inst, bool clear_unpredictable,
     }
 }
 
+void
+Scoreboard::setReturnCycle(MinorDynInstPtr inst, Cycles return_cycle)
+{
+    if (inst->isFault())
+        return;
+
+    unsigned int num_dests = inst->staticInst->numDestRegs();
+
+    for (unsigned int dest_index = 0; dest_index < num_dests;
+        dest_index++)
+    {
+        const RegId& reg = inst->flatDestRegIdx[dest_index];
+        Index index;
+
+        if (findIndex(reg, index) &&
+            writingInst[index] == inst->id.execSeqNum)
+        {
+            returnCycle[index] = return_cycle;
+        }
+    }
+}
+
 bool
 Scoreboard::canInstIssue(MinorDynInstPtr inst,
     const std::vector<Cycles> *src_reg_relative_latencies,
