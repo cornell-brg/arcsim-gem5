@@ -35,5 +35,10 @@ class RP2350DMA(BasicPioDevice):
     read_port = RequestPort("The read manager")
     write_port = RequestPort("The write manager")
     irq = VectorIntSourcePin("DMA_IRQ_0 to DMA_IRQ_3, in order")
+    window = Param.Latency(
+        "500ps",
+        "After a clock edge, how long a read's answer still counts as having"
+        " come at it, so that the next read leaves in the same cycle",
+    )
 
     cxx_exports = [PyBindMethod("dreq")]

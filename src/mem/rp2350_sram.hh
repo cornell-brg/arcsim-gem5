@@ -60,11 +60,10 @@ class RP2350SRAM : public AbstractMemory
 
     std::vector<std::unique_ptr<MemoryPort>> ports;
     std::array<PortID, 10> lastWinner;
-    // When each bank can grant its next beat, one per cycle; the manager
-    // it served last, and whether that beat had arrived in its cycle
+    // When each bank can grant its next beat, one per cycle, and the
+    // manager it served last
     std::array<Tick, 10> bankFree;
     std::array<PortID, 10> bankOwner;
-    std::array<bool, 10> bankOwnerPrompt;
     std::deque<Beat> beats;
     std::list<TransactionPtr> active;
     const Tick window;

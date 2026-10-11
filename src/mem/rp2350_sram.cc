@@ -90,7 +90,6 @@ RP2350SRAM::RP2350SRAM(const RP2350SRAMParams &p)
     lastWinner.fill(InvalidPortID);
     bankFree.fill(0);
     bankOwner.fill(InvalidPortID);
-    bankOwnerPrompt.fill(false);
     for (unsigned id = 0; id < p.port_port_connection_count; ++id) {
         unsigned priority = p.port_priority[
             std::min<size_t>(id, p.port_priority.size() - 1)];
@@ -337,11 +336,10 @@ RP2350SRAM::arbitrate()
     // Each manager presents its head beat. The delays a packet has picked
     // up on its way place its answer, not its turn. A bank serves one
     // manager per cycle, chosen with strict two-level priority and round
-    // robin among equal priorities. A manager served without having waited
-    // may make further beats on the bank in the cycle they arrive in, while
-    // no other manager asks for it: a core model that issues two accesses
-    // in a cycle pays for that in its own timing, as on a plain memory. A
-    // manager that has waited gets one beat a cycle, and stays behind.
+    // robin among equal priorities. The manager a bank serves may make
+    // further beats on it in the cycle they arrive in, while no other
+    // manager asks for it: a core model that issues two accesses in a cycle
+    // pays for that in its own timing, as on a plain memory.
     bool granted = true;
     while (granted) {
         granted = false;
@@ -365,8 +363,7 @@ RP2350SRAM::arbitrate()
             if (bankFree[bank] > now) {
                 // The bank has served its beat for this cycle.
                 const bool own = ready.size() == 1 &&
-                    winner == bankOwner[bank] && bankOwnerPrompt[bank] &&
-                    prompt;
+                    winner == bankOwner[bank] && prompt;
                 if (!own) {
                     again = std::min(again, bankFree[bank] + window);
                     continue;
@@ -388,9 +385,6 @@ RP2350SRAM::arbitrate()
                         winner = id;
                 }
                 lastWinner[bank] = winner;
-                bankOwnerPrompt[bank] =
-                    ports[winner]->requests.front()->cycle + clockPeriod() ==
-                        nextEdge;
             }
             DPRINTF(RP2350SRAM, "bank %d to manager %d of %d asking\n",
                     bank, winner, ready.size());

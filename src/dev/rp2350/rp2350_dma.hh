@@ -171,6 +171,10 @@ class RP2350DMA : public BasicPioDevice
     // Transfers read or being read, oldest first.
     std::deque<Transfer *> dataFifo;
     unsigned writesInFlight = 0;
+    unsigned readsInFlight = 0;
+    // The start of the clock cycle the last read left in
+    Tick lastReadCycle = MaxTick;
+    const Tick window;
 
     EventFunctionWrapper tickEvent;
 
@@ -202,6 +206,7 @@ class RP2350DMA : public BasicPioDevice
     void updateIrqs();
 
     void tick();
+    void startRead();
     void wake();
     bool idle() const;
 };

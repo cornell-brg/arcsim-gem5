@@ -55,7 +55,11 @@ RP2350DMA::RP2350DMA(const Params &p)
       readPort(name() + ".read_port", *this, true),
       writePort(name() + ".write_port", *this, false),
       requestorId(p.system->getRequestorId(this)),
-      tickEvent([this] { tick(); }, name() + ".tick"),
+      // After the responses of its clock edge, so that an answer arriving
+      // on the edge lets the next access leave at it
+      window(p.window),
+      tickEvent([this] { tick(); }, name() + ".tick", false,
+                Event::CPU_Tick_Pri),
       stats(*this)
 {
     fatal_if(p.port_irq_connection_count > NumIrqs,
@@ -462,6 +466,13 @@ RP2350DMA::recvResponse(PacketPtr pkt, bool is_read)
     if (is_read) {
         t->haveData = true;
         t->dataTick = curTick();
+        --readsInFlight;
+        // An answer that the bus delivers just after its clock edge came
+        // at that edge.
+        const Tick edge = clockEdge();
+        const Tick cycle = edge == curTick() ? edge : edge - clockPeriod();
+        if (curTick() != cycle && curTick() - cycle <= window)
+            startRead();
         wake();
     } else {
         const unsigned index = t->channel;
@@ -476,7 +487,9 @@ RP2350DMA::recvResponse(PacketPtr pkt, bool is_read)
         signalDrainDone();
 }
 
-// One clock cycle: at most one write and one read leave.
+// One clock cycle: at most one write and one read leave, each once its
+// manager's last access has been answered, as on a bus whose manager holds
+// its next address while an access waits.
 void
 RP2350DMA::tick()
 {
@@ -490,7 +503,7 @@ RP2350DMA::tick()
     }
 
     // Write manager: the oldest transfer, the cycle after its data came.
-    if (!writePort.waiting() && !dataFifo.empty()) {
+    if (!writePort.waiting() && writesInFlight == 0 && !dataFifo.empty()) {
         Transfer *t = dataFifo.front();
         if (t->haveData && t->dataTick < curTick()) {
             dataFifo.pop_front();
@@ -504,25 +517,7 @@ RP2350DMA::tick()
         }
     }
 
-    // Read manager: the next channel, round robin, with a transfer to make.
-    if (!readPort.waiting() && dataFifo.size() < DataFifoDepth &&
-        drainState() != DrainState::Draining) {
-        for (unsigned n = 0; n < NumChannels; ++n) {
-            const unsigned index = (nextChannel + n) % NumChannels;
-            if (!requesting(channels[index]))
-                continue;
-            nextChannel = (index + 1) % NumChannels;
-            Transfer *t = start(index);
-            dataFifo.push_back(t);
-            auto req = std::make_shared<Request>(t->readAddr, t->size, 0,
-                                                 requestorId);
-            PacketPtr pkt = new Packet(req, MemCmd::ReadReq);
-            pkt->dataStatic(t->data);
-            pkt->pushSenderState(t);
-            readPort.send(pkt);
-            break;
-        }
-    }
+    startRead();
 
     bool work = pendingTriggers || !dataFifo.empty();
     if (drainState() != DrainState::Draining) {
@@ -531,6 +526,36 @@ RP2350DMA::tick()
     }
     if (work)
         wake();
+}
+
+// Read manager: the next channel, round robin, with a transfer to make; one
+// read a cycle.
+void
+RP2350DMA::startRead()
+{
+    const Tick edge = clockEdge();
+    const Tick cycle = edge == curTick() ? edge : edge - clockPeriod();
+    if (readPort.waiting() || readsInFlight != 0 || lastReadCycle == cycle ||
+        dataFifo.size() >= DataFifoDepth ||
+        drainState() == DrainState::Draining)
+        return;
+    for (unsigned n = 0; n < NumChannels; ++n) {
+        const unsigned index = (nextChannel + n) % NumChannels;
+        if (!requesting(channels[index]))
+            continue;
+        nextChannel = (index + 1) % NumChannels;
+        Transfer *t = start(index);
+        dataFifo.push_back(t);
+        auto req = std::make_shared<Request>(t->readAddr, t->size, 0,
+                                             requestorId);
+        PacketPtr pkt = new Packet(req, MemCmd::ReadReq);
+        pkt->dataStatic(t->data);
+        pkt->pushSenderState(t);
+        ++readsInFlight;
+        lastReadCycle = cycle;
+        readPort.send(pkt);
+        break;
+    }
 }
 
 void
