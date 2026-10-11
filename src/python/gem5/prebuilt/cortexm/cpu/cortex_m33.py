@@ -122,19 +122,32 @@ class M33FloatDivFU(MinorFU):
 
 
 class M33MemFU(MinorFU):
-    """Loads and stores. One cycle for the address; the access's own time
-    comes from the memory system."""
+    """Loads and stores of the integer registers. One cycle for the
+    address; the access's own time comes from the memory system."""
 
-    opClasses = minorMakeOpClassSet(
-        ["MemRead", "MemWrite", "FloatMemRead", "FloatMemWrite"]
-    )
+    opClasses = minorMakeOpClassSet(["MemRead", "MemWrite"])
     opLat = 1
     issueLat = 1
-    # A load's result is ready after its data phase, so a load whose
-    # address depends on it waits for that.
+    # A loaded register has one cycle of result delay: an instruction
+    # that uses it, a load's or store's address included, waits a cycle
+    # [RP2350 datasheet 3.7.4.9.1].
     timings = [
         MinorFUTiming(
             description="M33Mem", srcRegsRelativeLats=[1], extraAssumedLat=2
+        )
+    ]
+
+
+class M33FloatMemFU(MinorFU):
+    """Loads and stores of the floating-point registers: as M33MemFU, but
+    a loaded register can be used in the next cycle."""
+
+    opClasses = minorMakeOpClassSet(["FloatMemRead", "FloatMemWrite"])
+    opLat = 1
+    issueLat = 1
+    timings = [
+        MinorFUTiming(
+            description="M33FMem", srcRegsRelativeLats=[1], extraAssumedLat=1
         )
     ]
 
@@ -156,6 +169,7 @@ class CortexM33FUPool(MinorFUPool):
         M33FloatMacFU(),
         M33FloatDivFU(),
         M33MemFU(),
+        M33FloatMemFU(),
         M33MiscFU(),
     ]
 
