@@ -65,11 +65,17 @@ Decode::Decode(const std::string &name,
     nextStageReserve(next_stage_input_buffer),
     outputWidth(params.executeInputWidth),
     processMoreThanOneInput(params.decodeCycleInput),
+    freeUpdateMicroops(params.executeFreeUpdateMicroops),
     decodeInfo(params.numThreads),
     threadPriority(0)
 {
     if (outputWidth < 1)
         fatal("%s: executeInputWidth must be >= 1 (%d)\n", name, outputWidth);
+
+    if (freeUpdateMicroops && outputWidth < 2) {
+        fatal("%s: executeFreeUpdateMicroops needs executeInputWidth >= 2"
+            " (%d)\n", name, outputWidth);
+    }
 
     if (params.decodeInputBufferSize < 1) {
         fatal("%s: decodeInputBufferSize must be >= 1 (%d)\n", name,
@@ -140,6 +146,17 @@ dynInstAddTracing(MinorDynInstPtr inst, StaticInstPtr static_inst,
 }
 #endif
 
+bool
+Decode::isFreeUpdate(const StaticInstPtr &static_inst)
+{
+    return static_inst->isMicroop() && !static_inst->isFirstMicroop() &&
+        static_inst->opClass() == IntAluOp && !static_inst->isMemRef() &&
+        !static_inst->isControl() && !static_inst->isDirectCtrl() &&
+        !static_inst->isIndirectCtrl() && !static_inst->isCondCtrl() &&
+        !static_inst->isUncondCtrl() && !static_inst->isSquashAfter() &&
+        !static_inst->isSerializing();
+}
+
 void
 Decode::evaluate()
 {
@@ -197,6 +214,14 @@ Decode::evaluate()
 
                 decode_info.inputIndex++;
                 decode_info.inMacroop = false;
+            } else if (freeUpdateMicroops && output_index != 0 &&
+                !(decode_info.inMacroop && isFreeUpdate(
+                    inst->staticInst->fetchMicroop(
+                        decode_info.microopPC->microPC()))))
+            {
+                /* Only a free micro-op shares the output, with the
+                 *  micro-op of its macro-op before it */
+                break;
             } else {
                 StaticInstPtr static_inst = inst->staticInst;
                 /* Static inst of a macro-op above the output_inst */
@@ -236,6 +261,8 @@ Decode::evaluate()
                         new MinorDynInst(static_micro_inst, inst->id);
                     set(output_inst->pc, decode_info.microopPC);
                     output_inst->fault = NoFault;
+                    output_inst->freeMicroop = freeUpdateMicroops &&
+                        isFreeUpdate(static_micro_inst);
 
                     /* Allow a predicted next address only on the last
                      *  microop */

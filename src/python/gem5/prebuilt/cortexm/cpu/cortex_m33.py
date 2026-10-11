@@ -227,7 +227,12 @@ class CortexM33CPU(ArmMMinorCPU):
     decodeCycleInput = True
 
     # -- Execute stage --
-    executeInputWidth = 1
+    # PUSH, POP and the load and store multiples take one cycle for each
+    # register [RP2350 datasheet 3.7.4.9.5]: the base register's update
+    # has no cycle of its own. It reaches Execute beside the transfer
+    # before it, the one case in which two micro-ops arrive together.
+    executeInputWidth = 2
+    executeFreeUpdateMicroops = True
     executeCycleInput = True
     executeIssueLimit = 1
     executeCommitLimit = 2

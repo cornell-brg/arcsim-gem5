@@ -521,6 +521,16 @@ class BaseMinorCPU(BaseCPU):
         " the execute cycle",
     )
 
+    executeFreeUpdateMicroops = Param.Bool(
+        False,
+        "A micro-op after its macro-op's first that only does integer"
+        " arithmetic (the base register update of a load or store multiple)"
+        " takes no cycle of its own: Decode passes it on with the micro-op"
+        " before it and nothing else shares a Decode output, and Execute"
+        " issues it with that micro-op, beyond its issue limits.  Needs"
+        " executeInputWidth of at least 2",
+    )
+
     executeLoadAccessAtIssue = Param.Bool(
         False,
         "A load issued to a single-cycle FU goes to memory in its issue"

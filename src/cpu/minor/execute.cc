@@ -867,7 +867,8 @@ Execute::issue(ThreadID thread_id)
             if (issued_mem_ref)
                 num_mem_insts_issued++;
 
-            if (!discarded && !inst->isBubble()) {
+            /* A free micro-op is issued beyond the limit */
+            if (!discarded && !inst->isBubble() && !inst->freeMicroop) {
                 num_insts_issued++;
 
                 if (num_insts_issued == issueLimit)
@@ -895,8 +896,11 @@ Execute::issue(ThreadID thread_id)
         /* We still have instructions */
         fu_index != numFuncUnits && /* Not visited all FUs */
         issued && /* We've not yet failed to issue an instruction */
-        num_insts_issued != issueLimit && /* Still allowed to issue */
-        num_mem_insts_issued != memoryIssueLimit);
+        ((num_insts_issued != issueLimit && /* Still allowed to issue */
+          num_mem_insts_issued != memoryIssueLimit) ||
+         /* or nothing to issue, or a micro-op that needs no allowance */
+         insts_in->insts[thread.inputIndex]->isBubble() ||
+         insts_in->insts[thread.inputIndex]->freeMicroop));
 
     return num_insts_issued;
 }

@@ -231,6 +231,10 @@ class MinorDynInst : public RefCounted
      *  to account for delay in absolute time */
     Cycles minimumCommitCycle{0};
 
+    /** A micro-op that takes no cycle of its own
+     *  (executeFreeUpdateMicroops) */
+    bool freeMicroop = false;
+
     /** For a load under executeLoadAccessAtIssue: cycles from its commit
      *  until its result is available (0: at its commit) */
     Cycles resultDelay{0};
