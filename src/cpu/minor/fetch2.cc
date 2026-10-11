@@ -706,6 +706,7 @@ SingleStageFetch2::SingleStageFetch2(const std::string &name,
     Fetch2(name, cpu_, params, inp_, branchInp_, predictionOut_, out_,
         next_stage_input_buffer),
     branchTargetAtDecode(params.fetchBranchTargetAtDecode),
+    registerTargetAtDecode(params.fetchRegisterTargetAtDecode),
     decodedBranchTid(InvalidThreadID)
 {
 }
@@ -723,8 +724,17 @@ SingleStageFetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
     if (branchTargetAtDecode) {
         /* No dynamic prediction: a direct branch's target is fetched from
          *  Decode, anything else waits for Execute */
-        if (inst->staticInst->isDirectCtrl()) {
-            decodedBranchTarget = inst->staticInst->branchTarget(*inst->pc);
+        const StaticInstPtr &static_inst = inst->staticInst;
+
+        if (static_inst->isDirectCtrl()) {
+            decodedBranchTarget = static_inst->branchTarget(*inst->pc);
+            decodedBranchTid = inst->id.threadId;
+        } else if (registerTargetAtDecode &&
+            static_inst->isIndirectCtrl() && !static_inst->isMemRef() &&
+            !static_inst->isMicroop() && static_inst->numSrcRegs() == 1 &&
+            static_inst->srcRegIdx(0).is(IntRegClass))
+        {
+            decodedRegisterBranch = inst;
             decodedBranchTid = inst->id.threadId;
         }
         return;

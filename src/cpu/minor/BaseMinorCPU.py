@@ -352,6 +352,13 @@ class BaseMinorCPU(BaseCPU):
         " stream, and starts the new stream if Execute takes the branch, as"
         " on cores that compute direct targets in decode",
     )
+    fetchRegisterTargetAtDecode = Param.Bool(
+        False,
+        "With fetchBranchTargetAtDecode: a branch to the value of its one"
+        " source register also has its target line fetched in its Decode"
+        " cycle, when every older instruction has been issued and none"
+        " still has that register to write",
+    )
     fetchReadAheadLimit = Param.Unsigned(
         0,
         "With singleFetchStage: no sequential fetch starts while this many"

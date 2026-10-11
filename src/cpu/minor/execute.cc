@@ -1238,6 +1238,20 @@ Execute::canCommitAtIssue(ThreadID thread_id, const MinorDynInstPtr &inst)
 }
 
 bool
+Execute::regWritePending(ThreadID thread_id, const RegId &reg)
+{
+    /* What an instruction not yet issued writes is not on the
+     *  scoreboard */
+    if (!inputBuffer[thread_id].empty())
+        return true;
+
+    ThreadContext *thread = cpu.getContext(thread_id);
+
+    return scoreboard[thread_id].resultPending(
+        reg.flatten(*thread->getIsaPtr()), cpu.curCycle());
+}
+
+bool
 Execute::canAccessAtIssue(ThreadID thread_id)
 {
     const ExecuteThreadInfo &ex_info = executeInfo[thread_id];

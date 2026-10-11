@@ -151,6 +151,9 @@ class Scoreboard : public Named
     void clearInstDests(MinorDynInstPtr inst, bool clear_unpredictable,
         Cycles now);
 
+    /** Is a result for flat_reg still to come from an issued instruction */
+    bool resultPending(const RegId &flat_reg, Cycles now);
+
     /** Set the return cycle of the destinations inst is the latest to
      *  write */
     void setReturnCycle(MinorDynInstPtr inst, Cycles return_cycle);

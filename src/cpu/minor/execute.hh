@@ -360,6 +360,12 @@ class Execute : public Named
      *  under loadAccessAtIssue */
     bool canAccessAtIssue(ThreadID thread_id);
 
+  public:
+    /** Is an instruction that may write reg waiting to be issued, or its
+     *  result still to come */
+    bool regWritePending(ThreadID thread_id, const RegId &reg);
+
+  protected:
     /** Set the drain state (with useful debugging messages) */
     void setDrainState(ThreadID thread_id, DrainState state);
 

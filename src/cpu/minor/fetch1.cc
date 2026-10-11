@@ -931,11 +931,9 @@ SingleStageFetch1::recvReqRetry()
 }
 
 void
-SingleStageFetch1::fetchBranchTarget(ThreadID tid,
-    const PCStateBase &target)
+SingleStageFetch1::fetchBranchTarget(ThreadID tid, Addr target_addr)
 {
     Fetch1ThreadInfo &thread = fetchInfo[tid];
-    Addr target_addr = target.instAddr();
     Addr aligned = target_addr & ~((Addr) lineSnap - 1);
     unsigned int request_size = maxLineWidth - (aligned % lineSnap);
 
@@ -1005,7 +1003,9 @@ SingleStageFetch1::takeTargetLine(const BranchData &execute_branch,
         !execute_branch.isStreamChange() || !execute_branch.target ||
         !execute_branch.inst || execute_branch.inst->isBubble() ||
         execute_branch.inst->isFault() ||
-        !execute_branch.inst->staticInst->isDirectCtrl())
+        !(execute_branch.inst->staticInst->isDirectCtrl() ||
+          (fetch2->registerAtDecode() &&
+           execute_branch.inst->staticInst->isIndirectCtrl())))
     {
         return false;
     }
@@ -1053,10 +1053,12 @@ SingleStageFetch1::SingleStageFetch1(const std::string &name_,
     Latch<BranchData>::Output prediction_,
     std::vector<InputBuffer<ForwardLineData>> &next_stage_input_buffer,
     SingleStageFetch2 *fetch2_,
-    Latch<BranchData>::Input eToF1Input_) :
+    Latch<BranchData>::Input eToF1Input_,
+    Execute &execute_) :
     Fetch1(name_, cpu_, params, inp_, out_, prediction_,
         next_stage_input_buffer),
     fetch2(fetch2_),
+    execute(execute_),
     eToF1Input(eToF1Input_),
     targetRequest(NULL),
     readAheadLimit(params.fetchReadAheadLimit)
@@ -1122,6 +1124,7 @@ SingleStageFetch1::evaluate()
         have_target_line = takeTargetLine(exec_branch, target_line);
         abandonTargetRequest();
         fetch2->decodedBranchTarget.reset();
+        fetch2->decodedRegisterBranch = nullptr;
     } else if (fetch2->decodedBranchTarget) {
         /* The direct branch decoded last cycle is in Decode now */
         ThreadID tid = fetch2->decodedBranchTid;
@@ -1129,9 +1132,24 @@ SingleStageFetch1::evaluate()
         if (fetchInfo[tid].state == FetchRunning &&
             icacheState == IcacheRunning)
         {
-            fetchBranchTarget(tid, *fetch2->decodedBranchTarget);
+            fetchBranchTarget(tid,
+                fetch2->decodedBranchTarget->instAddr());
         }
         fetch2->decodedBranchTarget.reset();
+    } else if (fetch2->decodedRegisterBranch) {
+        /* So is the register branch: its target can be read if nothing
+         *  ahead of it still has the register to write */
+        ThreadID tid = fetch2->decodedBranchTid;
+        const RegId &reg =
+            fetch2->decodedRegisterBranch->staticInst->srcRegIdx(0);
+
+        if (fetchInfo[tid].state == FetchRunning &&
+            icacheState == IcacheRunning &&
+            !execute.regWritePending(tid, reg))
+        {
+            fetchBranchTarget(tid, cpu.getContext(tid)->getReg(reg));
+        }
+        fetch2->decodedRegisterBranch = nullptr;
     }
 
     /* Step I-cache queues */

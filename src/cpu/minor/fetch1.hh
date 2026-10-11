@@ -63,6 +63,7 @@ namespace minor
 {
 
 class SingleStageFetch2;
+class Execute;
 
 /** A stage responsible for fetching "lines" from memory and passing
  *  them to Fetch2 */
@@ -449,6 +450,9 @@ class SingleStageFetch1 : public Fetch1
 {
   protected:
     SingleStageFetch2 *fetch2;
+
+    /** Asked whether a register branch's target can be read in Decode */
+    Execute &execute;
     BranchData lastPrediction;
 
     /** Direct access to the eToF1 latch INPUT wire.
@@ -480,8 +484,8 @@ class SingleStageFetch1 : public Fetch1
      *  allows? */
     bool readAheadFull();
 
-    /** Fetch the line holding target beside the sequential stream */
-    void fetchBranchTarget(ThreadID tid, const PCStateBase &target);
+    /** Fetch the line holding target_addr beside the sequential stream */
+    void fetchBranchTarget(ThreadID tid, Addr target_addr);
 
     /** Give up targetRequest */
     void abandonTargetRequest();
@@ -500,7 +504,8 @@ class SingleStageFetch1 : public Fetch1
         Latch<BranchData>::Output prediction_,
         std::vector<InputBuffer<ForwardLineData>> &next_stage_input_buffer,
         SingleStageFetch2 *fetch2_,
-        Latch<BranchData>::Input eToF1Input_);
+        Latch<BranchData>::Input eToF1Input_,
+        Execute &execute_);
 
     ~SingleStageFetch1() override = default;
 

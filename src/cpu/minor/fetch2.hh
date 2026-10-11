@@ -255,12 +255,21 @@ class SingleStageFetch2 : public Fetch2
     bool branchTargetAtDecode;
 
   public:
+    /** See fetchRegisterTargetAtDecode in BaseMinorCPU.py */
+    bool registerTargetAtDecode;
+
+  public:
     /** Target of the direct branch decoded this cycle, to be fetched
      *  next cycle */
     std::unique_ptr<PCStateBase> decodedBranchTarget;
     ThreadID decodedBranchTid;
 
+    /** The branch to a register's value decoded this cycle, whose target
+     *  is to be fetched next cycle; null if none */
+    MinorDynInstPtr decodedRegisterBranch;
+
     bool targetAtDecode() const { return branchTargetAtDecode; }
+    bool registerAtDecode() const { return registerTargetAtDecode; }
 
   public:
     SingleStageFetch2(const std::string &name,
