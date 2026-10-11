@@ -156,6 +156,15 @@ passes all 18 subtests.
 for SRAM and run the same way; a Pico 2 passes all 16 subtests of the first
 and all 5 of the second.
 
+`test_rp2350_xip.elf` times loads from flash, so it needs the flash
+interface as the Pico SDK sets it up, which `reset halt` stops the board
+before. Flash any Pico SDK firmware first; then, instead of `reset halt`:
+`reset run`, wait two seconds, `halt` both cores (`rp2350.cm1`, then
+`rp2350.cm0`), set `msplim_s` and `psplim_s` to 0 (the SDK's stack limit is
+above the test's stack), and carry on from `load_image` as above. It reads
+flash at 0x10100000 to 0x10210000, whatever is there, and writes none. A
+Pico 2 passes all 12 subtests.
+
 ## Pico SDK firmware
 
 `programs/rp2350_sdk/` holds firmware built with the Pico SDK (its

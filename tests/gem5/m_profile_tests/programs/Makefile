@@ -55,6 +55,7 @@ TESTS = cortexm4_basic test_cps test_mrs_msr test_bx_exc_return \
         test_it_fp_load_store \
         test_rp2350_dma \
         test_rp2350_dma_dreq \
+        test_rp2350_xip \
         test_rp2350_store_wait \
         test_nvic_pend_enable
 
@@ -80,7 +81,8 @@ test_rp2350_gpioc.elf: rp2350_sram.ld
 test_rp2350_order.o: ASFLAGS = -mcpu=cortex-m33 -mthumb
 test_rp2350_order.elf: LDFLAGS = -T rp2350_sram.ld --no-warn-rwx-segments
 test_rp2350_order.elf: rp2350_sram.ld
-RP2350_DMA_TESTS = test_rp2350_dma test_rp2350_dma_dreq test_rp2350_store_wait
+RP2350_DMA_TESTS = test_rp2350_dma test_rp2350_dma_dreq test_rp2350_xip \
+        test_rp2350_store_wait
 $(addsuffix .o, $(RP2350_DMA_TESTS)): ASFLAGS = -mcpu=cortex-m33 -mthumb
 $(addsuffix .elf, $(RP2350_DMA_TESTS)): LDFLAGS = -T rp2350_sram.ld --no-warn-rwx-segments
 $(addsuffix .elf, $(RP2350_DMA_TESTS)): rp2350_sram.ld

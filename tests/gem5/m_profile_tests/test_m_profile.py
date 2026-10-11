@@ -290,7 +290,7 @@ for sram_model in ("legacy", "banked"):
 
 
 def m_profile_rp2350_dma_test(name, firmware_name, ok_message, run_config,
-                              sram_model):
+                              sram_model, xip_model="legacy"):
     """Register a test that runs firmware on the RP2350 board's Arm proxy
     with its DMA, through configs/<run_config>, and passes when it prints
     ok_message."""
@@ -302,7 +302,7 @@ def m_profile_rp2350_dma_test(name, firmware_name, ok_message, run_config,
         return
     run_args = ["--firmware", firmware_path, "--sram-model", sram_model]
     if run_config == "run_rp2350_sdk.py":
-        run_args.append("--dma")
+        run_args += ["--dma", "--xip-model", xip_model]
     gem5_verify_config(
         name=f"m_profile_{name}_{sram_model}",
         verifiers=[verifier.MatchRegex(re.compile(ok_message))],
@@ -326,6 +326,11 @@ for sram_model in ("legacy", "banked"):
     m_profile_rp2350_dma_test(
         "rp2350_dma_dreq", "test_rp2350_dma_dreq.elf",
         r"RP2350_DMA_DREQ_OK", "run_rp2350_dma_dreq.py", sram_model,
+    )
+    # Flash timing and the DMA beside it, with the values a Pico 2 gives
+    m_profile_rp2350_dma_test(
+        "rp2350_xip", "test_rp2350_xip.elf", r"RP2350_XIP_OK",
+        "run_rp2350_sdk.py", sram_model, xip_model="qmi",
     )
 # A store that loses its bank holds the core, with the cycles a Pico 2 gives;
 # only the banked SRAM has banks to lose

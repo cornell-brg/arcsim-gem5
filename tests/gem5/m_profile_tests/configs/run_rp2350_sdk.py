@@ -1,7 +1,7 @@
 """Run Pico SDK firmware on the RP2350 board's Arm proxy.
 
     gem5.opt run_rp2350_sdk.py --firmware <elf> [--sram-model legacy|banked]
-                               [--dma]
+                               [--dma] [--xip-model legacy|qmi]
 
 The board has no APB peripherals and, of the AHB ones, at most the DMA
 (--dma). The SDK's start-up still writes a few of their registers (the boot
@@ -26,6 +26,7 @@ parser.add_argument(
     "--sram-model", choices=("legacy", "banked"), default="legacy"
 )
 parser.add_argument("--dma", action="store_true")
+parser.add_argument("--xip-model", choices=("legacy", "qmi"), default="legacy")
 parser.add_argument("--tick-limit", type=int, default=10**12)
 args = parser.parse_args()
 
@@ -39,7 +40,11 @@ sys.path.insert(
 from board import make_board  # noqa: E402
 
 board = make_board(
-    "arm-m4-proxy", args.firmware, sram_model=args.sram_model, dma=args.dma
+    "arm-m4-proxy",
+    args.firmware,
+    sram_model=args.sram_model,
+    dma=args.dma,
+    xip_model=args.xip_model,
 )
 # The DMA and its atomic aliases take the AHB's first 16 KiB.
 ahb_start = 0x50004000 if args.dma else 0x50000000

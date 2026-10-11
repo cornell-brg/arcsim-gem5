@@ -49,7 +49,7 @@ def _router(clock_domain):
 
 
 def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
-                   scratch_bank_bandwidth, sram_model, dma):
+                   scratch_bank_bandwidth, sram_model, dma, xip_model):
     """Wire both CPU ports to one shared XIP cache or the SRAM bus.
 
     The legacy path uses lumped SimpleMemory windows. The banked path uses
@@ -97,22 +97,29 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
     # XIP path: the front router merges instruction and data requests before
     # the shared cache. The QMI bridge connects only to flash memory.
     # The physical XIP cache is shared by instruction fetch and data reads.
-    # Cache geometry matches RP2350; gem5 hit and QMI miss timing are proxies.
-    board.flash = SimpleMemory(range=xip_range, latency="1ns")
-    # A hit answers in one core cycle (RP2350 datasheet 4.4.1, "1 cycle
-    # hit"): a request waits for the cache's next clock edge, so zero tag,
-    # data and response latency give a one-cycle round trip.
-    board.xip_cache = NoncoherentCache(
-        size="16KiB", assoc=2, tag_latency=0, data_latency=0,
-        response_latency=0, mshrs=4, tgts_per_mshr=4,
-        addr_ranges=[xip_range],
-    )
-    board.qmi_delay = Bridge(delay=f"{xip_miss_ns}ns")
-    board.xip_cache.mem_side = board.qmi_delay.cpu_side_port
-    board.qmi_delay.mem_side_port = board.flash.port
-
     board.xip_front = _router(board.fast_clock)
-    board.xip_front.mem_side_ports = board.xip_cache.cpu_side
+    if xip_model == "qmi":
+        # The cache's two banks and the flash interface's serial transfers,
+        # with a Pico 2's timing (RP2350XIP); xip_miss_ns is not used.
+        from m5.objects import RP2350XIP
+        board.flash = RP2350XIP(range=xip_range, clk_domain=board.clk_domain)
+        board.xip_front.mem_side_ports = board.flash.port
+    else:
+        # Cache geometry matches RP2350; gem5 hit and QMI miss timing are
+        # proxies.
+        board.flash = SimpleMemory(range=xip_range, latency="1ns")
+        # A hit answers in one core cycle (RP2350 datasheet 4.4.1, "1 cycle
+        # hit"): a request waits for the cache's next clock edge, so zero
+        # tag, data and response latency give a one-cycle round trip.
+        board.xip_cache = NoncoherentCache(
+            size="16KiB", assoc=2, tag_latency=0, data_latency=0,
+            response_latency=0, mshrs=4, tgts_per_mshr=4,
+            addr_ranges=[xip_range],
+        )
+        board.qmi_delay = Bridge(delay=f"{xip_miss_ns}ns")
+        board.xip_cache.mem_side = board.qmi_delay.cpu_side_port
+        board.qmi_delay.mem_side_port = board.flash.port
+        board.xip_front.mem_side_ports = board.xip_cache.cpu_side
 
     # CPU-facing routers choose the XIP path by address and send other
     # requests to the SRAM bus, whose default responder rejects bad addresses.
@@ -149,7 +156,7 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
 
 def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
               scratch_bank_bandwidth, arm_predictor, arm_divider, sram_model,
-              arm_timing, dma):
+              arm_timing, dma, xip_model):
     from m5.objects import ArmMSystem, ArmSemihosting
     from m5.objects.ArmMSystem import ArmMReleaseCortexM33
     from m5.objects.ArmMFsWorkload import ArmMFsWorkload
@@ -177,7 +184,7 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     _attach_memory(board, xip_miss_ns=xip_miss_ns,
                    sram_latency_ns=sram_latency_ns,
                    scratch_bank_bandwidth=scratch_bank_bandwidth,
-                   sram_model=sram_model, dma=dma)
+                   sram_model=sram_model, dma=dma, xip_model=xip_model)
 
     # Decouple in-flight ICode responses on SRAM branch redirects. Direct
     # xbar-to-memory fetch crashes this gem5 branch; this adds no SRAM cache.
@@ -271,7 +278,7 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
 
 
 def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
-                scratch_bank_bandwidth, sram_model, dma):
+                scratch_bank_bandwidth, sram_model, dma, xip_model):
     from m5.objects import RiscvSystem
     from m5.objects.RiscvCPU import RiscvMinorCPU
     from m5.objects.RiscvFsWorkload import RiscvBareMetal
@@ -288,7 +295,7 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     _attach_memory(board, xip_miss_ns=xip_miss_ns,
                    sram_latency_ns=sram_latency_ns,
                    scratch_bank_bandwidth=scratch_bank_bandwidth,
-                   sram_model=sram_model, dma=dma)
+                   sram_model=sram_model, dma=dma, xip_model=xip_model)
     if board._banked_sram:
         board.icode_router.mem_side_ports = board.sram.port
     board.mem_mode = "timing"
@@ -332,23 +339,30 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
 def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                scratch_bank_bandwidth=SCRATCH_BANK_BANDWIDTH,
                arm_predictor="m4", arm_divider="rp2350-m33",
-               sram_model="legacy", arm_timing="tuned", dma=False):
+               sram_model="legacy", arm_timing="tuned", dma=False,
+               xip_model="legacy"):
     """Return exactly one active core with the RP2350 memory baseline.
 
     dma adds the DMA controller (RP2350DMA) at 0x50000000-0x50003fff; on the
-    Hazard3 proxy its interrupt outputs are left unconnected."""
+    Hazard3 proxy its interrupt outputs are left unconnected. xip_model
+    "qmi" replaces the generic cache and fixed miss delay in front of flash
+    with RP2350XIP."""
     if sram_model not in ("legacy", "banked"):
         raise ValueError(f"Unknown SRAM model: {sram_model}")
+    if xip_model not in ("legacy", "qmi"):
+        raise ValueError(f"Unknown XIP model: {xip_model}")
     if core == "arm-m4-proxy":
         return _make_arm(firmware, xip_miss_ns=xip_miss_ns,
                          sram_latency_ns=sram_latency_ns,
                          scratch_bank_bandwidth=scratch_bank_bandwidth,
                          arm_predictor=arm_predictor,
                          arm_divider=arm_divider, sram_model=sram_model,
-                         arm_timing=arm_timing, dma=dma)
+                         arm_timing=arm_timing, dma=dma,
+                         xip_model=xip_model)
     if core == "hazard3-proxy":
         return _make_riscv(firmware, xip_miss_ns=xip_miss_ns,
                            sram_latency_ns=sram_latency_ns,
                            scratch_bank_bandwidth=scratch_bank_bandwidth,
-                           sram_model=sram_model, dma=dma)
+                           sram_model=sram_model, dma=dma,
+                           xip_model=xip_model)
     raise ValueError(f"Unknown RP2350 core selector: {core}")  
