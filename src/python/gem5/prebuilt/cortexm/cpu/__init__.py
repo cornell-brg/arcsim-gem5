@@ -25,5 +25,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from gem5.prebuilt.cortexm.cpu.cortex_m4 import CortexM4CPU
+from gem5.prebuilt.cortexm.cpu.cortex_m33 import CortexM33CPU
 
-__all__ = ["CortexM4CPU"]
+__all__ = ["CortexM4CPU", "CortexM33CPU"]

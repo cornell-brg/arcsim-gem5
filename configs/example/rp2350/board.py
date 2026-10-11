@@ -163,8 +163,8 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     from m5.objects.MProfilePlatform import ArmMPlatform
     from m5.objects.MProfileDWT import MProfileDWT
     from m5.objects.MProfileSCS import MProfileSCS
+    from m5.objects.BaseMinorCPU import DynamicLatencyIntDivFU
     from m5.objects.BranchPredictor import LocalBP, SimpleBTB
-    from gem5.prebuilt.cortexm.cpu.cortex_m4 import CortexM4CPU
 
     class RP2350M4ProxyPlatform(ArmMPlatform):
         code_ranges = [AddrRange(XIP_BASE, size=XIP_SIZE)]
@@ -178,8 +178,7 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
         # (BasicPioDevice's default is 100ns, 15 core cycles).
         dwt = MProfileDWT(pio_latency="1ns")
 
-    # The RP2350's Arm cores are Cortex-M33s: the M4 proxy CPU's timing with
-    # the M33's instruction set (FPv5).
+    # The RP2350's Arm cores are Cortex-M33s.
     board = ArmMSystem(release=ArmMReleaseCortexM33())
     _attach_memory(board, xip_miss_ns=xip_miss_ns,
                    sram_latency_ns=sram_latency_ns,
@@ -206,24 +205,27 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     board.platform = RP2350M4ProxyPlatform()
 
 
-    # This is the existing Cortex-M4 model, not an Armv8-M Cortex-M33 ISA.
     board.cpuid = 0x410FC241
-    board.cpu = CortexM4CPU(cpu_id=0)
 
-    # The CortexM4CPU timing as tuned against the STM32G474 (the default), or
-    # as it was before that tuning
-    if arm_timing == "pre-tuning":
-        from gem5.prebuilt.cortexm.cpu.cortex_m4 import use_pre_tuning_timing
+    # The CortexM33CPU timing, tuned against a Pico 2 (the default), or the
+    # CortexM4CPU's as it was before its tuning against the STM32G474
+    if arm_timing == "tuned":
+        from gem5.prebuilt.cortexm.cpu.cortex_m33 import CortexM33CPU
+        board.cpu = CortexM33CPU(cpu_id=0)
+    elif arm_timing == "pre-tuning":
+        from gem5.prebuilt.cortexm.cpu.cortex_m4 import (
+            CortexM4CPU,
+            use_pre_tuning_timing,
+        )
+        board.cpu = CortexM4CPU(cpu_id=0)
         use_pre_tuning_timing(board.cpu)
-    elif arm_timing != "tuned":
+    else:
         raise ValueError(f"Unknown Arm timing: {arm_timing}")
 
     # For playing around with different branch predictors and dividers
-    if arm_divider == "rp2350-m33":
-        from gem5.prebuilt.cortexm.cpu.cortex_m4 import M4IntDivFU
-        for unit in board.cpu.executeFuncUnits.funcUnits:
-            if isinstance(unit, M4IntDivFU):
-                unit.rp2350_m33_timing = True
+    for unit in board.cpu.executeFuncUnits.funcUnits:
+        if isinstance(unit, DynamicLatencyIntDivFU):
+            unit.rp2350_m33_timing = arm_divider == "rp2350-m33"
     if arm_predictor in ("local", "local-small"):
         board.cpu.branchPred.conditionalBranchPred = LocalBP(
             localPredictorSize=2048, localCtrBits=2
@@ -237,12 +239,6 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     # holds the instructions behind it. Only the banked SRAM has banks to
     # lose; the legacy memories keep the store buffer's timing.
     board.cpu.executeWaitedStoreHoldsInsts = board._banked_sram
-
-    # The Cortex-M33's prefetch holds a few bytes: it has fetched a word or
-    # two past a branch when the branch takes effect. 8 bytes are what
-    # decode can take in the two cycles a fetch needs here, so it waits for
-    # no line it did not wait for before.
-    board.cpu.fetchReadAheadLimit = 8
 
     board.cpu.clk_domain = board.clk_domain
     board.mem_mode = board.cpu.memory_mode()

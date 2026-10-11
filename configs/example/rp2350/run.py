@@ -32,8 +32,9 @@ parser.add_argument("--arm-divider", choices=("m4", "rp2350-m33"),
                     default="rp2350-m33")
 parser.add_argument("--arm-timing", choices=("tuned", "pre-tuning"),
                     default="tuned",
-                    help="CortexM4CPU timing as tuned against the STM32G474, or as "
-                    "it was before that tuning")
+                    help="CortexM33CPU timing, tuned against a Pico 2, or the "
+                    "CortexM4CPU's as it was before its tuning against the "
+                    "STM32G474")
 parser.add_argument("--dma", action="store_true",
                     help="Add the DMA controller")
 parser.add_argument("--xip-model", choices=("legacy", "qmi"), default="legacy",
