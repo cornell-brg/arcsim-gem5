@@ -467,6 +467,10 @@ class SingleStageFetch1 : public Fetch1
     /** Target requests given up while still in the memory system */
     std::vector<FetchRequestPtr> abandonedTargetRequests;
 
+    /** The port refused a branch target request, which is not resent:
+     *  nothing more may be sent until the port's retry arrives */
+    bool targetRefused = false;
+
     /** Fetch the line holding target beside the sequential stream */
     void fetchBranchTarget(ThreadID tid, const PCStateBase &target);
 

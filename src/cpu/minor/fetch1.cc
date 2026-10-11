@@ -313,6 +313,11 @@ Fetch1::tryToSendToTransfers(FetchRequestPtr request)
          *  for this queue->queue transfer */
         cpu.wakeupOnEvent(Pipeline::Fetch1StageId);
     } else if (request->state == FetchRequest::Translated) {
+        if (icacheState == IcacheNeedsRetry) {
+            DPRINTF(Fetch, "Port owes a retry, not issuing to memory\n");
+            return;
+        }
+
         if (!request->packet)
             request->makePacket();
 
@@ -913,10 +918,16 @@ SingleStageFetch1::recvTimingResp(PacketPtr pkt)
 void
 SingleStageFetch1::recvReqRetry()
 {
-    /* A refused branch target request is not resent, so a retry is
-     *  only for the line fetches */
-    if (icacheState == IcacheNeedsRetry)
+    if (targetRefused) {
+        /* A refused branch target request is not resent: the retry
+         *  lets the line fetches go again */
+        targetRefused = false;
+        icacheState = IcacheRunning;
+        stepQueues();
+        cpu.wakeupOnEvent(Pipeline::Fetch1StageId);
+    } else if (icacheState == IcacheNeedsRetry) {
         Fetch1::recvReqRetry();
+    }
 }
 
 void
@@ -960,10 +971,13 @@ SingleStageFetch1::fetchBranchTarget(ThreadID tid,
         request->state = FetchRequest::RequestIssuing;
         numFetchesInMemorySystem++;
     } else {
-        /* The port is busy: the target is fetched after the redirect */
+        /* The port is busy: the target is fetched after the redirect.
+         *  The port now owes a retry and takes nothing before it */
         DPRINTF(Fetch, "SF1: branch target line fetch refused\n");
         delete request;
         targetRequest = NULL;
+        targetRefused = true;
+        icacheState = IcacheNeedsRetry;
     }
 }
 
