@@ -90,6 +90,17 @@ class Decode : public Named
      *  there is room in the output to contain its processed data */
     bool processMoreThanOneInput;
 
+    /** See executeFreeUpdateMicroops in BaseMinorCPU.py */
+    bool freeUpdateMicroops;
+
+    /** An output holds one instruction, and with it those that take no
+     *  cycle of their own (executeFreeUpdateMicroops, fetchFoldMasks) */
+    bool packFreeInsts;
+
+    /** Is static_inst a micro-op that takes no cycle of its own under
+     *  freeUpdateMicroops */
+    static bool isFreeUpdate(const StaticInstPtr &static_inst);
+
   public:
     /* Public for Pipeline to be able to pass it to Fetch2 */
     std::vector<InputBuffer<ForwardInstData>> inputBuffer;

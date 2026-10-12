@@ -337,6 +337,8 @@ PySource('gem5.prebuilt.cortexm.cpu',
     'gem5/prebuilt/cortexm/cpu/__init__.py')
 PySource('gem5.prebuilt.cortexm.cpu',
     'gem5/prebuilt/cortexm/cpu/cortex_m4.py')
+PySource('gem5.prebuilt.cortexm.cpu',
+    'gem5/prebuilt/cortexm/cpu/cortex_m33.py')
 PySource('gem5.prebuilt.cortexm.boards',
     'gem5/prebuilt/cortexm/boards/__init__.py')
 PySource('gem5.prebuilt.cortexm.boards',

@@ -313,6 +313,15 @@ Fetch1::tryToSendToTransfers(FetchRequestPtr request)
          *  for this queue->queue transfer */
         cpu.wakeupOnEvent(Pipeline::Fetch1StageId);
     } else if (request->state == FetchRequest::Translated) {
+        if (icacheState == IcacheNeedsRetry) {
+            DPRINTF(Fetch, "Port owes a retry, not issuing to memory\n");
+            return;
+        }
+
+        /* The memory system may decline a read made on speculation */
+        if (sendOnSpeculation)
+            request->request->setFlags(Request::PREFETCH);
+
         if (!request->packet)
             request->makePacket();
 
@@ -865,6 +874,7 @@ SingleStageFetch1::recvTimingResp(PacketPtr pkt)
         abandonedTargetRequests.end(), fetch_request);
 
     if (fetch_request == targetRequest ||
+        fetch_request == olderTargetRequest ||
         abandoned != abandonedTargetRequests.end())
     {
         numFetchesInMemorySystem--;
@@ -883,6 +893,22 @@ SingleStageFetch1::recvTimingResp(PacketPtr pkt)
     }
 
     assert(!fetch_request->packet);
+
+    if (pkt->isError() && pkt->req->isPrefetch()) {
+        /* A read on speculation that the memory system declined: it is
+         *  sent again once no branch ahead of it can turn the stream
+         *  away, and dropped if one does */
+        DPRINTF(Fetch, "SF1: fetch on speculation declined addr=%#x\n",
+            pkt->getAddr());
+        numFetchesInMemorySystem--;
+        delete pkt;
+        fetch_request->declined = true;
+        /* No longer in the memory system */
+        fetch_request->state = FetchRequest::Translated;
+        cpu.wakeupOnEventImmediate(Pipeline::Fetch1StageId);
+        return true;
+    }
+
     fetch_request->packet = pkt;
 
     numFetchesInMemorySystem--;
@@ -913,22 +939,89 @@ SingleStageFetch1::recvTimingResp(PacketPtr pkt)
 void
 SingleStageFetch1::recvReqRetry()
 {
-    /* A refused branch target request is not resent, so a retry is
-     *  only for the line fetches */
-    if (icacheState == IcacheNeedsRetry)
+    if (targetRefused) {
+        /* A refused branch target request is not resent: the retry
+         *  lets the line fetches go again */
+        targetRefused = false;
+        icacheState = IcacheRunning;
+        stepQueues();
+        cpu.wakeupOnEvent(Pipeline::Fetch1StageId);
+    } else if (icacheState == IcacheNeedsRetry) {
         Fetch1::recvReqRetry();
+    }
 }
 
 void
-SingleStageFetch1::fetchBranchTarget(ThreadID tid,
-    const PCStateBase &target)
+SingleStageFetch1::resendDeclined(bool on_speculation)
+{
+    for (FetchRequestPtr request : transfers.getQueue()) {
+        if (!request->declined)
+            continue;
+
+        if (request->isDiscardable()) {
+            /* The stream has turned away: it goes with the stream's
+             *  other lines */
+            request->declined = false;
+            request->state = FetchRequest::Complete;
+        } else if (!on_speculation && icacheState == IcacheRunning) {
+            request->request->clearFlags(Request::PREFETCH);
+            request->makePacket();
+
+            if (icachePort.sendTimingReq(request->packet)) {
+                request->packet = NULL;
+                request->declined = false;
+                request->state = FetchRequest::RequestIssuing;
+                numFetchesInMemorySystem++;
+            } else {
+                /* The port now owes a retry and takes nothing before
+                 *  it */
+                request->packet->popSenderState();
+                delete request->packet;
+                request->packet = NULL;
+                targetRefused = true;
+                icacheState = IcacheNeedsRetry;
+            }
+        }
+    }
+}
+
+bool
+SingleStageFetch1::targetAwaited(ThreadID tid) const
+{
+    return targetRequest &&
+        execute.lastCompletedFetchSeqNum(tid) < targetBranchSeqNum;
+}
+
+bool
+SingleStageFetch1::canFetchTarget(ThreadID tid) const
+{
+    if (!targetAwaited(tid))
+        return true;
+
+    /* Nothing is fetched for what follows a branch sure to be taken */
+    return targetBranchMayFallThrough && (!olderTargetRequest ||
+        execute.lastCompletedFetchSeqNum(tid) >= olderTargetBranchSeqNum);
+}
+
+void
+SingleStageFetch1::fetchBranchTarget(ThreadID tid, Addr target_addr,
+    const MinorDynInstPtr &branch)
 {
     Fetch1ThreadInfo &thread = fetchInfo[tid];
-    Addr target_addr = target.instAddr();
     Addr aligned = target_addr & ~((Addr) lineSnap - 1);
     unsigned int request_size = maxLineWidth - (aligned % lineSnap);
 
-    abandonTargetRequest();
+    /* The target of an older branch not yet through Execute is kept
+     *  beside this one */
+    abandonTargetRequest(olderTargetRequest);
+
+    if (branchSpeculation && targetAwaited(tid)) {
+        olderTargetRequest = targetRequest;
+        olderTargetBranchSeqNum = targetBranchSeqNum;
+        targetRequest = NULL;
+    } else {
+        abandonTargetRequest(targetRequest);
+    }
 
     InstId request_id(tid, thread.streamSeqNum, thread.predictionSeqNum,
         lineSeqNum);
@@ -941,7 +1034,9 @@ SingleStageFetch1::fetchBranchTarget(ThreadID tid,
         cpu.instRequestorId(), target_addr);
     request->request->setStreamId(thread.streamSeqNum);
 
-    request->fault = cpu.threads[tid]->mmu->translateAtomic(
+    /* The branch may not be taken, or not to here: a translation with
+     *  no effect on the thread's state */
+    request->fault = cpu.threads[tid]->mmu->translateFunctional(
         request->request, cpu.getContext(tid), BaseMMU::Execute);
 
     if (request->fault != NoFault) {
@@ -951,57 +1046,71 @@ SingleStageFetch1::fetchBranchTarget(ThreadID tid,
 
     DPRINTF(Fetch, "SF1: fetching branch target line addr=%#x\n", aligned);
 
+    /* A read on speculation: the memory system may answer that the line
+     *  is not at hand rather than go to fetch it */
+    if (branchSpeculation)
+        request->request->setFlags(Request::PREFETCH);
+
     request->state = FetchRequest::Translated;
     request->makePacket();
     targetRequest = request;
+    targetBranchSeqNum = branch->id.fetchSeqNum;
+    targetBranchMayFallThrough = !branch->staticInst->isUncondCtrl() &&
+        !branch->staticInst->isSquashAfter();
 
     if (icachePort.sendTimingReq(request->packet)) {
         request->packet = NULL;
         request->state = FetchRequest::RequestIssuing;
         numFetchesInMemorySystem++;
     } else {
-        /* The port is busy: the target is fetched after the redirect */
+        /* The port is busy: the target is fetched after the redirect.
+         *  The port now owes a retry and takes nothing before it */
         DPRINTF(Fetch, "SF1: branch target line fetch refused\n");
         delete request;
         targetRequest = NULL;
+        targetRefused = true;
+        icacheState = IcacheNeedsRetry;
     }
 }
 
 void
-SingleStageFetch1::abandonTargetRequest()
+SingleStageFetch1::abandonTargetRequest(FetchRequestPtr &target_request)
 {
-    if (!targetRequest)
+    if (!target_request)
         return;
 
-    if (targetRequest->state == FetchRequest::RequestIssuing) {
-        abandonedTargetRequests.push_back(targetRequest);
+    if (target_request->state == FetchRequest::RequestIssuing) {
+        abandonedTargetRequests.push_back(target_request);
     } else {
         /* Its response has arrived */
-        delete targetRequest;
+        delete target_request;
     }
 
-    targetRequest = NULL;
+    target_request = NULL;
 }
 
 bool
-SingleStageFetch1::takeTargetLine(const BranchData &execute_branch,
-    ForwardLineData &line_out)
+SingleStageFetch1::takeTargetLine(FetchRequestPtr &target_request,
+    const BranchData &execute_branch, ForwardLineData &line_out)
 {
-    if (!targetRequest || !targetRequest->isComplete() ||
+    if (!target_request || !target_request->isComplete() ||
         !execute_branch.isStreamChange() || !execute_branch.target ||
         !execute_branch.inst || execute_branch.inst->isBubble() ||
         execute_branch.inst->isFault() ||
-        !execute_branch.inst->staticInst->isDirectCtrl())
+        !(execute_branch.inst->staticInst->isDirectCtrl() ||
+          execute_branch.inst->staticInst->isSquashAfter() ||
+          (fetch2->registerAtDecode() &&
+           execute_branch.inst->staticInst->isIndirectCtrl())))
     {
         return false;
     }
 
-    PacketPtr packet = targetRequest->packet;
+    PacketPtr packet = target_request->packet;
     Addr target_addr = execute_branch.target->instAddr();
-    Addr line_base = targetRequest->request->getVaddr();
+    Addr line_base = target_request->request->getVaddr();
 
     if (!packet || packet->isError() || target_addr < line_base ||
-        target_addr >= line_base + targetRequest->request->getSize())
+        target_addr >= line_base + target_request->request->getSize())
     {
         return false;
     }
@@ -1017,16 +1126,16 @@ SingleStageFetch1::takeTargetLine(const BranchData &execute_branch,
     line_out.fetchAddr = target_addr;
     line_out.lineBaseAddr = line_base;
     line_out.adoptPacketData(packet);
-    targetRequest->packet = NULL;
+    target_request->packet = NULL;
 
     /* Fetching carries on after this line */
-    thread.fetchAddr = line_base + targetRequest->request->getSize();
+    thread.fetchAddr = line_base + target_request->request->getSize();
 
     DPRINTF(Fetch, "SF1: taking branch target line addr=%#x as %s\n",
         line_base, line_out.id);
 
-    delete targetRequest;
-    targetRequest = NULL;
+    delete target_request;
+    target_request = NULL;
 
     return true;
 }
@@ -1039,13 +1148,40 @@ SingleStageFetch1::SingleStageFetch1(const std::string &name_,
     Latch<BranchData>::Output prediction_,
     std::vector<InputBuffer<ForwardLineData>> &next_stage_input_buffer,
     SingleStageFetch2 *fetch2_,
-    Latch<BranchData>::Input eToF1Input_) :
+    Latch<BranchData>::Input eToF1Input_,
+    Execute &execute_) :
     Fetch1(name_, cpu_, params, inp_, out_, prediction_,
         next_stage_input_buffer),
     fetch2(fetch2_),
+    execute(execute_),
     eToF1Input(eToF1Input_),
-    targetRequest(NULL)
+    branchSpeculation(params.fetchBranchSpeculation),
+    targetRequest(NULL),
+    olderTargetRequest(NULL),
+    readAheadLimit(params.fetchReadAheadLimit)
 {
+}
+
+bool
+SingleStageFetch1::readAheadFull()
+{
+    /* Only single-threaded M-profile */
+    ThreadID tid = 0;
+    Fetch1ThreadInfo &thread = fetchInfo[tid];
+
+    if (readAheadLimit == 0 || thread.state != FetchRunning)
+        return false;
+
+    /* Decode has got to here in the stream, or not yet to its start */
+    Addr decode_to = thread.pc->instAddr();
+    fetch2->decodeAddr(tid, thread.streamSeqNum, thread.predictionSeqNum,
+        decode_to);
+
+    /* With nothing waiting or on its way there is nothing to wait for */
+    bool waiting = numInFlightFetches() != 0 ||
+        !fetch2->inputBuffer[tid].empty();
+
+    return waiting && thread.fetchAddr >= decode_to + readAheadLimit;
 }
 
 void
@@ -1082,19 +1218,65 @@ SingleStageFetch1::evaluate()
     bool have_target_line = false;
 
     if (exec_branch.isStreamChange()) {
-        have_target_line = takeTargetLine(exec_branch, target_line);
-        abandonTargetRequest();
+        have_target_line =
+            takeTargetLine(olderTargetRequest, exec_branch, target_line) ||
+            takeTargetLine(targetRequest, exec_branch, target_line);
+        abandonTargetRequest(olderTargetRequest);
+        abandonTargetRequest(targetRequest);
         fetch2->decodedBranchTarget.reset();
+        fetch2->decodedBranch = nullptr;
+        fetch2->decodedRegisterBranch = nullptr;
+        fetch2->sureBranch = nullptr;
+        fetch2->lastBranch = nullptr;
+        sendOnSpeculation = false;
     } else if (fetch2->decodedBranchTarget) {
-        /* The direct branch decoded last cycle is in Decode now */
+        /* The direct branch decoded last cycle is in Decode now.  The
+         *  targets of two older branches not yet through Execute are
+         *  kept: this one's is fetched once one of them has fallen
+         *  through */
         ThreadID tid = fetch2->decodedBranchTid;
 
-        if (fetchInfo[tid].state == FetchRunning &&
-            icacheState == IcacheRunning)
-        {
-            fetchBranchTarget(tid, *fetch2->decodedBranchTarget);
+        if (!branchSpeculation) {
+            /* Each decoded branch's target fetch replaces the last */
+            if (fetchInfo[tid].state == FetchRunning &&
+                icacheState == IcacheRunning)
+            {
+                fetchBranchTarget(tid,
+                    fetch2->decodedBranchTarget->instAddr(),
+                    fetch2->decodedBranch);
+            }
+            fetch2->decodedBranchTarget.reset();
+        } else if (canFetchTarget(tid)) {
+            if (fetchInfo[tid].state == FetchRunning &&
+                icacheState == IcacheRunning &&
+                execute.lastCompletedFetchSeqNum(tid) <
+                    fetch2->decodedBranch->id.fetchSeqNum)
+            {
+                fetchBranchTarget(tid,
+                    fetch2->decodedBranchTarget->instAddr(),
+                    fetch2->decodedBranch);
+            }
+            fetch2->decodedBranchTarget.reset();
         }
-        fetch2->decodedBranchTarget.reset();
+    } else if (fetch2->decodedRegisterBranch) {
+        /* So is the register branch: its target can be read if nothing
+         *  ahead of it still has the register to write */
+        ThreadID tid = fetch2->decodedBranchTid;
+        const RegId &reg =
+            fetch2->decodedRegisterBranch->staticInst->srcRegIdx(0);
+
+        if (fetchInfo[tid].state == FetchRunning &&
+            icacheState == IcacheRunning &&
+            (branchSpeculation ? canFetchTarget(tid) : !targetAwaited(tid)) &&
+            !execute.regWritePending(tid, reg,
+                fetch2->decodedRegisterBranch))
+        {
+            fetchBranchTarget(tid, cpu.getContext(tid)->getReg(reg),
+                fetch2->decodedRegisterBranch);
+            fetch2->decodedRegisterBranch = nullptr;
+        } else if (--fetch2->decodedRegisterTries == 0) {
+            fetch2->decodedRegisterBranch = nullptr;
+        }
     }
 
     /* Step I-cache queues */
@@ -1144,9 +1326,30 @@ SingleStageFetch1::evaluate()
      * If no prediction was produced but the lookahead scan detects a
      * branch instruction next in the line, suppress the sequential
      * prefetch. */
+    /* A branch sure to be taken that turns out to go nowhere, to the
+     *  instruction after it, ends nothing */
+    if (fetch2->sureBranch &&
+        execute.lastCompletedFetchSeqNum(fetch2->sureBranch->id.threadId) >=
+            fetch2->sureBranch->id.fetchSeqNum)
+    {
+        fetch2->sureBranch = nullptr;
+    }
+
+    if (fetch2->lastBranch &&
+        execute.lastCompletedFetchSeqNum(fetch2->lastBranch->id.threadId) >=
+            fetch2->lastBranch->id.fetchSeqNum)
+    {
+        fetch2->lastBranch = nullptr;
+    }
+
+    /* Behind a branch Execute has yet to complete, the stream is fetched
+     *  on speculation */
+    sendOnSpeculation = static_cast<bool>(fetch2->lastBranch);
+    resendDeclined(sendOnSpeculation);
+
     if (!prediction.isBubble() || !fetch2->scanNextForBranch()) {
-    // if (!prediction.isBubble()) {
-        tryToFetch();
+        if (!fetch2->sureBranch && !readAheadFull())
+            tryToFetch();
     }
 
     /* --- Post-evaluate --- */

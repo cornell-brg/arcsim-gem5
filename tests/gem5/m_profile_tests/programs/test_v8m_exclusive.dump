@@ -1,0 +1,455 @@
+
+test_v8m_exclusive.elf:     file format elf32-littlearm
+
+SYMBOL TABLE:
+08000000 l    d  .isr_vector	00000000 .isr_vector
+08000040 l    d  .text	00000000 .text
+08000528 l    d  .rodata	00000000 .rodata
+20000000 l    d  .data	00000000 .data
+20000000 l    d  .bss	00000000 .bss
+00000000 l    d  .ARM.attributes	00000000 .ARM.attributes
+00000000 l    df *ABS*	00000000 test_v8m_exclusive.o
+20000100 l       *ABS*	00000000 TEST_RESULT
+20000104 l       *ABS*	00000000 TEST_SUBTEST
+cafecafe l       *ABS*	00000000 PASS_VAL
+deaddead l       *ABS*	00000000 FAIL_VAL
+20020000 l       *ABS*	00000000 STACK_TOP
+20000200 l       *ABS*	00000000 BUF
+e000ed08 l       *ABS*	00000000 SCB_VTOR
+08000000 l       .isr_vector	00000000 __isr_vector
+080004c6 l     F .text	00000000 Fault_Handler
+080004c4 l     F .text	00000000 SVC_Handler
+08000490 l       .text	00000000 fail
+080004a4 l     F .text	00000000 try_lock
+0800049a l       .text	00000000 done
+08000040 g     F .text	00000000 Reset_Handler
+20020000 g       *ABS*	00000000 _estack
+
+
+
+Disassembly of section .text:
+
+08000040 <Reset_Handler>:
+ 8000040:	f8df 0488 	ldr.w	r0, [pc, #1160]	@ 80004cc <Fault_Handler+0x6>
+ 8000044:	4685      	mov	sp, r0
+ 8000046:	f8df 0488 	ldr.w	r0, [pc, #1160]	@ 80004d0 <Fault_Handler+0xa>
+ 800004a:	f8df 1488 	ldr.w	r1, [pc, #1160]	@ 80004d4 <Fault_Handler+0xe>
+ 800004e:	6008      	str	r0, [r1, #0]
+ 8000050:	b662      	cpsie	i
+ 8000052:	f8df 4484 	ldr.w	r4, [pc, #1156]	@ 80004d8 <Fault_Handler+0x12>
+ 8000056:	f3bf 8f2f 	clrex
+ 800005a:	2701      	movs	r7, #1
+ 800005c:	f8df 047c 	ldr.w	r0, [pc, #1148]	@ 80004dc <Fault_Handler+0x16>
+ 8000060:	6020      	str	r0, [r4, #0]
+ 8000062:	4622      	mov	r2, r4
+ 8000064:	f06f 0c00 	mvn.w	ip, #0
+ 8000068:	e8d2 cfcf 	ldaexb	ip, [r2]
+ 800006c:	f04f 06f4 	mov.w	r6, #244	@ 0xf4
+ 8000070:	45b4      	cmp	ip, r6
+ 8000072:	f040 820d 	bne.w	8000490 <fail>
+ 8000076:	f8df 1468 	ldr.w	r1, [pc, #1128]	@ 80004e0 <Fault_Handler+0x1a>
+ 800007a:	e8c2 1f4c 	strexb	ip, r1, [r2]
+ 800007e:	f04f 0600 	mov.w	r6, #0
+ 8000082:	45b4      	cmp	ip, r6
+ 8000084:	f040 8204 	bne.w	8000490 <fail>
+ 8000088:	6820      	ldr	r0, [r4, #0]
+ 800008a:	f8df 6458 	ldr.w	r6, [pc, #1112]	@ 80004e4 <Fault_Handler+0x1e>
+ 800008e:	42b0      	cmp	r0, r6
+ 8000090:	f040 81fe 	bne.w	8000490 <fail>
+ 8000094:	2702      	movs	r7, #2
+ 8000096:	f8df 1450 	ldr.w	r1, [pc, #1104]	@ 80004e8 <Fault_Handler+0x22>
+ 800009a:	e8c2 1f8f 	stlb	r1, [r2]
+ 800009e:	6820      	ldr	r0, [r4, #0]
+ 80000a0:	f8df 6448 	ldr.w	r6, [pc, #1096]	@ 80004ec <Fault_Handler+0x26>
+ 80000a4:	42b0      	cmp	r0, r6
+ 80000a6:	f040 81f3 	bne.w	8000490 <fail>
+ 80000aa:	2703      	movs	r7, #3
+ 80000ac:	f8df 042c 	ldr.w	r0, [pc, #1068]	@ 80004dc <Fault_Handler+0x16>
+ 80000b0:	6020      	str	r0, [r4, #0]
+ 80000b2:	f06f 0000 	mvn.w	r0, #0
+ 80000b6:	e8d4 0fcf 	ldaexb	r0, [r4]
+ 80000ba:	f04f 06f4 	mov.w	r6, #244	@ 0xf4
+ 80000be:	42b0      	cmp	r0, r6
+ 80000c0:	f040 81e6 	bne.w	8000490 <fail>
+ 80000c4:	f8df 2428 	ldr.w	r2, [pc, #1064]	@ 80004f0 <Fault_Handler+0x2a>
+ 80000c8:	f06f 0100 	mvn.w	r1, #0
+ 80000cc:	e8c4 2fc1 	stlexb	r1, r2, [r4]
+ 80000d0:	f04f 0600 	mov.w	r6, #0
+ 80000d4:	42b1      	cmp	r1, r6
+ 80000d6:	f040 81db 	bne.w	8000490 <fail>
+ 80000da:	6820      	ldr	r0, [r4, #0]
+ 80000dc:	f8df 6414 	ldr.w	r6, [pc, #1044]	@ 80004f4 <Fault_Handler+0x2e>
+ 80000e0:	42b0      	cmp	r0, r6
+ 80000e2:	f040 81d5 	bne.w	8000490 <fail>
+ 80000e6:	2704      	movs	r7, #4
+ 80000e8:	f8df 040c 	ldr.w	r0, [pc, #1036]	@ 80004f8 <Fault_Handler+0x32>
+ 80000ec:	6020      	str	r0, [r4, #0]
+ 80000ee:	f06f 0000 	mvn.w	r0, #0
+ 80000f2:	e8d4 0fdf 	ldaexh	r0, [r4]
+ 80000f6:	f24f 36f4 	movw	r6, #62452	@ 0xf3f4
+ 80000fa:	42b0      	cmp	r0, r6
+ 80000fc:	f040 81c8 	bne.w	8000490 <fail>
+ 8000100:	4afe      	ldr	r2, [pc, #1016]	@ (80004fc <Fault_Handler+0x36>)
+ 8000102:	f06f 0100 	mvn.w	r1, #0
+ 8000106:	e8c4 2fd1 	stlexh	r1, r2, [r4]
+ 800010a:	f04f 0600 	mov.w	r6, #0
+ 800010e:	42b1      	cmp	r1, r6
+ 8000110:	f040 81be 	bne.w	8000490 <fail>
+ 8000114:	6820      	ldr	r0, [r4, #0]
+ 8000116:	4efa      	ldr	r6, [pc, #1000]	@ (8000500 <Fault_Handler+0x3a>)
+ 8000118:	42b0      	cmp	r0, r6
+ 800011a:	f040 81b9 	bne.w	8000490 <fail>
+ 800011e:	2705      	movs	r7, #5
+ 8000120:	2000      	movs	r0, #0
+ 8000122:	e8d4 0fef 	ldaex	r0, [r4]
+ 8000126:	4ef6      	ldr	r6, [pc, #984]	@ (8000500 <Fault_Handler+0x3a>)
+ 8000128:	42b0      	cmp	r0, r6
+ 800012a:	f040 81b1 	bne.w	8000490 <fail>
+ 800012e:	4af5      	ldr	r2, [pc, #980]	@ (8000504 <Fault_Handler+0x3e>)
+ 8000130:	f06f 0100 	mvn.w	r1, #0
+ 8000134:	e8c4 2fe1 	stlex	r1, r2, [r4]
+ 8000138:	f04f 0600 	mov.w	r6, #0
+ 800013c:	42b1      	cmp	r1, r6
+ 800013e:	f040 81a7 	bne.w	8000490 <fail>
+ 8000142:	6820      	ldr	r0, [r4, #0]
+ 8000144:	4eef      	ldr	r6, [pc, #956]	@ (8000504 <Fault_Handler+0x3e>)
+ 8000146:	42b0      	cmp	r0, r6
+ 8000148:	f040 81a2 	bne.w	8000490 <fail>
+ 800014c:	2706      	movs	r7, #6
+ 800014e:	48e3      	ldr	r0, [pc, #908]	@ (80004dc <Fault_Handler+0x16>)
+ 8000150:	6020      	str	r0, [r4, #0]
+ 8000152:	f06f 0e00 	mvn.w	lr, #0
+ 8000156:	e8d4 ef4f 	ldrexb	lr, [r4]
+ 800015a:	f04f 06f4 	mov.w	r6, #244	@ 0xf4
+ 800015e:	45b6      	cmp	lr, r6
+ 8000160:	f040 8196 	bne.w	8000490 <fail>
+ 8000164:	f8df 8388 	ldr.w	r8, [pc, #904]	@ 80004f0 <Fault_Handler+0x2a>
+ 8000168:	f06f 0900 	mvn.w	r9, #0
+ 800016c:	e8c4 8f49 	strexb	r9, r8, [r4]
+ 8000170:	f04f 0600 	mov.w	r6, #0
+ 8000174:	45b1      	cmp	r9, r6
+ 8000176:	f040 818b 	bne.w	8000490 <fail>
+ 800017a:	6820      	ldr	r0, [r4, #0]
+ 800017c:	4edd      	ldr	r6, [pc, #884]	@ (80004f4 <Fault_Handler+0x2e>)
+ 800017e:	42b0      	cmp	r0, r6
+ 8000180:	f040 8186 	bne.w	8000490 <fail>
+ 8000184:	2707      	movs	r7, #7
+ 8000186:	48dc      	ldr	r0, [pc, #880]	@ (80004f8 <Fault_Handler+0x32>)
+ 8000188:	6020      	str	r0, [r4, #0]
+ 800018a:	f06f 0000 	mvn.w	r0, #0
+ 800018e:	e8d4 0f5f 	ldrexh	r0, [r4]
+ 8000192:	f24f 36f4 	movw	r6, #62452	@ 0xf3f4
+ 8000196:	42b0      	cmp	r0, r6
+ 8000198:	f040 817a 	bne.w	8000490 <fail>
+ 800019c:	4ad7      	ldr	r2, [pc, #860]	@ (80004fc <Fault_Handler+0x36>)
+ 800019e:	f06f 0100 	mvn.w	r1, #0
+ 80001a2:	e8c4 2f51 	strexh	r1, r2, [r4]
+ 80001a6:	f04f 0600 	mov.w	r6, #0
+ 80001aa:	42b1      	cmp	r1, r6
+ 80001ac:	f040 8170 	bne.w	8000490 <fail>
+ 80001b0:	6820      	ldr	r0, [r4, #0]
+ 80001b2:	4ed3      	ldr	r6, [pc, #844]	@ (8000500 <Fault_Handler+0x3a>)
+ 80001b4:	42b0      	cmp	r0, r6
+ 80001b6:	f040 816b 	bne.w	8000490 <fail>
+ 80001ba:	2708      	movs	r7, #8
+ 80001bc:	48d2      	ldr	r0, [pc, #840]	@ (8000508 <Fault_Handler+0x42>)
+ 80001be:	60a0      	str	r0, [r4, #8]
+ 80001c0:	f1a4 0508 	sub.w	r5, r4, #8
+ 80001c4:	2000      	movs	r0, #0
+ 80001c6:	e855 0f04 	ldrex	r0, [r5, #16]
+ 80001ca:	4ecf      	ldr	r6, [pc, #828]	@ (8000508 <Fault_Handler+0x42>)
+ 80001cc:	42b0      	cmp	r0, r6
+ 80001ce:	f040 815f 	bne.w	8000490 <fail>
+ 80001d2:	4acc      	ldr	r2, [pc, #816]	@ (8000504 <Fault_Handler+0x3e>)
+ 80001d4:	f06f 0100 	mvn.w	r1, #0
+ 80001d8:	e845 2104 	strex	r1, r2, [r5, #16]
+ 80001dc:	f04f 0600 	mov.w	r6, #0
+ 80001e0:	42b1      	cmp	r1, r6
+ 80001e2:	f040 8155 	bne.w	8000490 <fail>
+ 80001e6:	68a0      	ldr	r0, [r4, #8]
+ 80001e8:	4ec6      	ldr	r6, [pc, #792]	@ (8000504 <Fault_Handler+0x3e>)
+ 80001ea:	42b0      	cmp	r0, r6
+ 80001ec:	f040 8150 	bne.w	8000490 <fail>
+ 80001f0:	6820      	ldr	r0, [r4, #0]
+ 80001f2:	4ec3      	ldr	r6, [pc, #780]	@ (8000500 <Fault_Handler+0x3a>)
+ 80001f4:	42b0      	cmp	r0, r6
+ 80001f6:	f040 814b 	bne.w	8000490 <fail>
+ 80001fa:	2709      	movs	r7, #9
+ 80001fc:	48be      	ldr	r0, [pc, #760]	@ (80004f8 <Fault_Handler+0x32>)
+ 80001fe:	6020      	str	r0, [r4, #0]
+ 8000200:	f06f 0000 	mvn.w	r0, #0
+ 8000204:	e8d4 0f8f 	ldab	r0, [r4]
+ 8000208:	f04f 06f4 	mov.w	r6, #244	@ 0xf4
+ 800020c:	42b0      	cmp	r0, r6
+ 800020e:	f040 813f 	bne.w	8000490 <fail>
+ 8000212:	f06f 0000 	mvn.w	r0, #0
+ 8000216:	e8d4 0f9f 	ldah	r0, [r4]
+ 800021a:	f24f 36f4 	movw	r6, #62452	@ 0xf3f4
+ 800021e:	42b0      	cmp	r0, r6
+ 8000220:	f040 8136 	bne.w	8000490 <fail>
+ 8000224:	2000      	movs	r0, #0
+ 8000226:	e8d4 0faf 	lda	r0, [r4]
+ 800022a:	4eb3      	ldr	r6, [pc, #716]	@ (80004f8 <Fault_Handler+0x32>)
+ 800022c:	42b0      	cmp	r0, r6
+ 800022e:	f040 812f 	bne.w	8000490 <fail>
+ 8000232:	270a      	movs	r7, #10
+ 8000234:	49b5      	ldr	r1, [pc, #724]	@ (800050c <Fault_Handler+0x46>)
+ 8000236:	f04f 30ff 	mov.w	r0, #4294967295	@ 0xffffffff
+ 800023a:	6020      	str	r0, [r4, #0]
+ 800023c:	e8c4 1f8f 	stlb	r1, [r4]
+ 8000240:	6820      	ldr	r0, [r4, #0]
+ 8000242:	f06f 06bb 	mvn.w	r6, #187	@ 0xbb
+ 8000246:	42b0      	cmp	r0, r6
+ 8000248:	f040 8122 	bne.w	8000490 <fail>
+ 800024c:	f04f 30ff 	mov.w	r0, #4294967295	@ 0xffffffff
+ 8000250:	6020      	str	r0, [r4, #0]
+ 8000252:	e8c4 1f9f 	stlh	r1, [r4]
+ 8000256:	6820      	ldr	r0, [r4, #0]
+ 8000258:	4ead      	ldr	r6, [pc, #692]	@ (8000510 <Fault_Handler+0x4a>)
+ 800025a:	42b0      	cmp	r0, r6
+ 800025c:	f040 8118 	bne.w	8000490 <fail>
+ 8000260:	f04f 30ff 	mov.w	r0, #4294967295	@ 0xffffffff
+ 8000264:	6020      	str	r0, [r4, #0]
+ 8000266:	e8c4 1faf 	stl	r1, [r4]
+ 800026a:	6820      	ldr	r0, [r4, #0]
+ 800026c:	4ea7      	ldr	r6, [pc, #668]	@ (800050c <Fault_Handler+0x46>)
+ 800026e:	42b0      	cmp	r0, r6
+ 8000270:	f040 810e 	bne.w	8000490 <fail>
+ 8000274:	270b      	movs	r7, #11
+ 8000276:	f04f 3055 	mov.w	r0, #1431655765	@ 0x55555555
+ 800027a:	6020      	str	r0, [r4, #0]
+ 800027c:	e8d4 0fef 	ldaex	r0, [r4]
+ 8000280:	e8c4 0fe1 	stlex	r1, r0, [r4]
+ 8000284:	f04f 0600 	mov.w	r6, #0
+ 8000288:	42b1      	cmp	r1, r6
+ 800028a:	f040 8101 	bne.w	8000490 <fail>
+ 800028e:	f04f 32aa 	mov.w	r2, #2863311530	@ 0xaaaaaaaa
+ 8000292:	2100      	movs	r1, #0
+ 8000294:	e8c4 2fc1 	stlexb	r1, r2, [r4]
+ 8000298:	f04f 0601 	mov.w	r6, #1
+ 800029c:	42b1      	cmp	r1, r6
+ 800029e:	f040 80f7 	bne.w	8000490 <fail>
+ 80002a2:	2100      	movs	r1, #0
+ 80002a4:	e8c4 2fd1 	stlexh	r1, r2, [r4]
+ 80002a8:	f04f 0601 	mov.w	r6, #1
+ 80002ac:	42b1      	cmp	r1, r6
+ 80002ae:	f040 80ef 	bne.w	8000490 <fail>
+ 80002b2:	2100      	movs	r1, #0
+ 80002b4:	e8c4 2fe1 	stlex	r1, r2, [r4]
+ 80002b8:	f04f 0601 	mov.w	r6, #1
+ 80002bc:	42b1      	cmp	r1, r6
+ 80002be:	f040 80e7 	bne.w	8000490 <fail>
+ 80002c2:	2100      	movs	r1, #0
+ 80002c4:	e8c4 2f41 	strexb	r1, r2, [r4]
+ 80002c8:	f04f 0601 	mov.w	r6, #1
+ 80002cc:	42b1      	cmp	r1, r6
+ 80002ce:	f040 80df 	bne.w	8000490 <fail>
+ 80002d2:	2100      	movs	r1, #0
+ 80002d4:	e8c4 2f51 	strexh	r1, r2, [r4]
+ 80002d8:	f04f 0601 	mov.w	r6, #1
+ 80002dc:	42b1      	cmp	r1, r6
+ 80002de:	f040 80d7 	bne.w	8000490 <fail>
+ 80002e2:	2100      	movs	r1, #0
+ 80002e4:	e844 2100 	strex	r1, r2, [r4]
+ 80002e8:	f04f 0601 	mov.w	r6, #1
+ 80002ec:	42b1      	cmp	r1, r6
+ 80002ee:	f040 80cf 	bne.w	8000490 <fail>
+ 80002f2:	6820      	ldr	r0, [r4, #0]
+ 80002f4:	f04f 3655 	mov.w	r6, #1431655765	@ 0x55555555
+ 80002f8:	42b0      	cmp	r0, r6
+ 80002fa:	f040 80c9 	bne.w	8000490 <fail>
+ 80002fe:	270c      	movs	r7, #12
+ 8000300:	e8d4 0fef 	ldaex	r0, [r4]
+ 8000304:	f3bf 8f2f 	clrex
+ 8000308:	2100      	movs	r1, #0
+ 800030a:	e8c4 2fe1 	stlex	r1, r2, [r4]
+ 800030e:	f04f 0601 	mov.w	r6, #1
+ 8000312:	42b1      	cmp	r1, r6
+ 8000314:	f040 80bc 	bne.w	8000490 <fail>
+ 8000318:	e8d4 0fcf 	ldaexb	r0, [r4]
+ 800031c:	f3bf 8f2f 	clrex
+ 8000320:	2100      	movs	r1, #0
+ 8000322:	e8c4 2f41 	strexb	r1, r2, [r4]
+ 8000326:	f04f 0601 	mov.w	r6, #1
+ 800032a:	42b1      	cmp	r1, r6
+ 800032c:	f040 80b0 	bne.w	8000490 <fail>
+ 8000330:	e8d4 0fdf 	ldaexh	r0, [r4]
+ 8000334:	f3bf 8f2f 	clrex
+ 8000338:	2100      	movs	r1, #0
+ 800033a:	e8c4 2fd1 	stlexh	r1, r2, [r4]
+ 800033e:	f04f 0601 	mov.w	r6, #1
+ 8000342:	42b1      	cmp	r1, r6
+ 8000344:	f040 80a4 	bne.w	8000490 <fail>
+ 8000348:	e854 0f00 	ldrex	r0, [r4]
+ 800034c:	f3bf 8f2f 	clrex
+ 8000350:	2100      	movs	r1, #0
+ 8000352:	e844 2100 	strex	r1, r2, [r4]
+ 8000356:	f04f 0601 	mov.w	r6, #1
+ 800035a:	42b1      	cmp	r1, r6
+ 800035c:	f040 8098 	bne.w	8000490 <fail>
+ 8000360:	6820      	ldr	r0, [r4, #0]
+ 8000362:	f04f 3655 	mov.w	r6, #1431655765	@ 0x55555555
+ 8000366:	42b0      	cmp	r0, r6
+ 8000368:	f040 8092 	bne.w	8000490 <fail>
+ 800036c:	270d      	movs	r7, #13
+ 800036e:	e8d4 0fef 	ldaex	r0, [r4]
+ 8000372:	e8d4 1faf 	lda	r1, [r4]
+ 8000376:	e8d4 1f8f 	ldab	r1, [r4]
+ 800037a:	f504 7580 	add.w	r5, r4, #256	@ 0x100
+ 800037e:	e8c5 2faf 	stl	r2, [r5]
+ 8000382:	f06f 0100 	mvn.w	r1, #0
+ 8000386:	e8c4 2fe1 	stlex	r1, r2, [r4]
+ 800038a:	f04f 0600 	mov.w	r6, #0
+ 800038e:	42b1      	cmp	r1, r6
+ 8000390:	d17e      	bne.n	8000490 <fail>
+ 8000392:	6820      	ldr	r0, [r4, #0]
+ 8000394:	f04f 36aa 	mov.w	r6, #2863311530	@ 0xaaaaaaaa
+ 8000398:	42b0      	cmp	r0, r6
+ 800039a:	d179      	bne.n	8000490 <fail>
+ 800039c:	270e      	movs	r7, #14
+ 800039e:	f04f 3055 	mov.w	r0, #1431655765	@ 0x55555555
+ 80003a2:	6020      	str	r0, [r4, #0]
+ 80003a4:	f64c 20fe 	movw	r0, #51966	@ 0xcafe
+ 80003a8:	42a4      	cmp	r4, r4
+ 80003aa:	bf18      	it	ne
+ 80003ac:	e8d4 0fcf 	ldaexbne	r0, [r4]
+ 80003b0:	f64c 26fe 	movw	r6, #51966	@ 0xcafe
+ 80003b4:	42b0      	cmp	r0, r6
+ 80003b6:	d16b      	bne.n	8000490 <fail>
+ 80003b8:	2100      	movs	r1, #0
+ 80003ba:	e8c4 2fc1 	stlexb	r1, r2, [r4]
+ 80003be:	f04f 0601 	mov.w	r6, #1
+ 80003c2:	42b1      	cmp	r1, r6
+ 80003c4:	d164      	bne.n	8000490 <fail>
+ 80003c6:	6820      	ldr	r0, [r4, #0]
+ 80003c8:	f04f 3655 	mov.w	r6, #1431655765	@ 0x55555555
+ 80003cc:	42b0      	cmp	r0, r6
+ 80003ce:	d15f      	bne.n	8000490 <fail>
+ 80003d0:	270f      	movs	r7, #15
+ 80003d2:	e8d4 0fef 	ldaex	r0, [r4]
+ 80003d6:	f64c 21fe 	movw	r1, #51966	@ 0xcafe
+ 80003da:	42a4      	cmp	r4, r4
+ 80003dc:	bf18      	it	ne
+ 80003de:	e8c4 2fe1 	stlexne	r1, r2, [r4]
+ 80003e2:	f64c 26fe 	movw	r6, #51966	@ 0xcafe
+ 80003e6:	42b1      	cmp	r1, r6
+ 80003e8:	d152      	bne.n	8000490 <fail>
+ 80003ea:	6820      	ldr	r0, [r4, #0]
+ 80003ec:	f04f 3655 	mov.w	r6, #1431655765	@ 0x55555555
+ 80003f0:	42b0      	cmp	r0, r6
+ 80003f2:	d14d      	bne.n	8000490 <fail>
+ 80003f4:	42a4      	cmp	r4, r4
+ 80003f6:	bf08      	it	eq
+ 80003f8:	e8c4 2fe1 	stlexeq	r1, r2, [r4]
+ 80003fc:	f04f 0600 	mov.w	r6, #0
+ 8000400:	42b1      	cmp	r1, r6
+ 8000402:	d145      	bne.n	8000490 <fail>
+ 8000404:	6820      	ldr	r0, [r4, #0]
+ 8000406:	f04f 36aa 	mov.w	r6, #2863311530	@ 0xaaaaaaaa
+ 800040a:	42b0      	cmp	r0, r6
+ 800040c:	d140      	bne.n	8000490 <fail>
+ 800040e:	2710      	movs	r7, #16
+ 8000410:	f04f 3055 	mov.w	r0, #1431655765	@ 0x55555555
+ 8000414:	6020      	str	r0, [r4, #0]
+ 8000416:	42a4      	cmp	r4, r4
+ 8000418:	bf1c      	itt	ne
+ 800041a:	e8c4 2f8f 	stlbne	r2, [r4]
+ 800041e:	e8c4 2faf 	stlne	r2, [r4]
+ 8000422:	6820      	ldr	r0, [r4, #0]
+ 8000424:	f04f 3655 	mov.w	r6, #1431655765	@ 0x55555555
+ 8000428:	42b0      	cmp	r0, r6
+ 800042a:	d131      	bne.n	8000490 <fail>
+ 800042c:	2711      	movs	r7, #17
+ 800042e:	e8d4 0fef 	ldaex	r0, [r4]
+ 8000432:	df00      	svc	0
+ 8000434:	2100      	movs	r1, #0
+ 8000436:	e8c4 2fe1 	stlex	r1, r2, [r4]
+ 800043a:	f04f 0601 	mov.w	r6, #1
+ 800043e:	42b1      	cmp	r1, r6
+ 8000440:	d126      	bne.n	8000490 <fail>
+ 8000442:	6820      	ldr	r0, [r4, #0]
+ 8000444:	f04f 3655 	mov.w	r6, #1431655765	@ 0x55555555
+ 8000448:	42b0      	cmp	r0, r6
+ 800044a:	d121      	bne.n	8000490 <fail>
+ 800044c:	2712      	movs	r7, #18
+ 800044e:	f04f 0000 	mov.w	r0, #0
+ 8000452:	6020      	str	r0, [r4, #0]
+ 8000454:	f000 f826 	bl	80004a4 <try_lock>
+ 8000458:	f04f 0601 	mov.w	r6, #1
+ 800045c:	42b0      	cmp	r0, r6
+ 800045e:	d117      	bne.n	8000490 <fail>
+ 8000460:	f000 f820 	bl	80004a4 <try_lock>
+ 8000464:	f04f 0600 	mov.w	r6, #0
+ 8000468:	42b0      	cmp	r0, r6
+ 800046a:	d111      	bne.n	8000490 <fail>
+ 800046c:	2100      	movs	r1, #0
+ 800046e:	e8c4 1f8f 	stlb	r1, [r4]
+ 8000472:	f000 f817 	bl	80004a4 <try_lock>
+ 8000476:	f04f 0601 	mov.w	r6, #1
+ 800047a:	42b0      	cmp	r0, r6
+ 800047c:	d108      	bne.n	8000490 <fail>
+ 800047e:	6820      	ldr	r0, [r4, #0]
+ 8000480:	f04f 0601 	mov.w	r6, #1
+ 8000484:	42b0      	cmp	r0, r6
+ 8000486:	d103      	bne.n	8000490 <fail>
+ 8000488:	4822      	ldr	r0, [pc, #136]	@ (8000514 <Fault_Handler+0x4e>)
+ 800048a:	4923      	ldr	r1, [pc, #140]	@ (8000518 <Fault_Handler+0x52>)
+ 800048c:	6008      	str	r0, [r1, #0]
+ 800048e:	e004      	b.n	800049a <done>
+
+08000490 <fail>:
+ 8000490:	4822      	ldr	r0, [pc, #136]	@ (800051c <Fault_Handler+0x56>)
+ 8000492:	4921      	ldr	r1, [pc, #132]	@ (8000518 <Fault_Handler+0x52>)
+ 8000494:	6008      	str	r0, [r1, #0]
+ 8000496:	4922      	ldr	r1, [pc, #136]	@ (8000520 <Fault_Handler+0x5a>)
+ 8000498:	600f      	str	r7, [r1, #0]
+
+0800049a <done>:
+ 800049a:	f04f 0018 	mov.w	r0, #24
+ 800049e:	4921      	ldr	r1, [pc, #132]	@ (8000524 <Fault_Handler+0x5e>)
+ 80004a0:	beab      	bkpt	0x00ab
+ 80004a2:	e7fe      	b.n	80004a2 <done+0x8>
+
+080004a4 <try_lock>:
+ 80004a4:	e8d4 3fcf 	ldaexb	r3, [r4]
+ 80004a8:	b943      	cbnz	r3, 80004bc <try_lock+0x18>
+ 80004aa:	2101      	movs	r1, #1
+ 80004ac:	e8c4 1f43 	strexb	r3, r1, [r4]
+ 80004b0:	2b00      	cmp	r3, #0
+ 80004b2:	d1f7      	bne.n	80004a4 <try_lock>
+ 80004b4:	f3bf 8f5f 	dmb	sy
+ 80004b8:	2001      	movs	r0, #1
+ 80004ba:	4770      	bx	lr
+ 80004bc:	f3bf 8f2f 	clrex
+ 80004c0:	2000      	movs	r0, #0
+ 80004c2:	4770      	bx	lr
+
+080004c4 <SVC_Handler>:
+ 80004c4:	4770      	bx	lr
+
+080004c6 <Fault_Handler>:
+ 80004c6:	f447 7780 	orr.w	r7, r7, #256	@ 0x100
+ 80004ca:	e7e1      	b.n	8000490 <fail>
+ 80004cc:	20020000 	.word	0x20020000
+ 80004d0:	08000000 	.word	0x08000000
+ 80004d4:	e000ed08 	.word	0xe000ed08
+ 80004d8:	20000200 	.word	0x20000200
+ 80004dc:	818283f4 	.word	0x818283f4
+ 80004e0:	12345601 	.word	0x12345601
+ 80004e4:	81828301 	.word	0x81828301
+ 80004e8:	aabbcc00 	.word	0xaabbcc00
+ 80004ec:	81828300 	.word	0x81828300
+ 80004f0:	123456a5 	.word	0x123456a5
+ 80004f4:	818283a5 	.word	0x818283a5
+ 80004f8:	8182f3f4 	.word	0x8182f3f4
+ 80004fc:	1234beef 	.word	0x1234beef
+ 8000500:	8182beef 	.word	0x8182beef
+ 8000504:	600df00d 	.word	0x600df00d
+ 8000508:	0badf00d 	.word	0x0badf00d
+ 800050c:	11223344 	.word	0x11223344
+ 8000510:	ffff3344 	.word	0xffff3344
+ 8000514:	cafecafe 	.word	0xcafecafe
+ 8000518:	20000100 	.word	0x20000100
+ 800051c:	deaddead 	.word	0xdeaddead
+ 8000520:	20000104 	.word	0x20000104
+ 8000524:	00020026 	.word	0x00020026

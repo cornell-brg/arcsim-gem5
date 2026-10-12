@@ -4,3 +4,8 @@ SimObject('RP2350SIO.py', sim_objects=['RP2350SIO'])
 Source('rp2350_sio.cc')
 
 DebugFlag('RP2350SIO')
+
+SimObject('RP2350DMA.py', sim_objects=['RP2350DMA'])
+Source('rp2350_dma.cc')
+
+DebugFlag('RP2350DMA')

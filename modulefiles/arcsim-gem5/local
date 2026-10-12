@@ -1,7 +1,9 @@
 #%Module1.0
 
 # The arcsim gem5 fork in this clone. Computes its root from its own location,
-# since a clone can live anywhere. arcsim-bench runs build/ARM/gem5.opt from it.
+# since a clone can live anywhere. ARCSIM_GEM5_ARM and ARCSIM_GEM5_RISCV name the
+# binaries arcsim-bench and arcsim-core run; set either to another build of this
+# clone (build/ARM_ARCSIM/gem5.opt, say) to use it instead.
 
 module-whatis "arcsim gem5 fork (local clone)"
 
@@ -10,3 +12,5 @@ conflict arcsim-gem5
 set root [file normalize [file join [file dirname $ModulesCurrentModulefile] .. ..]]
 
 setenv ARCSIM_GEM5_HOME $root
+setenv ARCSIM_GEM5_ARM   $root/build/ARM/gem5.opt
+setenv ARCSIM_GEM5_RISCV $root/build/RISCV/gem5.opt

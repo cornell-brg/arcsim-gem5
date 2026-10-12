@@ -8,7 +8,7 @@ from m5.objects import Root
 from m5.stats import dump as stats_dump
 from m5.stats import reset as stats_reset
 
-from board import SCRATCH_BANK_BANDWIDTH, make_board
+from board import SCRATCH_BANK_BANDWIDTH, make_board, memory_models
 
 
 parser = argparse.ArgumentParser()
@@ -17,11 +17,18 @@ parser.add_argument("--core", choices=("arm-m4-proxy", "hazard3-proxy"),
 parser.add_argument("--firmware", type=Path, required=True)
 parser.add_argument("--xip-miss-ns", type=int, default=50)
 parser.add_argument("--xip-hit-latency-cycles", type=int, default=1,
-                    help="Set both parallel XIP cache tag and data latency")
+                    help="Set both parallel XIP cache tag and data latency, "
+                    "in cycles of the cache's 10 GHz clock")
 parser.add_argument("--xip-replacement", choices=("lru", "random"),
                     default="lru")
 parser.add_argument("--sram-latency-ns", type=int, default=1)
-parser.add_argument("--sram-model", choices=("legacy", "banked"), default="legacy",
+parser.add_argument("--model", choices=("legacy", "accurate"),
+                    default="legacy",
+                    help="The memory system: accurate is the banked SRAM, the "
+                    "DMA controller and the qmi XIP model, timed against a "
+                    "Pico 2; --sram-model, --dma and --xip-model each choose "
+                    "one part and override it")
+parser.add_argument("--sram-model", choices=("legacy", "banked"),
                     help="Banked selects clocked 32-bit SRAM service; legacy timing knobs apply only to legacy")
 parser.add_argument("--scratch-bank-bandwidth",
                     default=SCRATCH_BANK_BANDWIDTH)
@@ -32,8 +39,14 @@ parser.add_argument("--arm-divider", choices=("m4", "rp2350-m33"),
                     default="rp2350-m33")
 parser.add_argument("--arm-timing", choices=("tuned", "pre-tuning"),
                     default="tuned",
-                    help="CortexM4CPU timing as tuned against the STM32G474, or as "
-                    "it was before that tuning")
+                    help="CortexM33CPU timing, tuned against a Pico 2, or the "
+                    "CortexM4CPU's as it was before its tuning against the "
+                    "STM32G474")
+parser.add_argument("--dma", action=argparse.BooleanOptionalAction,
+                    help="Add the DMA controller")
+parser.add_argument("--xip-model", choices=("legacy", "qmi"),
+                    help="qmi selects the cache banks and flash interface "
+                    "timing of a Pico 2; the XIP knobs apply only to legacy")
 parser.add_argument("--tick-limit", type=int, default=10_000_000_000)
 args = parser.parse_args()
 if not args.firmware.is_file():
@@ -42,6 +55,8 @@ if (args.xip_miss_ns < 0 or args.sram_latency_ns < 0
         or args.xip_hit_latency_cycles < 0):
     parser.error("Memory delays must be nonnegative")
 
+args.sram_model, args.dma, args.xip_model = memory_models(
+    args.model, args.sram_model, args.dma, args.xip_model)
 board = make_board(
     args.core, str(args.firmware.resolve()),
     xip_miss_ns=args.xip_miss_ns,
@@ -51,22 +66,29 @@ board = make_board(
     arm_divider=args.arm_divider,
     sram_model=args.sram_model,
     arm_timing=args.arm_timing,
+    dma=args.dma,
+    xip_model=args.xip_model,
 )
-board.xip_cache.tag_latency = args.xip_hit_latency_cycles
-board.xip_cache.data_latency = args.xip_hit_latency_cycles
-if args.xip_replacement == "random":
-    from m5.objects import RandomRP
-    board.xip_cache.replacement_policy = RandomRP()
+if args.xip_model == "legacy":
+    board.xip_cache.tag_latency = args.xip_hit_latency_cycles
+    board.xip_cache.data_latency = args.xip_hit_latency_cycles
+    if args.xip_replacement == "random":
+        from m5.objects import RandomRP
+        board.xip_cache.replacement_policy = RandomRP()
 board.exit_on_work_items = True
 root = Root(full_system=True, system=board)
 m5.instantiate()
 print(f"RP2350 core={args.core} cpu_id=0 clock=150MHz")
 print("XIP=0x10000000+4MiB cache=16KiB/2-way/8B")
-print(f"XIP cache tag/data latency={args.xip_hit_latency_cycles} cycles; "
-      f"replacement={args.xip_replacement}; QMI delay={args.xip_miss_ns} ns")
+if args.xip_model == "qmi":
+    print("XIP model=qmi: two cache banks, flash interface timing of a Pico 2")
+else:
+    print(f"XIP cache tag/data latency={args.xip_hit_latency_cycles} cycles; "
+          f"replacement={args.xip_replacement}; "
+          f"QMI delay={args.xip_miss_ns} ns")
 print("SRAM=0x20000000+512KiB group windows, 0x20080000/0x20081000+4KiB")
 if args.sram_model == "banked":
-    print("SRAM model=banked: ten banks, 32-bit grants at 150MHz, one-cycle response")
+    print("SRAM model=banked: ten banks, 32-bit grants at 150MHz, zero wait states")
 else:
     print(f"SRAM model=legacy; scratch bank effective bandwidth={args.scratch_bank_bandwidth}")
 roi_start = None

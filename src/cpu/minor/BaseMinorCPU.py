@@ -97,6 +97,18 @@ class MinorFUTiming(SimObject):
         " functional unit.  For mem refs, if this is 0, the result's time"
         " is marked as unpredictable and no forwarding can take place.",
     )
+    extraIssueLat = Param.Cycles(
+        0,
+        "extra cycles, beyond the functional unit's issueLat, before the"
+        " unit takes another inst. after this one",
+    )
+    resultUsePenalty = Param.Cycles(
+        0,
+        "cycles an inst. that reads this inst.'s results is held back,"
+        " counted from when this inst. completes, however long that took"
+        " (0: none).  A reader whose srcRegsRelativeLats entry for that"
+        " register is larger than its others by as much is not held back",
+    )
     srcRegsRelativeLats = VectorParam.Cycles(
         "the maximum number of cycles"
         " after inst. issue that each src reg can be available for this"
@@ -352,6 +364,54 @@ class BaseMinorCPU(BaseCPU):
         " stream, and starts the new stream if Execute takes the branch, as"
         " on cores that compute direct targets in decode",
     )
+    fetchBranchSpeculation = Param.Bool(
+        False,
+        "With fetchBranchTargetAtDecode: the target lines of two branches"
+        " Execute has yet to complete are kept, the second only behind a"
+        " conditional branch, where otherwise each decoded branch's target"
+        " fetch replaces the last.  The line after a squash-after"
+        " instruction is fetched in the same way.  Nothing more of the"
+        " sequential stream is fetched once an unconditional branch has"
+        " been decoded.  A target line, and what is fetched of the stream"
+        " behind any other branch Execute has yet to complete, is fetched"
+        " on speculation: its request is flagged a prefetch, which the"
+        " memory system may decline with an error, and a declined line is"
+        " fetched again once it is sure to be wanted",
+    )
+    fetchRegisterTargetAtDecode = Param.Bool(
+        False,
+        "With fetchBranchTargetAtDecode: a branch to the value of its one"
+        " source register also has its target line fetched in its Decode"
+        " cycle, when every older instruction has been issued and none"
+        " still has that register to write",
+    )
+    fetchFoldMasks = VectorParam.UInt64(
+        [],
+        "With fetchFoldMatches and fetchFoldKinds: instructions that take"
+        " no cycle of their own beside a 16-bit neighbour (folding, or"
+        " limited dual issue): one in the same fetched word, or the last of"
+        " the word before if that one was not branched to.  Nothing folds"
+        " into an instruction of several micro-ops, nor a branch into a"
+        " branch.  The patterns are tested in order, and the first with"
+        " (ext_mach_inst & mask) == match gives the instruction's kind",
+    )
+    fetchFoldMatches = VectorParam.UInt64([], "see fetchFoldMasks")
+    fetchFoldKinds = VectorParam.Unsigned(
+        [],
+        "see fetchFoldMasks: 0 for an instruction that does not fold, 1 for"
+        " one that folds into the 16-bit instruction before it, 2 for one"
+        " that folds into the 16-bit instruction after it.  Needs"
+        " decodeInputWidth and executeInputWidth of at least 2",
+    )
+    fetchReadAheadLimit = Param.Unsigned(
+        0,
+        "With singleFetchStage: no sequential fetch starts while this many"
+        " bytes of the stream, or more, are fetched or on their way and not"
+        " yet decoded (0: no limit), as a core whose prefetch buffer holds"
+        " a few bytes.  Decode never waits for a line it would not have"
+        " waited for without the limit if this is at least the bytes it"
+        " can take in the cycles a fetch needs",
+    )
     fetch1FetchLimit = Param.Unsigned(
         1, "Number of line fetches allowable in flight at once"
     )
@@ -479,6 +539,15 @@ class BaseMinorCPU(BaseCPU):
         " pipeline.  Micro-ops after the first of a macro-op follow it",
     )
 
+    executeWaitedStoreHoldsInsts = Param.Bool(
+        False,
+        "A store sent to memory that is not answered within its cycle keeps"
+        " Execute from committing or issuing until it is, as on a core with"
+        " no write buffer, whose pipeline stalls while its bus makes a store"
+        " wait.  The store buffer then sends a store in the cycle the store"
+        " commits, the cycle of its address phase",
+    )
+
     executeDynamicLatencyHoldsInst = Param.Bool(
         False,
         "An FU's data-dependent extra latency (dynamicExtraLatency, e.g. an"
@@ -493,7 +562,37 @@ class BaseMinorCPU(BaseCPU):
         "A single-cycle branch or squash-after instruction that issues with"
         " nothing older in flight changes the stream in its issue cycle"
         " rather than one cycle later, as on cores that redirect fetch from"
-        " the execute cycle",
+        " the execute cycle.  So does a single-cycle instruction with a"
+        " branch folded into it (fetchFoldMasks) that reads nothing the"
+        " instruction writes, and the branch with it",
+    )
+
+    executeFreeUpdateMicroops = Param.Bool(
+        False,
+        "A micro-op after its macro-op's first that only does integer"
+        " arithmetic (the base register update of a load or store multiple)"
+        " takes no cycle of its own: Decode passes it on with the micro-op"
+        " before it and nothing else shares a Decode output, and Execute"
+        " issues it with that micro-op, beyond its issue limits.  Needs"
+        " executeInputWidth of at least 2",
+    )
+
+    executeLoadAccessAtIssue = Param.Bool(
+        False,
+        "A load issued to a single-cycle FU goes to memory in its issue"
+        " cycle rather than one cycle later, when nothing it has to wait"
+        " for is still in flight: answered within that cycle, it completes"
+        " in the next, as on cores whose load takes one cycle",
+    )
+
+    executeAlignedTransfers = Param.Bool(
+        False,
+        "An access takes a cycle for each naturally aligned bus transfer of"
+        " up to 4 bytes it is made as, and nothing issues in the cycles"
+        " after its first: a load one transfer for each 32-bit word it"
+        " touches, a store one for each aligned piece (3 for a word one"
+        " byte past a word boundary), as on cores that split unaligned"
+        " accesses, and those of more than a word, on a 32-bit bus",
     )
 
     enableIdling = Param.Bool(

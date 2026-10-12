@@ -65,11 +65,19 @@ Decode::Decode(const std::string &name,
     nextStageReserve(next_stage_input_buffer),
     outputWidth(params.executeInputWidth),
     processMoreThanOneInput(params.decodeCycleInput),
+    freeUpdateMicroops(params.executeFreeUpdateMicroops),
+    packFreeInsts(params.executeFreeUpdateMicroops ||
+        !params.fetchFoldMasks.empty()),
     decodeInfo(params.numThreads),
     threadPriority(0)
 {
     if (outputWidth < 1)
         fatal("%s: executeInputWidth must be >= 1 (%d)\n", name, outputWidth);
+
+    if (freeUpdateMicroops && outputWidth < 2) {
+        fatal("%s: executeFreeUpdateMicroops needs executeInputWidth >= 2"
+            " (%d)\n", name, outputWidth);
+    }
 
     if (params.decodeInputBufferSize < 1) {
         fatal("%s: decodeInputBufferSize must be >= 1 (%d)\n", name,
@@ -140,6 +148,17 @@ dynInstAddTracing(MinorDynInstPtr inst, StaticInstPtr static_inst,
 }
 #endif
 
+bool
+Decode::isFreeUpdate(const StaticInstPtr &static_inst)
+{
+    return static_inst->isMicroop() && !static_inst->isFirstMicroop() &&
+        static_inst->opClass() == IntAluOp && !static_inst->isMemRef() &&
+        !static_inst->isControl() && !static_inst->isDirectCtrl() &&
+        !static_inst->isIndirectCtrl() && !static_inst->isCondCtrl() &&
+        !static_inst->isUncondCtrl() && !static_inst->isSquashAfter() &&
+        !static_inst->isSerializing();
+}
+
 void
 Decode::evaluate()
 {
@@ -177,6 +196,8 @@ Decode::evaluate()
         const ForwardInstData *insts_in = getInput(tid);
 
         unsigned int output_index = 0;
+        /* Instructions in the output that take a cycle */
+        unsigned int output_costed = 0;
 
         /* Pack instructions into the output while we can.  This may involve
          * using more than one input line */
@@ -197,6 +218,14 @@ Decode::evaluate()
 
                 decode_info.inputIndex++;
                 decode_info.inMacroop = false;
+            } else if (packFreeInsts && output_costed != 0 &&
+                !inst->freeMicroop &&
+                !(freeUpdateMicroops && decode_info.inMacroop &&
+                    isFreeUpdate(inst->staticInst->fetchMicroop(
+                        decode_info.microopPC->microPC()))))
+            {
+                /* One instruction that takes a cycle to an output */
+                break;
             } else {
                 StaticInstPtr static_inst = inst->staticInst;
                 /* Static inst of a macro-op above the output_inst */
@@ -236,6 +265,8 @@ Decode::evaluate()
                         new MinorDynInst(static_micro_inst, inst->id);
                     set(output_inst->pc, decode_info.microopPC);
                     output_inst->fault = NoFault;
+                    output_inst->freeMicroop = freeUpdateMicroops &&
+                        isFreeUpdate(static_micro_inst);
 
                     /* Allow a predicted next address only on the last
                      *  microop */
@@ -293,6 +324,8 @@ Decode::evaluate()
                 /* Push into output */
                 insts_out.insts[output_index] = output_inst;
                 output_index++;
+                if (!output_inst->freeMicroop)
+                    output_costed++;
             }
 
             /* Have we finished with the input? */
@@ -308,6 +341,19 @@ Decode::evaluate()
                     DPRINTF(Decode, "Wrapping\n");
                     insts_in = getInput(tid);
                 }
+            }
+        }
+
+        /* Bubbles that pad the input hold nothing back */
+        while (insts_in && !decode_info.inMacroop &&
+            decode_info.inputIndex < insts_in->width() &&
+            insts_in->insts[decode_info.inputIndex]->isBubble())
+        {
+            decode_info.inputIndex++;
+
+            if (decode_info.inputIndex == insts_in->width()) {
+                popInput(tid);
+                insts_in = NULL;
             }
         }
 

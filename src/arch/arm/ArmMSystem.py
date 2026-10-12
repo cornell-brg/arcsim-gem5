@@ -52,6 +52,7 @@ from m5.params import *
 #   has(M_PROFILE_ARMV6M)   -> base Thumb subset
 #   has(M_PROFILE_ARMV7M)   -> full Thumb-2, BASEPRI, FAULTMASK, IT
 #   has(M_PROFILE_ARMV7EM)  -> DSP instruction base encoding space
+#   has(M_PROFILE_ARMV8M)   -> load-acquire, store-release (LDA, STL, LDAEX, STLEX)
 #   has(M_PROFILE_DSP)      -> DSP/SIMD packed arithmetic
 #   has(M_PROFILE_FPU_SP)   -> single-precision FP instructions
 #   has(M_PROFILE_FPU_DP)   -> double-precision FP instructions
@@ -149,14 +150,17 @@ class ArmMReleaseCortexM33(ArmMReleaseCortexM4):
     Cortex-M33 — ARMv8-M Mainline with DSP + single-precision FPv5.
 
     The M4's instruction set plus the FPv5 additions (VSEL, VMAXNM/VMINNM,
-    VRINT, VCVTA/N/P/M); its FPU has no double precision. The RP2350's Arm
-    cores.
+    VRINT, VCVTA/N/P/M) and ARMv8-M's load-acquire and store-release
+    instructions; its FPU has no double precision. The RP2350's Arm cores.
 
     Reference: DDI0553 (Armv8-M Architecture Reference Manual),
                100230 (Cortex-M33 Technical Reference Manual)
     """
 
-    extensions = ArmMReleaseCortexM4.extensions + ["M_PROFILE_FPV5"]
+    extensions = ArmMReleaseCortexM4.extensions + [
+        "M_PROFILE_FPV5",
+        "M_PROFILE_ARMV8M",
+    ]
 
 
 class ArmMSystem(System):

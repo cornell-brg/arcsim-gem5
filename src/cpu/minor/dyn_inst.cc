@@ -93,7 +93,7 @@ MinorDynInst::isLastOpInInst() const
 bool
 MinorDynInst::isNoCostInst() const
 {
-    return isInst() && staticInst->opClass() == No_OpClass;
+    return isInst() && (freeMicroop || staticInst->opClass() == No_OpClass);
 }
 
 void

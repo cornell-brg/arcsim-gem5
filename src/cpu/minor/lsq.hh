@@ -166,6 +166,10 @@ class LSQ : public Named
         /** Address translation is delayed due to table walk */
         bool isTranslationDelayed;
 
+        /** When memory first took a packet of this store from the store
+         *  buffer; MaxTick before that */
+        Tick storeSentTick = MaxTick;
+
         enum LSQRequestState
         {
             NotIssued, /* Newly created */
@@ -527,6 +531,10 @@ class LSQ : public Named
         /** Drained if there is absolutely nothing left in the buffer */
         bool isDrained() const { return slots.empty(); }
 
+        /** Is a store that was sent to memory in an earlier cycle still
+         *  without its answer? */
+        bool hasWaitedStore() const;
+
         /** Try to issue more stores to memory */
         void step();
 
@@ -650,7 +658,8 @@ class LSQ : public Named
         unsigned int max_accesses_in_memory_system, unsigned int line_width,
         unsigned int requests_queue_size, unsigned int transfers_queue_size,
         unsigned int store_buffer_size,
-        unsigned int store_buffer_cycle_store_limit);
+        unsigned int store_buffer_cycle_store_limit,
+        bool waited_store_holds_insts);
 
     virtual ~LSQ();
 
@@ -689,6 +698,14 @@ class LSQ : public Named
 
     /** A store has been committed, please move it to the store buffer */
     void sendStoreToStoreBuffer(LSQRequestPtr request);
+
+    /** See executeWaitedStoreHoldsInsts in BaseMinorCPU.py */
+    const bool waitedStoreHoldsInsts;
+
+    /** Is the bus making a store wait, so that Execute must hold its
+     *  instructions this cycle? */
+    bool storeHoldsInsts() const
+    { return waitedStoreHoldsInsts && storeBuffer.hasWaitedStore(); }
 
     /** Are there any accesses other than normal cached loads in the
      *  memory system or having received responses which need to be

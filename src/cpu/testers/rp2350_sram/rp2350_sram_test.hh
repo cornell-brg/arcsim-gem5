@@ -31,6 +31,8 @@ class RP2350SRAMTest : public ClockedObject
     };
     std::vector<std::unique_ptr<TestPort>> ports;
     const std::string scenario;
+    const Tick sramWindow;
+    const Tick sramLatency;
     RequestorID requestor;
     EventFunctionWrapper stepEvent;
     EventFunctionWrapper retryEvent;

@@ -10,4 +10,6 @@ class RP2350SRAMTest(ClockedObject):
     cxx_class = "gem5::RP2350SRAMTest"
     port = VectorRequestPort("Two independent test managers")
     scenario = Param.String("same", "Deterministic SRAM regression scenario")
+    sram_window = Param.Latency("500ps", "The SRAM's window parameter")
+    sram_latency = Param.Latency("1ns", "The SRAM's latency parameter")
     system = Param.System(Parent.any, "Test system")

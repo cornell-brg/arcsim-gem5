@@ -91,6 +91,25 @@ class Fetch2 : public Named
      *  there is room in the output to contain its processed data */
     bool processMoreThanOneInput;
 
+    /** See fetchFoldMasks in BaseMinorCPU.py */
+    std::vector<uint64_t> foldMasks;
+    std::vector<uint64_t> foldMatches;
+    std::vector<unsigned int> foldKinds;
+
+    /** How static_inst folds: 0 not at all, 1 into the 16-bit instruction
+     *  before it, 2 into the one after it */
+    unsigned int foldKind(const StaticInstPtr &static_inst) const;
+
+    /** Does next fold into first, the 16-bit instruction before it?  Not
+     *  into one of several micro-ops, whose last has no room beside it,
+     *  nor a branch into a branch */
+    bool foldsInto(const StaticInstPtr &next,
+        const StaticInstPtr &first) const;
+
+    /** The next instruction of the line being decoded, if all of it is in
+     *  that line, and its size, without taking it; null otherwise */
+    StaticInstPtr peekNext(ThreadID tid, Addr &size);
+
     /** Branch predictor passed from Python configuration */
     branch_prediction::BPredUnit &branchPredictor;
 
@@ -254,13 +273,34 @@ class SingleStageFetch2 : public Fetch2
     /** See fetchBranchTargetAtDecode in BaseMinorCPU.py */
     bool branchTargetAtDecode;
 
+    /** See fetchBranchSpeculation in BaseMinorCPU.py */
+    bool branchSpeculation;
+
   public:
-    /** Target of the direct branch decoded this cycle, to be fetched
-     *  next cycle */
+    /** See fetchRegisterTargetAtDecode in BaseMinorCPU.py */
+    bool registerTargetAtDecode;
+
+  public:
+    /** The oldest unconditional branch decoded in this stream, which
+     *  ends the stream's sequential fetches; null if none */
+    MinorDynInstPtr sureBranch;
+
+    /** The youngest branch decoded in this stream; null if none */
+    MinorDynInstPtr lastBranch;
+
+    /** The direct branch decoded this cycle and its target, to be
+     *  fetched next cycle */
     std::unique_ptr<PCStateBase> decodedBranchTarget;
+    MinorDynInstPtr decodedBranch;
     ThreadID decodedBranchTid;
 
+    /** The branch to a register's value decoded last, whose target is
+     *  still to be fetched, and the cycles left to try in; null if none */
+    MinorDynInstPtr decodedRegisterBranch;
+    unsigned int decodedRegisterTries = 0;
+
     bool targetAtDecode() const { return branchTargetAtDecode; }
+    bool registerAtDecode() const { return registerTargetAtDecode; }
 
   public:
     SingleStageFetch2(const std::string &name,
@@ -302,6 +342,12 @@ class SingleStageFetch2 : public Fetch2
      *  modeling the Cortex-M4's ability to detect branches in the
      *  32-bit fetch word during decode [DDI0439D §3.3]. */
     bool scanNextForBranch();
+
+    /** If the instructions being decoded are of the stream and prediction
+     *  given, set addr to the address of the next to decode and return
+     *  true */
+    bool decodeAddr(ThreadID tid, InstSeqNum stream_seq_num,
+        InstSeqNum prediction_seq_num, Addr &addr) const;
 
     /** Check if the next stage (Decode) is blocked. */
     bool isNextStageBlocked(ThreadID tid) const {

@@ -119,6 +119,19 @@ class Execute : public Named
      *  effect in the cycle it issues when nothing older is in flight */
     bool branchAtIssue;
 
+    /** See executeLoadAccessAtIssue in BaseMinorCPU.py */
+    bool loadAccessAtIssue;
+
+    /** See executeAlignedTransfers in BaseMinorCPU.py */
+    bool alignedTransfers;
+
+    /** Nothing issues before this cycle: an access of several bus
+     *  transfers is still making them */
+    Cycles issueHeldUntil{0};
+
+    /** The commit pass for instructions issued this cycle is running */
+    bool committingAtIssue = false;
+
     /** See executeInOrderCompletion in BaseMinorCPU.py */
     bool inOrderCompletion;
 
@@ -244,6 +257,9 @@ class Execute : public Named
 
     std::vector<ExecuteThreadInfo> executeInfo;
 
+    /** See lastCompletedFetchSeqNum */
+    std::vector<InstSeqNum> lastCompleted;
+
     ThreadID interruptPriority;
     ThreadID issuePriority;
     ThreadID commitPriority;
@@ -353,6 +369,34 @@ class Execute : public Named
      *  under branchAtIssue */
     bool canCommitAtIssue(ThreadID thread_id, const MinorDynInstPtr &inst);
 
+  public:
+    /** Under alignedTransfers, hold issue for the bus transfers after
+     *  the first of an access now going to memory */
+    void holdIssueForTransfers(bool is_load, Addr addr, unsigned int size);
+
+  protected:
+
+    /** Is inst, the oldest in flight, followed by a branch folded into it
+     *  that reads nothing inst writes? */
+    bool leadsFoldedBranch(ThreadID thread_id, const MinorDynInstPtr &inst);
+
+    /** Can the load issued this cycle go to memory in the same cycle
+     *  under loadAccessAtIssue */
+    bool canAccessAtIssue(ThreadID thread_id);
+
+  public:
+    /** The fetch sequence number of the instruction to complete last */
+    InstSeqNum
+    lastCompletedFetchSeqNum(ThreadID thread_id) const
+    {
+        return lastCompleted[thread_id];
+    }
+
+    /** Has an instruction ahead of inst that writes reg yet to complete */
+    bool regWritePending(ThreadID thread_id, const RegId &reg,
+        const MinorDynInstPtr &inst);
+
+  protected:
     /** Set the drain state (with useful debugging messages) */
     void setDrainState(ThreadID thread_id, DrainState state);
 

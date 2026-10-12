@@ -3,7 +3,7 @@
 #
 # Two-phase checkpoint/restore test for M-profile SCS (Bug 19).
 #
-# Uses multiprocessing.Process to run two separate gem5 simulations
+# Uses forked multiprocessing processes to run two separate gem5 simulations
 # in the same script (gem5 cannot be re-initialized within one process).
 #
 # Phase 1 (child process): Run firmware that configures NVIC priorities,
@@ -22,10 +22,10 @@
 #       --firmware tests/gem5/m_profile_tests/programs/test_scs_checkpoint.elf
 
 import argparse
+import multiprocessing
 import os
 import re
 import sys
-from multiprocessing import Process
 
 import m5
 from m5 import debug as m5_debug
@@ -49,6 +49,11 @@ CHECKPOINT_TICK = 523776
 _EXIT_OK = 0
 _EXIT_FAIL = 1
 _EXIT_CHECKPOINT = 42
+
+# Each phase runs in a forked copy of this process.  A spawned child would
+# have to re-import this script, which gem5 runs as __m5_main__ and cannot
+# re-import.  Using a fork context keeps the global start method unchanged.
+_fork = multiprocessing.get_context("fork")
 
 
 def _build_system(firmware_path):
@@ -175,7 +180,7 @@ cpt_path = os.path.join(m5.options.outdir, "scs_test.cpt")
 
 # Phase 1: run firmware to checkpoint tick, save checkpoint
 print("=== Phase 1: Configure state and checkpoint ===")
-p1 = Process(target=_run_phase1, args=(args.firmware, cpt_path))
+p1 = _fork.Process(target=_run_phase1, args=(args.firmware, cpt_path))
 p1.start()
 p1.join()
 
@@ -186,7 +191,7 @@ if p1.exitcode != _EXIT_CHECKPOINT:
 
 # Phase 2: restore from checkpoint, firmware verifies exception chain
 print("=== Phase 2: Restore and verify ===")
-p2 = Process(target=_run_phase2, args=(args.firmware, cpt_path))
+p2 = _fork.Process(target=_run_phase2, args=(args.firmware, cpt_path))
 p2.start()
 p2.join()
 

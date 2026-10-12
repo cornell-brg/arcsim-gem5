@@ -461,6 +461,15 @@ class Queue : public Named, public Reservable
         return true;
     }
 
+    /** Call func on each element, oldest first */
+    template <typename Func>
+    void
+    forEach(Func func) const
+    {
+        for (const ElemType &elem : queue)
+            func(elem);
+    }
+
     /** Clear all allocated space.  Be careful how this is used */
     void clearReservedSpace() { numReservedSlots = 0; }
 
@@ -624,6 +633,17 @@ class InputBuffer : public Reservable
 
     /** No single element or queue entries */
     bool empty() const { return !elementPtr && queue.empty(); }
+
+    /** Call func on each element held, oldest first */
+    template <typename Func>
+    void
+    forEach(Func func) const
+    {
+        if (elementPtr)
+            func(*elementPtr);
+        else
+            queue.forEach(func);
+    }
 
     /** Return the element, or the front of the queue */
     const ElemType &front() const
