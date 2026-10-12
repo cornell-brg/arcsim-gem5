@@ -577,6 +577,16 @@ class BaseMinorCPU(BaseCPU):
         " in the next, as on cores whose load takes one cycle",
     )
 
+    executeAlignedTransfers = Param.Bool(
+        False,
+        "An access takes a cycle for each naturally aligned bus transfer of"
+        " up to 4 bytes it is made as, and nothing issues in the cycles"
+        " after its first: a load one transfer for each 32-bit word it"
+        " touches, a store one for each aligned piece (3 for a word one"
+        " byte past a word boundary), as on cores that split unaligned"
+        " accesses, and those of more than a word, on a 32-bit bus",
+    )
+
     enableIdling = Param.Bool(
         True, "Enable cycle skipping when the processor is idle\n"
     )
