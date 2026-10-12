@@ -779,6 +779,13 @@ Execute::issue(ThreadID thread_id)
 
                         /* Issue to FU */
                         fu->push(fu_inst);
+
+                        /* The FU stays busy longer for this inst. */
+                        if (timing && timing->extraIssueLat != Cycles(0)) {
+                            fu->nextInsertCycle = cpu.curCycle() +
+                                fu->description.issueLat +
+                                timing->extraIssueLat;
+                        }
                         /* And start the countdown on activity to allow
                          *  this instruction to get to the end of its FU */
                         cpu.activityRecorder->activity();

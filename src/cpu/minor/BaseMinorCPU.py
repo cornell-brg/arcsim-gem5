@@ -97,6 +97,11 @@ class MinorFUTiming(SimObject):
         " functional unit.  For mem refs, if this is 0, the result's time"
         " is marked as unpredictable and no forwarding can take place.",
     )
+    extraIssueLat = Param.Cycles(
+        0,
+        "extra cycles, beyond the functional unit's issueLat, before the"
+        " unit takes another inst. after this one",
+    )
     resultUsePenalty = Param.Cycles(
         0,
         "cycles an inst. that reads this inst.'s results is held back,"

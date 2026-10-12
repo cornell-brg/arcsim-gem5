@@ -128,6 +128,10 @@ class MinorFUTiming: public SimObject
      *  blocking following dependent instructions from issuing */
     Cycles extraAssumedLat;
 
+    /** Extra cycles, beyond the FU's issueLat, before the FU takes
+     *  another instruction after this one */
+    Cycles extraIssueLat;
+
     /** Cycles a reader of this instruction's results is held back, from
      *  when this instruction completes */
     Cycles resultUsePenalty;

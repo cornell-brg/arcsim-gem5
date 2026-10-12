@@ -51,6 +51,8 @@ _SHIFTED_REG_FLAGS = _t32(0xFE100000, 0xEA100000)
 _SHIFT_INSTS = _t32(0xFFEF0000, 0xEA4F0000)
 # VMOV from a single-precision register to a core register
 _VMOV_TO_CORE = _t32(0xFFF00F7F, 0xEE100A10)
+# VMRS APSR_nzcv, FPSCR
+_VMRS_FLAGS = _t32(0xFFFFFFFF, 0xEEF1FA10)
 
 # A 16-bit Thumb instruction in an ExtMachInst: thumb without bigThumb, the
 # instruction in bits 15:0.
@@ -160,8 +162,14 @@ class M33IntDivFU(DynamicLatencyIntDivFU):
     ]
 
 
-class M33FloatFU(MinorFU):
-    """FPv5 single-precision and DSP SIMD operations of one cycle.
+class M33FPU(MinorFU):
+    """The single-precision floating-point unit: FPv5 and DSP SIMD
+    operations, and loads and stores of the floating-point registers.
+
+    A floating-point instruction leaves the execute stage after one cycle
+    and integer instructions carry on behind it, but the unit takes no
+    other instruction, a load or store of its registers included, until
+    it is done with the one it has [RP2350 datasheet 3.7.4.9.10].
 
     The ARM ISA maps VFP single-precision Thumb instructions to SimdFloat*
     OpClasses (not Float*), so both families are listed."""
@@ -173,32 +181,57 @@ class M33FloatFU(MinorFU):
             "FloatCvt",
             "FloatMisc",
             "FloatMult",
+            "FloatMultAcc",
+            "FloatDiv",
+            "FloatSqrt",
+            "FloatMemRead",
+            "FloatMemWrite",
             "SimdFloatAdd",
             "SimdFloatAlu",
             "SimdFloatCmp",
             "SimdFloatCvt",
             "SimdFloatMisc",
             "SimdFloatMult",
+            "SimdFloatMultAcc",
+            "SimdFloatDiv",
+            "SimdFloatSqrt",
             "SimdAdd",
             "SimdAlu",
             "SimdCmp",
             "SimdMisc",
             "SimdMult",
+            "SimdMultAcc",
             "SimdShift",
             "SimdShiftAcc",
         ]
     )
     opLat = 1
     issueLat = 1
-    # VADD, VSUB and VMUL have a cycle of result delay, as has a move to a
-    # core register [RP2350 datasheet 3.7.4.9.10].
+    resultAfterCommit = True
     timings = [
+        # A loaded register can be used in the next cycle, unlike a core
+        # register (M33MemFU).
+        MinorFUTiming(
+            description="M33FMem",
+            srcRegsRelativeLats=[1],
+            extraAssumedLat=1,
+            opClasses=minorMakeOpClassSet(["FloatMemRead", "FloatMemWrite"]),
+        ),
+        # A move to a core register has a cycle of result delay.
         MinorFUTiming(
             description="M33FToCore",
             srcRegsRelativeLats=[1],
             resultUsePenalty=1,
             **_VMOV_TO_CORE,
         ),
+        # A move of the comparison flags to the core's takes two cycles.
+        MinorFUTiming(
+            description="M33FFlags",
+            srcRegsRelativeLats=[1],
+            extraCommitLat=1,
+            **_VMRS_FLAGS,
+        ),
+        # VADD, VSUB and VMUL have a cycle of result delay.
         MinorFUTiming(
             description="M33FArith",
             srcRegsRelativeLats=[1],
@@ -207,40 +240,33 @@ class M33FloatFU(MinorFU):
                 ["FloatAdd", "FloatMult", "SimdFloatAdd", "SimdFloatMult"]
             ),
         ),
-        MinorFUTiming(description="M33Float", srcRegsRelativeLats=[1]),
-    ]
-
-
-class M33FloatMacFU(MinorFU):
-    """VMLA, VFMA, VFMS, VNMLA, VNMLS: three cycles, not pipelined."""
-
-    opClasses = minorMakeOpClassSet(
-        ["FloatMultAcc", "SimdMultAcc", "SimdFloatMultAcc"]
-    )
-    opLat = 3
-    issueLat = 3
-    timings = [MinorFUTiming(description="M33FMac", srcRegsRelativeLats=[2])]
-
-
-class M33FloatDivFU(MinorFU):
-    """VDIV.F32 and VSQRT.F32: 14 cycles, not pipelined.
-
-    The divider works beside the pipeline: the instruction leaves the
-    execute stage after one cycle, later instructions that do not read
-    its result go ahead, and its result comes 14 cycles after issue, with
-    a cycle of result delay [RP2350 datasheet 3.7.4.9.10]. A second divide
-    waits for the first (issueLat)."""
-
-    opClasses = minorMakeOpClassSet(
-        ["FloatDiv", "FloatSqrt", "SimdFloatDiv", "SimdFloatSqrt"]
-    )
-    opLat = 1
-    issueLat = 14
-    resultAfterCommit = True
-    timings = [
+        # VMLA, VFMA and their kin occupy the unit for 3 cycles, with a
+        # cycle of result delay. The register accumulated onto, the first
+        # source, is not held back by the result delay of the instruction
+        # that wrote it.
         MinorFUTiming(
-            description="M33FDiv", srcRegsRelativeLats=[0], extraAssumedLat=15
-        )
+            description="M33FMac",
+            srcRegsRelativeLats=[2, 1],
+            extraIssueLat=2,
+            extraAssumedLat=2,
+            resultUsePenalty=1,
+            opClasses=minorMakeOpClassSet(
+                ["FloatMultAcc", "SimdMultAcc", "SimdFloatMultAcc"]
+            ),
+        ),
+        # VDIV and VSQRT occupy the unit for 14 cycles, with a cycle of
+        # result delay.
+        MinorFUTiming(
+            description="M33FDiv",
+            srcRegsRelativeLats=[0],
+            extraIssueLat=13,
+            extraAssumedLat=13,
+            resultUsePenalty=1,
+            opClasses=minorMakeOpClassSet(
+                ["FloatDiv", "FloatSqrt", "SimdFloatDiv", "SimdFloatSqrt"]
+            ),
+        ),
+        MinorFUTiming(description="M33Float", srcRegsRelativeLats=[1]),
     ]
 
 
@@ -267,20 +293,6 @@ class M33MemFU(MinorFU):
     ]
 
 
-class M33FloatMemFU(MinorFU):
-    """Loads and stores of the floating-point registers: as M33MemFU, but
-    a loaded register can be used in the next cycle."""
-
-    opClasses = minorMakeOpClassSet(["FloatMemRead", "FloatMemWrite"])
-    opLat = 1
-    issueLat = 1
-    timings = [
-        MinorFUTiming(
-            description="M33FMem", srcRegsRelativeLats=[1], extraAssumedLat=1
-        )
-    ]
-
-
 class M33MiscFU(MinorFU):
     """DMB, DSB, ISB, NOP, BKPT, system instructions."""
 
@@ -294,11 +306,8 @@ class CortexM33FUPool(MinorFUPool):
         M33IntAluFU(),
         M33IntMulFU(),
         M33IntDivFU(),
-        M33FloatFU(),
-        M33FloatMacFU(),
-        M33FloatDivFU(),
+        M33FPU(),
         M33MemFU(),
-        M33FloatMemFU(),
         M33MiscFU(),
     ]
 
@@ -400,10 +409,10 @@ class CortexM33CPU(ArmMMinorCPU):
     # A branch drives its target address in its execute cycle, so the
     # refill starts there rather than a cycle later at commit.
     executeBranchAtIssue = True
-    # One execute stage: a multi-cycle instruction (SDIV, VMLA, LDM, a load
+    # One execute stage: a multi-cycle instruction (SDIV, LDM, a load
     # the bus makes wait) holds up the next one, except that loads and
-    # stores pipeline behind each other and VDIV/VSQRT complete beside the
-    # pipeline (M33FloatDivFU).
+    # stores pipeline behind each other and the floating-point unit works
+    # beside the pipeline (M33FPU).
     executeInOrderCompletion = True
     # A load takes one cycle: its address phase is its execute cycle, and
     # the instruction behind it executes in its data phase [RP2350
