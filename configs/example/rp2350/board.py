@@ -339,17 +339,39 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     return board
 
 
+def memory_models(model, sram_model=None, dma=None, xip_model=None):
+    """(sram_model, dma, xip_model) for a board model, each as given or,
+    if None, as the model names it."""
+    if model not in ("legacy", "accurate"):
+        raise ValueError(f"Unknown board model: {model}")
+    accurate = model == "accurate"
+    if sram_model is None:
+        sram_model = "banked" if accurate else "legacy"
+    if dma is None:
+        dma = accurate
+    if xip_model is None:
+        xip_model = "qmi" if accurate else "legacy"
+    return sram_model, dma, xip_model
+
+
 def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                scratch_bank_bandwidth=SCRATCH_BANK_BANDWIDTH,
                arm_predictor="m4", arm_divider="rp2350-m33",
-               sram_model="legacy", arm_timing="tuned", dma=False,
-               xip_model="legacy"):
+               sram_model=None, arm_timing="tuned", dma=None,
+               xip_model=None, model="legacy"):
     """Return exactly one active core with the RP2350 memory baseline.
+
+    model names the memory system: "legacy" is the lumped SRAM windows and
+    the generic cache in front of flash; "accurate" is the banked SRAM, the
+    DMA controller and RP2350XIP, the models timed against a Pico 2.
+    sram_model, dma and xip_model each choose one part and override model.
 
     dma adds the DMA controller (RP2350DMA) at 0x50000000-0x50003fff; on the
     Hazard3 proxy its interrupt outputs are left unconnected. xip_model
     "qmi" replaces the generic cache and fixed miss delay in front of flash
     with RP2350XIP."""
+    sram_model, dma, xip_model = memory_models(model, sram_model, dma,
+                                                xip_model)
     if sram_model not in ("legacy", "banked"):
         raise ValueError(f"Unknown SRAM model: {sram_model}")
     if xip_model not in ("legacy", "qmi"):

@@ -8,7 +8,7 @@ from m5.objects import Root
 from m5.stats import dump as stats_dump
 from m5.stats import reset as stats_reset
 
-from board import SCRATCH_BANK_BANDWIDTH, make_board
+from board import SCRATCH_BANK_BANDWIDTH, make_board, memory_models
 
 
 parser = argparse.ArgumentParser()
@@ -22,7 +22,13 @@ parser.add_argument("--xip-hit-latency-cycles", type=int, default=1,
 parser.add_argument("--xip-replacement", choices=("lru", "random"),
                     default="lru")
 parser.add_argument("--sram-latency-ns", type=int, default=1)
-parser.add_argument("--sram-model", choices=("legacy", "banked"), default="legacy",
+parser.add_argument("--model", choices=("legacy", "accurate"),
+                    default="legacy",
+                    help="The memory system: accurate is the banked SRAM, the "
+                    "DMA controller and the qmi XIP model, timed against a "
+                    "Pico 2; --sram-model, --dma and --xip-model each choose "
+                    "one part and override it")
+parser.add_argument("--sram-model", choices=("legacy", "banked"),
                     help="Banked selects clocked 32-bit SRAM service; legacy timing knobs apply only to legacy")
 parser.add_argument("--scratch-bank-bandwidth",
                     default=SCRATCH_BANK_BANDWIDTH)
@@ -36,9 +42,9 @@ parser.add_argument("--arm-timing", choices=("tuned", "pre-tuning"),
                     help="CortexM33CPU timing, tuned against a Pico 2, or the "
                     "CortexM4CPU's as it was before its tuning against the "
                     "STM32G474")
-parser.add_argument("--dma", action="store_true",
+parser.add_argument("--dma", action=argparse.BooleanOptionalAction,
                     help="Add the DMA controller")
-parser.add_argument("--xip-model", choices=("legacy", "qmi"), default="legacy",
+parser.add_argument("--xip-model", choices=("legacy", "qmi"),
                     help="qmi selects the cache banks and flash interface "
                     "timing of a Pico 2; the XIP knobs apply only to legacy")
 parser.add_argument("--tick-limit", type=int, default=10_000_000_000)
@@ -49,6 +55,8 @@ if (args.xip_miss_ns < 0 or args.sram_latency_ns < 0
         or args.xip_hit_latency_cycles < 0):
     parser.error("Memory delays must be nonnegative")
 
+args.sram_model, args.dma, args.xip_model = memory_models(
+    args.model, args.sram_model, args.dma, args.xip_model)
 board = make_board(
     args.core, str(args.firmware.resolve()),
     xip_miss_ns=args.xip_miss_ns,
