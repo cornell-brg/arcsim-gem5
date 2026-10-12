@@ -402,16 +402,17 @@ MMMU::readFromStack(Addr frameptr, uint32_t numWords, ThreadContext *tc)
     std::vector<uint32_t> result(numWords);
     bool isTimingMode = tc->getSystemPtr()->isTimingMode();
 
+    // Register with interrupt controller: unstacking in progress.
+    auto *mintr = dynamic_cast<MProfileInterrupts *>(
+        tc->getCpuPtr()->getInterruptController(tc->threadId()));
+    assert(mintr);
+    mintr->setupStackPending();
+
     if (isTimingMode) {
         // New generation for this unstacking operation.
         stackingGeneration++;
         currentGenExpected = numWords;
 
-        // Register with interrupt controller: unstacking in progress.
-        auto *mintr = dynamic_cast<MProfileInterrupts *>(
-            tc->getCpuPtr()->getInterruptController(tc->threadId()));
-        assert(mintr);
-        mintr->setupStackPending();
         stackingCompleteCallback = [mintr]() {
             mintr->removeStackReadPending();
         };
@@ -469,6 +470,11 @@ MMMU::readFromStack(Addr frameptr, uint32_t numWords, ThreadContext *tc)
                     i, addr, sendTick, stackingGeneration);
             stackingPort.schedTimingReq(pkt, sendTick);
         }
+    } else {
+        // Atomic mode: the functional reads above are the whole
+        // unstacking, so complete the return now, as stackingComplete()
+        // does in timing mode once the last read responds.
+        mintr->removeStackReadPending();
     }
 
     return result;
