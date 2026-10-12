@@ -75,6 +75,14 @@ class RP2350XIP : public AbstractMemory
         Addr missLine = 0;
         // Accesses that found the bank busy, oldest first
         std::deque<AccessPtr> waiting;
+        // Accesses that found the bank free this cycle: it takes those of
+        // one manager
+        std::vector<AccessPtr> asking;
+        // The cycle in which it last did, and that manager
+        Tick takenCycle = MaxTick;
+        RequestorID takenBy = 0;
+        // The manager it last chose over another
+        RequestorID lastChosen = 0;
         // The cycle in which the bank last gave a word to an access that
         // waited, and the manager that access came from
         Tick servedCycle = MaxTick;
@@ -115,6 +123,7 @@ class RP2350XIP : public AbstractMemory
     unsigned outstanding = 0;
     EventFunctionWrapper qmiEvent;
     EventFunctionWrapper releaseEvent;
+    EventFunctionWrapper grantEvent;
     std::array<EventFunctionWrapper, NumBanks> serveEvents;
     std::unique_ptr<Packet> pendingDelete;
 
@@ -142,6 +151,12 @@ class RP2350XIP : public AbstractMemory
     // wait.
     void advance(const AccessPtr &access);
     void startMiss(unsigned bank, const AccessPtr &access, Addr line);
+    // Each free bank takes the accesses of one of the managers that asked
+    // for it this cycle, the managers taking turns; the others' wait.
+    void grant();
+    // The access's place in the order of turns after manager `last`
+    static RequestorID turn(RequestorID last, const AccessPtr &access);
+    void wait(unsigned bank, const AccessPtr &access);
     void markWaited(const AccessPtr &access);
     void respond(const AccessPtr &access);
     void release();

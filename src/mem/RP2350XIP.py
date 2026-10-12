@@ -7,16 +7,18 @@ class RP2350XIP(AbstractMemory):
     the QSPI memory interface (QMI), holding the flash contents.
 
     The cache is 16 KiB, two-way, of 8-byte lines (datasheet 4.4.1). A hit
-    answers in the cycle it is asked, as an SRAM read does. A miss reads its whole line from flash
-    as one serial transfer and takes a way at random. The lines of even and
-    odd line addresses are two banks: while a bank waits for a line from
-    flash, every other access to that bank waits with it, and the other
-    bank goes on answering hits. When the line has come the bank gives
-    those that waited one 32-bit word a cycle, the bus managers taking
-    turns, and a manager with an access waiting makes no other: so a core
-    that asks for whole lines, several ahead, gets them at the rate of one
-    that fetches a word at a time. Accesses that never wait are answered
-    whole, any number a cycle.
+    answers in the cycle it is asked, as an SRAM read does. A miss reads
+    its whole line from flash as one serial transfer and takes a way at
+    random. The lines of even and odd line addresses are two banks. A bank
+    takes one bus manager's accesses a cycle: when two managers ask in the
+    same cycle, a core's fetch and its load of a literal for one, the
+    other's access waits, the managers taking turns (datasheet 2.1.1).
+    While a bank waits for a line from flash, every other access to that
+    bank waits with it, and the other bank goes on answering hits. A bank
+    gives those that waited one 32-bit word a cycle, again in turn, and a
+    manager with an access waiting makes no other: so a core that asks for
+    whole lines, several ahead, gets them at the rate of one that fetches
+    a word at a time.
 
     The QMI makes one transfer at a time, in the order they were asked for.
     A transfer whose line follows the last one's in address order, while

@@ -72,6 +72,7 @@ RP2350XIP::RP2350XIP(const RP2350XIPParams &p)
       pageBreak(p.page_break),
       qmiEvent([this] { finishQmi(); }, name() + ".qmi"),
       releaseEvent([this] { release(); }, name() + ".release"),
+      grantEvent([this] { grant(); }, name() + ".grant"),
       serveEvents{{{[this] { serve(0); }, name() + ".serve0"},
                    {[this] { serve(1); }, name() + ".serve1"}}},
       xipStats(*this)
@@ -225,36 +226,102 @@ RP2350XIP::startMiss(unsigned index, const AccessPtr &access, Addr line)
         startQmi(thisCycle());
 }
 
+RequestorID
+RP2350XIP::turn(RequestorID last, const AccessPtr &access)
+{
+    return static_cast<RequestorID>(access->requestor - last - 1);
+}
+
+void
+RP2350XIP::wait(unsigned index, const AccessPtr &access)
+{
+    Bank &bank = banks[index];
+    DPRINTF(RP2350XIP, "line %#x waits for bank %d\n", access->nextLine,
+            index);
+    markWaited(access);
+    access->beatsLeft = 0;
+    bank.waiting.push_back(access);
+    ++xipStats.bankWaits;
+    if (!bank.busy && !serveEvents[index].scheduled())
+        schedule(serveEvents[index], nextCycle());
+}
+
 void
 RP2350XIP::advance(const AccessPtr &access)
 {
-    while (access->nextLine <= access->endLine) {
-        const Addr line = access->nextLine;
-        const unsigned index = bankOf(line);
-        Bank &bank = banks[index];
-        // A bank that waits for flash, or is working through the accesses
-        // that waited with it, takes this one in its turn.
-        if (bank.busy || !bank.waiting.empty() ||
-            bank.servedCycle == thisCycle())
-        {
-            DPRINTF(RP2350XIP, "line %#x waits for bank %d\n", line, index);
-            markWaited(access);
-            access->beatsLeft = 0;
-            bank.waiting.push_back(access);
-            ++xipStats.bankWaits;
-            if (!bank.busy && !serveEvents[index].scheduled())
-                schedule(serveEvents[index], nextCycle());
-            return;
-        }
-        if (lookup(line)) {
-            ++xipStats.hits;
-            access->nextLine += LineBytes;
-            continue;
-        }
-        startMiss(index, access, line);
+    if (access->nextLine > access->endLine) {
+        respond(access);
         return;
     }
-    respond(access);
+    const unsigned index = bankOf(access->nextLine);
+    Bank &bank = banks[index];
+    // A bank that waits for flash, is working through the accesses that
+    // waited with it, or has taken another manager's access this cycle
+    // takes this one in its turn.
+    if (bank.busy || !bank.waiting.empty() ||
+        bank.servedCycle == thisCycle() ||
+        (bank.takenCycle == thisCycle() &&
+         bank.takenBy != access->requestor))
+    {
+        wait(index, access);
+        return;
+    }
+    bank.asking.push_back(access);
+    // The bank chooses at mid-cycle, when the cycle's accesses have all
+    // arrived.
+    if (!grantEvent.scheduled()) {
+        schedule(grantEvent,
+                 std::max(curTick(), thisCycle() + clockPeriod() / 2));
+    }
+}
+
+void
+RP2350XIP::grant()
+{
+    for (unsigned index = 0; index < NumBanks; ++index) {
+        Bank &bank = banks[index];
+        if (bank.asking.empty())
+            continue;
+        std::vector<AccessPtr> asking;
+        asking.swap(bank.asking);
+        // Of several managers, the one after the manager the bank last
+        // chose
+        const RequestorID manager = (*std::min_element(
+            asking.begin(), asking.end(),
+            [&bank](const AccessPtr &a, const AccessPtr &b) {
+                return turn(bank.lastChosen, a) < turn(bank.lastChosen, b);
+            }))->requestor;
+        bank.takenCycle = thisCycle();
+        bank.takenBy = manager;
+        std::vector<AccessPtr> taken;
+        for (const AccessPtr &access : asking) {
+            if (access->requestor == manager) {
+                taken.push_back(access);
+            } else {
+                bank.lastChosen = manager;
+                wait(index, access);
+            }
+        }
+        for (const AccessPtr &access : taken) {
+            const Addr line = access->nextLine;
+            if (bank.busy) {
+                wait(index, access);
+            } else if (lookup(line)) {
+                ++xipStats.hits;
+                // Its next line is the other bank's.
+                access->nextLine += LineBytes;
+                advance(access);
+            } else {
+                startMiss(index, access, line);
+            }
+        }
+    }
+    if (!grantEvent.scheduled() &&
+        std::any_of(banks.begin(), banks.end(),
+                    [](const Bank &bank) { return !bank.asking.empty(); }))
+    {
+        schedule(grantEvent, curTick());
+    }
 }
 
 void
@@ -379,13 +446,9 @@ RP2350XIP::serve(unsigned index)
     Bank &bank = banks[index];
     if (bank.busy || bank.waiting.empty())
         return;
-    auto turn = [&bank](const AccessPtr &access) {
-        return static_cast<RequestorID>(
-            access->requestor - bank.lastRequestor - 1);
-    };
     auto chosen = std::min_element(bank.waiting.begin(), bank.waiting.end(),
-        [&turn](const AccessPtr &a, const AccessPtr &b) {
-            return turn(a) < turn(b);
+        [&bank](const AccessPtr &a, const AccessPtr &b) {
+            return turn(bank.lastRequestor, a) < turn(bank.lastRequestor, b);
         });
     AccessPtr access = *chosen;
     const Addr line = access->nextLine;
