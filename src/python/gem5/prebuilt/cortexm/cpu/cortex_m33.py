@@ -51,6 +51,28 @@ _SHIFTED_REG_FLAGS = _t32(0xFE100000, 0xEA100000)
 _SHIFT_INSTS = _t32(0xFFEF0000, 0xEA4F0000)
 # VMOV from a single-precision register to a core register
 _VMOV_TO_CORE = _t32(0xFFF00F7F, 0xEE100A10)
+# Data processing with a modified immediate operand (first halfword 1111
+# 0i0x xxxS nnnn; second 0 imm3 dddd imm8)
+# ... that is MOV or MOVS
+_MOV_IMM = _t32(0xFBEF8000, 0xF04F0000)
+# ... whose immediate entails a shift: i set, or imm3 4 or more
+_ROTATED_IMM = [_t32(0xFE008000, 0xF4000000), _t32(0xFA00C000, 0xF0004000)]
+# ... and that set the flags, the compares among them
+_ROTATED_IMM_FLAGS = [
+    _t32(0xFE108000, 0xF4100000),
+    _t32(0xFA10C000, 0xF0104000),
+]
+# SEL (first halfword 1111 1010 1010 nnnn; second 1111 dddd 1000 mmmm)
+_SEL = _t32(0xFFF0F0F0, 0xFAA0F080)
+# Parallel add and subtract, UQSUB8 and its kin (first halfword 1111 1010
+# 1xxx nnnn; second 1111 dddd 0xxx mmmm)
+_PARALLEL = _t32(0xFF80F080, 0xFA80F000)
+# LDRD and STRD (first halfword 1110 100P U1WL nnnn), with an offset or
+# pre-index, and with a post-index
+_LDRD = [_t32(0xFF500000, 0xE9500000), _t32(0xFF700000, 0xE8700000)]
+_STRD = [_t32(0xFF500000, 0xE9400000), _t32(0xFF700000, 0xE8600000)]
+# DSB and DMB (second halfword 1000 1111 010x xxxx)
+_DSB_DMB = _t32(0xFFFFFFE0, 0xF3BF8F40)
 # VMRS APSR_nzcv, FPSCR
 _VMRS_FLAGS = _t32(0xFFFFFFFF, 0xEEF1FA10)
 
@@ -61,34 +83,31 @@ _T16 = 1 << 36
 
 def _fold(patterns):
     """(mask, match, kind) lists for fetchFoldMasks and its companions from
-    (halfwords, mask, match, kind) entries."""
+    (mask, match, kind) entries for 16-bit instructions."""
     masks, matches, kinds = [], [], []
-    for halfwords, mask, match, kind in patterns:
+    for mask, match, kind in patterns:
         masks.append(_T32 | mask)
-        matches.append((_T32 if halfwords == 2 else _T16) | match)
+        matches.append(_T16 | match)
         kinds.append(kind)
     return masks, matches, kinds
 
 
-# Folding [RP2350 datasheet 3.7.4.9.7, 3.7.4.9.9]: a NOP, or a B, B<cond> or
-# BX LR, takes no cycle of its own after a 16-bit instruction, and an IT
-# none before one.
+# Folding [RP2350 datasheet 3.7.4.9.7, 3.7.4.9.9]: a NOP, or a 16-bit B,
+# B<cond> or BX LR, takes no cycle of its own after a 16-bit instruction,
+# and an IT none before one.
 _FOLD_INTO_PREVIOUS = 1
 _FOLD_INTO_NEXT = 2
 _FOLD_MASKS, _FOLD_MATCHES, _FOLD_KINDS = _fold(
     [
-        (1, 0xFFFF, 0xBF00, _FOLD_INTO_PREVIOUS),  # NOP
-        (1, 0xFF08, 0xBF08, _FOLD_INTO_NEXT),  # IT: 1011 1111 with a mask
-        (1, 0xFF04, 0xBF04, _FOLD_INTO_NEXT),
-        (1, 0xFF02, 0xBF02, _FOLD_INTO_NEXT),
-        (1, 0xFF01, 0xBF01, _FOLD_INTO_NEXT),
-        (1, 0xFE00, 0xDE00, 0),  # UDF and SVC, not B<cond>
-        (1, 0xF000, 0xD000, _FOLD_INTO_PREVIOUS),  # B<cond>
-        (1, 0xF800, 0xE000, _FOLD_INTO_PREVIOUS),  # B
-        (1, 0xFFFF, 0x4770, _FOLD_INTO_PREVIOUS),  # BX LR
-        (2, 0xFB80D000, 0xF3808000, 0),  # MSR and others, not B<cond>.W
-        (2, 0xF800D000, 0xF0008000, _FOLD_INTO_PREVIOUS),  # B<cond>.W
-        (2, 0xF800D000, 0xF0009000, _FOLD_INTO_PREVIOUS),  # B.W
+        (0xFFFF, 0xBF00, _FOLD_INTO_PREVIOUS),  # NOP
+        (0xFF08, 0xBF08, _FOLD_INTO_NEXT),  # IT: 1011 1111 with a mask
+        (0xFF04, 0xBF04, _FOLD_INTO_NEXT),
+        (0xFF02, 0xBF02, _FOLD_INTO_NEXT),
+        (0xFF01, 0xBF01, _FOLD_INTO_NEXT),
+        (0xFE00, 0xDE00, 0),  # UDF and SVC, not B<cond>
+        (0xF000, 0xD000, _FOLD_INTO_PREVIOUS),  # B<cond>
+        (0xF800, 0xE000, _FOLD_INTO_PREVIOUS),  # B
+        (0xFFFF, 0x4770, _FOLD_INTO_PREVIOUS),  # BX LR
     ]
 )
 
@@ -104,6 +123,13 @@ class M33IntAluFU(MinorFU):
     # whatever follows it; the shift instructions themselves do not
     # [RP2350 datasheet 3.7.4.9.2].
     timings = [
+        # DSB and DMB take two cycles.
+        MinorFUTiming(
+            description="M33Barrier",
+            srcRegsRelativeLats=[1],
+            extraCommitLat=1,
+            **_DSB_DMB,
+        ),
         MinorFUTiming(
             description="M33Shift", srcRegsRelativeLats=[1], **_SHIFT_INSTS
         ),
@@ -123,6 +149,47 @@ class M33IntAluFU(MinorFU):
             srcRegsRelativeLats=[1],
             resultUsePenalty=1,
             **_SHIFTED_REG,
+        ),
+        # An immediate operand that entails a shift does as a shifted
+        # register: a cycle of result delay, or with the flags set a cycle
+        # more whatever follows; MOV does not [RP2350 datasheet
+        # 3.7.4.9.2].
+        MinorFUTiming(
+            description="M33MovImm", srcRegsRelativeLats=[1], **_MOV_IMM
+        ),
+    ]
+    timings += [
+        MinorFUTiming(
+            description="M33RotatedFlags",
+            srcRegsRelativeLats=[1],
+            extraCommitLat=1,
+            **pattern,
+        )
+        for pattern in _ROTATED_IMM_FLAGS
+    ]
+    timings += [
+        MinorFUTiming(
+            description="M33Rotated",
+            srcRegsRelativeLats=[1],
+            resultUsePenalty=1,
+            **pattern,
+        )
+        for pattern in _ROTATED_IMM
+    ]
+    # SEL and the parallel adds and subtracts have a cycle of result delay,
+    # which the flags SEL selects by, its first source, do not wait for.
+    timings += [
+        MinorFUTiming(
+            description="M33Sel",
+            srcRegsRelativeLats=[2, 1],
+            resultUsePenalty=1,
+            **_SEL,
+        ),
+        MinorFUTiming(
+            description="M33Parallel",
+            srcRegsRelativeLats=[1],
+            resultUsePenalty=1,
+            **_PARALLEL,
         ),
         MinorFUTiming(description="M33Int", srcRegsRelativeLats=[1]),
     ]
@@ -231,13 +298,20 @@ class M33FPU(MinorFU):
             extraCommitLat=1,
             **_VMRS_FLAGS,
         ),
-        # VADD, VSUB and VMUL have a cycle of result delay.
+        # VADD, VSUB, VMUL and VCVT have a cycle of result delay.
         MinorFUTiming(
             description="M33FArith",
             srcRegsRelativeLats=[1],
             resultUsePenalty=1,
             opClasses=minorMakeOpClassSet(
-                ["FloatAdd", "FloatMult", "SimdFloatAdd", "SimdFloatMult"]
+                [
+                    "FloatAdd",
+                    "FloatMult",
+                    "FloatCvt",
+                    "SimdFloatAdd",
+                    "SimdFloatMult",
+                    "SimdFloatCvt",
+                ]
             ),
         ),
         # VMLA, VFMA and their kin occupy the unit for 3 cycles, with a
@@ -258,7 +332,7 @@ class M33FPU(MinorFU):
         # result delay.
         MinorFUTiming(
             description="M33FDiv",
-            srcRegsRelativeLats=[0],
+            srcRegsRelativeLats=[1],
             extraIssueLat=13,
             extraAssumedLat=13,
             resultUsePenalty=1,
@@ -281,7 +355,28 @@ class M33MemFU(MinorFU):
     # load's or store's address is made from are source operands; the
     # register a store writes to memory is not, and can come a cycle later
     # [RP2350 datasheet 3.7.4.9.5, 3.7.4.9.6].
+    # LDRD and STRD take a cycle for each register. Both of LDRD's are
+    # taken as ready when it ends.
     timings = [
+        MinorFUTiming(
+            description="M33Strd",
+            srcRegsRelativeLats=[1, 2],
+            extraCommitLat=1,
+            **pattern,
+        )
+        for pattern in _STRD
+    ]
+    timings += [
+        MinorFUTiming(
+            description="M33Ldrd",
+            srcRegsRelativeLats=[1],
+            extraCommitLat=1,
+            extraIssueLat=1,
+            **pattern,
+        )
+        for pattern in _LDRD
+    ]
+    timings += [
         MinorFUTiming(
             description="M33Store",
             srcRegsRelativeLats=[1, 2],
