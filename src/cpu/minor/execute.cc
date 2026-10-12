@@ -1213,6 +1213,56 @@ Execute::countInFlight(ExecuteThreadInfo &thread,
 }
 
 bool
+Execute::leadsFoldedBranch(ThreadID thread_id, const MinorDynInstPtr &inst)
+{
+    const ExecuteThreadInfo &ex_info = executeInfo[thread_id];
+    MinorDynInstPtr branch;
+    unsigned int index = 0;
+
+    ex_info.inFlightInsts->forEach(
+        [&](const QueuedInst &in_flight) {
+            if (index++ == 1)
+                branch = in_flight.inst;
+        });
+
+    if (!branch || !branch->isInst() || !branch->freeMicroop ||
+        branch->id.streamSeqNum != ex_info.streamSeqNum ||
+        inst->resultDelay != Cycles(0))
+    {
+        return false;
+    }
+
+    const StaticInstPtr &static_inst = inst->staticInst;
+    const StaticInstPtr &branch_inst = branch->staticInst;
+
+    /* Some decoders mark a branch only by its kind, not IsControl */
+    bool is_branch = branch_inst->isControl() ||
+        branch_inst->isDirectCtrl() || branch_inst->isIndirectCtrl() ||
+        branch_inst->isCondCtrl() || branch_inst->isUncondCtrl();
+
+    if (!is_branch || branch_inst->isMemRef() || static_inst->isMicroop() ||
+        static_inst->isSerializing() || static_inst->isNonSpeculative())
+    {
+        return false;
+    }
+
+    /* The branch waits for nothing that inst writes: its flags, if it is
+     *  conditional, or its register */
+    auto *isa = cpu.getContext(thread_id)->getIsaPtr();
+
+    for (unsigned int dest = 0; dest < static_inst->numDestRegs(); dest++) {
+        RegId written = static_inst->destRegIdx(dest).flatten(*isa);
+
+        for (unsigned int src = 0; src < branch_inst->numSrcRegs(); src++) {
+            if (branch_inst->srcRegIdx(src).flatten(*isa) == written)
+                return false;
+        }
+    }
+
+    return true;
+}
+
+bool
 Execute::canCommitAtIssue(ThreadID thread_id, const MinorDynInstPtr &inst)
 {
     const ExecuteThreadInfo &ex_info = executeInfo[thread_id];
@@ -1232,8 +1282,10 @@ Execute::canCommitAtIssue(ThreadID thread_id, const MinorDynInstPtr &inst)
         static_inst->isCondCtrl() || static_inst->isUncondCtrl() ||
         static_inst->isSquashAfter();
 
+    /* A branch, or an instruction with a branch folded into it that it
+     *  does not hold up: the two take one cycle between them */
     if (static_inst->isMemRef() || static_inst->isQuiesce() ||
-        !can_redirect)
+        (!can_redirect && !leadsFoldedBranch(thread_id, inst)))
     {
         return false;
     }
@@ -1330,7 +1382,6 @@ Execute::canAccessAtIssue(ThreadID thread_id)
 
     return fu->description.opLat == Cycles(1) &&
         fu->alreadyPushed() && fu->back().inst == inst &&
-        inst->extraCommitDelay == Cycles(0) &&
         !inst->extraCommitDelayExpr &&
         ex_info.inFlightInsts->front().inst->id.execSeqNum >
             inst->instToWaitFor;
@@ -1372,6 +1423,10 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
     /* Has an instruction been completed?  Once this becomes false, we stop
      *  trying to complete instructions. */
     bool completed_inst = true;
+
+    /* The instruction committed at issue has a branch folded into it,
+     *  which follows it */
+    bool leads_folded_branch = false;
 
     /* Number of insts committed this cycle to check against commitLimit */
     unsigned int num_insts_committed = 0;
@@ -1439,6 +1494,7 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
             updateBranchData(thread_id, BranchData::UnpredictedBranch,
                 MinorDynInst::bubble(), thread->pcState(), branch);
         } else if (mem_response && !at_issue &&
+            inst->minimumCommitCycle <= now &&
             num_mem_refs_committed < memoryCommitLimit)
         {
             /* Try to commit from the memory responses next */
@@ -1523,6 +1579,7 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
                         *inst);
                     try_to_commit = true;
                     completed_inst = true;
+                    leads_folded_branch = leadsFoldedBranch(thread_id, inst);
                 } else if (loadAccessAtIssue &&
                     canAccessAtIssue(thread_id))
                 {
@@ -1606,9 +1663,15 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
 
                     /* Move the extraCommitDelay from the instruction
                      *  into the minimumCommitCycle */
+                    /* A load that goes to memory in its issue cycle
+                     *  takes the extra cycles before it completes, not
+                     *  before its access */
+                    bool access_at_issue = at_issue && early_memory_issue;
+
                     if (inst->extraCommitDelay != Cycles(0)) {
                         inst->minimumCommitCycle = cpu.curCycle() +
-                            inst->extraCommitDelay;
+                            inst->extraCommitDelay +
+                            Cycles(access_at_issue ? 1 : 0);
                         inst->extraCommitDelay = Cycles(0);
                     }
 
@@ -1623,7 +1686,9 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
                             " as there are incomplete barriers in flight\n",
                             *inst);
                         completed_inst = false;
-                    } else if (inst->minimumCommitCycle > now) {
+                    } else if (inst->minimumCommitCycle > now &&
+                        !access_at_issue)
+                    {
                         DPRINTF(MinorExecute, "Not committing inst: %s yet"
                             " as it wants to be stalled for %d more cycles\n",
                             *inst, inst->minimumCommitCycle - now);
@@ -1742,7 +1807,7 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
         }
 
         /* One instruction at issue, beside those that take no cycle */
-        if (at_issue && !inst->isNoCostInst())
+        if (at_issue && !inst->isNoCostInst() && !leads_folded_branch)
             completed_inst = false;
 
         /* Handle per-cycle instruction counting */

@@ -359,6 +359,10 @@ class Execute : public Named
      *  under branchAtIssue */
     bool canCommitAtIssue(ThreadID thread_id, const MinorDynInstPtr &inst);
 
+    /** Is inst, the oldest in flight, followed by a branch folded into it
+     *  that reads nothing inst writes? */
+    bool leadsFoldedBranch(ThreadID thread_id, const MinorDynInstPtr &inst);
+
     /** Can the load issued this cycle go to memory in the same cycle
      *  under loadAccessAtIssue */
     bool canAccessAtIssue(ThreadID thread_id);

@@ -554,7 +554,9 @@ class BaseMinorCPU(BaseCPU):
         "A single-cycle branch or squash-after instruction that issues with"
         " nothing older in flight changes the stream in its issue cycle"
         " rather than one cycle later, as on cores that redirect fetch from"
-        " the execute cycle",
+        " the execute cycle.  So does a single-cycle instruction with a"
+        " branch folded into it (fetchFoldMasks) that reads nothing the"
+        " instruction writes, and the branch with it",
     )
 
     executeFreeUpdateMicroops = Param.Bool(
