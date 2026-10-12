@@ -72,12 +72,29 @@ Fetch2::Fetch2(const std::string &name,
     nextStageReserve(next_stage_input_buffer),
     outputWidth(params.decodeInputWidth),
     processMoreThanOneInput(params.fetch2CycleInput),
+    foldMasks(params.fetchFoldMasks),
+    foldMatches(params.fetchFoldMatches),
+    foldKinds(params.fetchFoldKinds),
     branchPredictor(*params.branchPred),
     fetchInfo(params.numThreads),
     threadPriority(0), stats(&cpu_)
 {
     if (outputWidth < 1)
         fatal("%s: decodeInputWidth must be >= 1 (%d)\n", name, outputWidth);
+
+    if (foldMasks.size() != foldMatches.size() ||
+        foldMasks.size() != foldKinds.size())
+    {
+        fatal("%s: fetchFoldMasks, fetchFoldMatches and fetchFoldKinds"
+            " differ in length\n", name);
+    }
+
+    if (!foldMasks.empty() &&
+        (outputWidth < 2 || params.executeInputWidth < 2))
+    {
+        fatal("%s: fetchFoldMasks needs decodeInputWidth and"
+            " executeInputWidth >= 2\n", name);
+    }
 
     if (params.fetch2InputBufferSize < 1) {
         fatal("%s: fetch2InputBufferSize must be >= 1 (%d)\n", name,
@@ -313,6 +330,59 @@ Fetch2::discardStaleLines()
     }
 }
 
+unsigned int
+Fetch2::foldKind(const StaticInstPtr &static_inst) const
+{
+    uint64_t mach_inst = static_inst->getEMI();
+
+    for (size_t i = 0; i < foldMasks.size(); i++) {
+        if ((mach_inst & foldMasks[i]) == foldMatches[i])
+            return foldKinds[i];
+    }
+
+    return 0;
+}
+
+StaticInstPtr
+Fetch2::peekNext(ThreadID tid, Addr &size)
+{
+    Fetch2ThreadInfo &fetch_info = fetchInfo[tid];
+    const ForwardLineData *line_in = getInput(tid);
+
+    if (!line_in || line_in->isFault() || !fetch_info.havePC ||
+        fetch_info.inputIndex >= line_in->lineWidth)
+    {
+        return nullptr;
+    }
+
+    InstDecoder *decoder = cpu.getContext(tid)->getDecoderPtr();
+
+    /* Decoding moves the PC and the decoder's state on */
+    std::unique_ptr<PCStateBase> saved_pc(fetch_info.pc->clone());
+    StaticInstPtr static_inst = nullptr;
+
+    memcpy(decoder->moreBytesPtr(), line_in->line + fetch_info.inputIndex,
+        decoder->moreBytesSize());
+
+    if (!decoder->instReady()) {
+        decoder->moreBytes(*fetch_info.pc,
+            line_in->lineBaseAddr + fetch_info.inputIndex);
+    }
+
+    if (decoder->instReady()) {
+        static_inst = decoder->decode(*fetch_info.pc);
+        fetch_info.pc->uReset();
+        static_inst->advancePC(*fetch_info.pc);
+        size = fetch_info.pc->instAddr() - saved_pc->instAddr();
+    }
+
+    /* The instruction is decoded again when it is taken */
+    set(fetch_info.pc, saved_pc);
+    decoder->reset();
+
+    return static_inst;
+}
+
 void
 Fetch2::decodeInstructions(BranchData &prediction_out)
 {
@@ -331,6 +401,12 @@ Fetch2::decodeInstructions(BranchData &prediction_out)
 
         unsigned int output_index = 0;
 
+        /* With fold patterns, the output holds one instruction, or two of
+         *  which one folds into the other */
+        bool folding = !foldMasks.empty();
+        bool fold_second = false;
+        bool second_is_free = false;
+
         /* Pack instructions into the output while we can.  This may involve
          * using more than one input line.  Note that lineWidth will be 0
          * for faulting lines */
@@ -338,6 +414,7 @@ Fetch2::decodeInstructions(BranchData &prediction_out)
             (line_in->isFault() ||
                 fetch_info.inputIndex < line_in->lineWidth) && /* More input */
             output_index < outputWidth && /* More output to fill */
+            (!folding || output_index == 0 || fold_second) &&
             prediction_out.isBubble() /* No predicted branch */)
         {
             ThreadContext *thread = cpu.getContext(line_in->id.threadId);
@@ -524,6 +601,31 @@ Fetch2::decodeInstructions(BranchData &prediction_out)
                 /* Pack the generated dynamic instruction into the output */
                 insts_out.insts[output_index] = dyn_inst;
                 output_index++;
+
+                if (folding && output_index == 2) {
+                    dyn_inst->freeMicroop = second_is_free;
+                    fold_second = false;
+                } else if (folding && !dyn_inst->isFault() &&
+                    prediction_out.isBubble())
+                {
+                    /* Does the rest of this fetched word hold an
+                     *  instruction that folds with this one? */
+                    Addr size = fetch_info.pc->instAddr() -
+                        dyn_inst->pc->instAddr();
+                    Addr next_size = 0;
+                    StaticInstPtr next = peekNext(tid, next_size);
+
+                    if (next && size == 2 && foldKind(next) == 1) {
+                        fold_second = true;
+                        second_is_free = true;
+                    } else if (next && next_size == 2 &&
+                        foldKind(dyn_inst->staticInst) == 2)
+                    {
+                        fold_second = true;
+                        second_is_free = false;
+                        dyn_inst->freeMicroop = true;
+                    }
+                }
 
                 /* Output MinorTrace instruction info for
                  *  pre-microop decomposition macroops */
@@ -729,6 +831,7 @@ SingleStageFetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
         if (static_inst->isDirectCtrl()) {
             decodedBranchTarget = static_inst->branchTarget(*inst->pc);
             decodedBranchTid = inst->id.threadId;
+            decodedBranchSeqNum = inst->id.fetchSeqNum;
         } else if (registerTargetAtDecode &&
             static_inst->isIndirectCtrl() && !static_inst->isMemRef() &&
             !static_inst->isMicroop() && static_inst->numSrcRegs() == 1 &&
@@ -739,6 +842,7 @@ SingleStageFetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
             decodedRegisterBranch = inst;
             decodedRegisterTries = 3;
             decodedBranchTid = inst->id.threadId;
+            decodedBranchSeqNum = inst->id.fetchSeqNum;
         }
         return;
     }

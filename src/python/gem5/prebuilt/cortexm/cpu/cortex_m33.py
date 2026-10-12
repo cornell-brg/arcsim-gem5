@@ -52,6 +52,44 @@ _SHIFT_INSTS = _t32(0xFFEF0000, 0xEA4F0000)
 # VMOV from a single-precision register to a core register
 _VMOV_TO_CORE = _t32(0xFFF00F7F, 0xEE100A10)
 
+# A 16-bit Thumb instruction in an ExtMachInst: thumb without bigThumb, the
+# instruction in bits 15:0.
+_T16 = 1 << 36
+
+
+def _fold(patterns):
+    """(mask, match, kind) lists for fetchFoldMasks and its companions from
+    (halfwords, mask, match, kind) entries."""
+    masks, matches, kinds = [], [], []
+    for halfwords, mask, match, kind in patterns:
+        masks.append(_T32 | mask)
+        matches.append((_T32 if halfwords == 2 else _T16) | match)
+        kinds.append(kind)
+    return masks, matches, kinds
+
+
+# Folding [RP2350 datasheet 3.7.4.9.7, 3.7.4.9.9]: a NOP, or a B, B<cond> or
+# BX LR, takes no cycle of its own after a 16-bit instruction, and an IT
+# none before one.
+_FOLD_INTO_PREVIOUS = 1
+_FOLD_INTO_NEXT = 2
+_FOLD_MASKS, _FOLD_MATCHES, _FOLD_KINDS = _fold(
+    [
+        (1, 0xFFFF, 0xBF00, _FOLD_INTO_PREVIOUS),  # NOP
+        (1, 0xFF08, 0xBF08, _FOLD_INTO_NEXT),  # IT: 1011 1111 with a mask
+        (1, 0xFF04, 0xBF04, _FOLD_INTO_NEXT),
+        (1, 0xFF02, 0xBF02, _FOLD_INTO_NEXT),
+        (1, 0xFF01, 0xBF01, _FOLD_INTO_NEXT),
+        (1, 0xFE00, 0xDE00, 0),  # UDF and SVC, not B<cond>
+        (1, 0xF000, 0xD000, _FOLD_INTO_PREVIOUS),  # B<cond>
+        (1, 0xF800, 0xE000, _FOLD_INTO_PREVIOUS),  # B
+        (1, 0xFFFF, 0x4770, _FOLD_INTO_PREVIOUS),  # BX LR
+        (2, 0xFB80D000, 0xF3808000, 0),  # MSR and others, not B<cond>.W
+        (2, 0xF800D000, 0xF0008000, _FOLD_INTO_PREVIOUS),  # B<cond>.W
+        (2, 0xF800D000, 0xF0009000, _FOLD_INTO_PREVIOUS),  # B.W
+    ]
+)
+
 
 class M33IntAluFU(MinorFU):
     """ADD, SUB, MOV, AND, ORR, EOR, CMP, CMN, TST, TEQ, CLZ, REV, etc."""
@@ -292,8 +330,9 @@ class CortexM33CPU(ArmMMinorCPU):
     MinorCPU modelling the Cortex-M33's three-stage pipeline.
 
     singleFetchStage collapses Minor's Fetch1 and Fetch2 into one fetch
-    stage, giving Fetch, Decode and Execute. All widths are 1: one
-    instruction decoded, issued and committed a cycle.
+    stage, giving Fetch, Decode and Execute. One instruction is decoded,
+    issued and committed a cycle, beside those that take no cycle of their
+    own.
     """
 
     threadPolicy = "SingleThreaded"
@@ -324,11 +363,15 @@ class CortexM33CPU(ArmMMinorCPU):
     fetch2InputBufferSize = 2
     fetch2ToDecodeForwardDelay = 1
     fetch2CycleInput = True
+    fetchFoldMasks = _FOLD_MASKS
+    fetchFoldMatches = _FOLD_MATCHES
+    fetchFoldKinds = _FOLD_KINDS
 
     # -- Decode stage --
+    # One instruction a cycle, and with it one that folds into it.
     decodeInputBufferSize = 1
     decodeToExecuteForwardDelay = 1
-    decodeInputWidth = 1
+    decodeInputWidth = 2
     decodeCycleInput = True
 
     # -- Execute stage --

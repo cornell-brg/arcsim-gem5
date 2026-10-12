@@ -66,6 +66,8 @@ Decode::Decode(const std::string &name,
     outputWidth(params.executeInputWidth),
     processMoreThanOneInput(params.decodeCycleInput),
     freeUpdateMicroops(params.executeFreeUpdateMicroops),
+    packFreeInsts(params.executeFreeUpdateMicroops ||
+        !params.fetchFoldMasks.empty()),
     decodeInfo(params.numThreads),
     threadPriority(0)
 {
@@ -194,6 +196,8 @@ Decode::evaluate()
         const ForwardInstData *insts_in = getInput(tid);
 
         unsigned int output_index = 0;
+        /* Instructions in the output that take a cycle */
+        unsigned int output_costed = 0;
 
         /* Pack instructions into the output while we can.  This may involve
          * using more than one input line */
@@ -214,13 +218,13 @@ Decode::evaluate()
 
                 decode_info.inputIndex++;
                 decode_info.inMacroop = false;
-            } else if (freeUpdateMicroops && output_index != 0 &&
-                !(decode_info.inMacroop && isFreeUpdate(
-                    inst->staticInst->fetchMicroop(
+            } else if (packFreeInsts && output_costed != 0 &&
+                !inst->freeMicroop &&
+                !(freeUpdateMicroops && decode_info.inMacroop &&
+                    isFreeUpdate(inst->staticInst->fetchMicroop(
                         decode_info.microopPC->microPC()))))
             {
-                /* Only a free micro-op shares the output, with the
-                 *  micro-op of its macro-op before it */
+                /* One instruction that takes a cycle to an output */
                 break;
             } else {
                 StaticInstPtr static_inst = inst->staticInst;
@@ -320,6 +324,8 @@ Decode::evaluate()
                 /* Push into output */
                 insts_out.insts[output_index] = output_inst;
                 output_index++;
+                if (!output_inst->freeMicroop)
+                    output_costed++;
             }
 
             /* Have we finished with the input? */
@@ -335,6 +341,19 @@ Decode::evaluate()
                     DPRINTF(Decode, "Wrapping\n");
                     insts_in = getInput(tid);
                 }
+            }
+        }
+
+        /* Bubbles that pad the input hold nothing back */
+        while (insts_in && !decode_info.inMacroop &&
+            decode_info.inputIndex < insts_in->width() &&
+            insts_in->insts[decode_info.inputIndex]->isBubble())
+        {
+            decode_info.inputIndex++;
+
+            if (decode_info.inputIndex == insts_in->width()) {
+                popInput(tid);
+                insts_in = NULL;
             }
         }
 

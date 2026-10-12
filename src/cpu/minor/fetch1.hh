@@ -468,6 +468,9 @@ class SingleStageFetch1 : public Fetch1
      *  in Decode (fetchBranchTargetAtDecode); null if none */
     FetchRequestPtr targetRequest;
 
+    /** The fetch sequence number of the branch targetRequest is for */
+    InstSeqNum targetBranchSeqNum = 0;
+
     /** Target requests given up while still in the memory system */
     std::vector<FetchRequestPtr> abandonedTargetRequests;
 
@@ -484,8 +487,13 @@ class SingleStageFetch1 : public Fetch1
      *  allows? */
     bool readAheadFull();
 
-    /** Fetch the line holding target_addr beside the sequential stream */
-    void fetchBranchTarget(ThreadID tid, Addr target_addr);
+    /** Fetch the line holding target_addr, the target of the branch with
+     *  fetch sequence number branch_seq_num, beside the sequential stream */
+    void fetchBranchTarget(ThreadID tid, Addr target_addr,
+        InstSeqNum branch_seq_num);
+
+    /** Is targetRequest for a branch Execute has yet to complete? */
+    bool targetAwaited(ThreadID tid) const;
 
     /** Give up targetRequest */
     void abandonTargetRequest();

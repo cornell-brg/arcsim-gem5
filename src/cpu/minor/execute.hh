@@ -247,6 +247,9 @@ class Execute : public Named
 
     std::vector<ExecuteThreadInfo> executeInfo;
 
+    /** See lastCompletedFetchSeqNum */
+    std::vector<InstSeqNum> lastCompleted;
+
     ThreadID interruptPriority;
     ThreadID issuePriority;
     ThreadID commitPriority;
@@ -361,6 +364,13 @@ class Execute : public Named
     bool canAccessAtIssue(ThreadID thread_id);
 
   public:
+    /** The fetch sequence number of the instruction to complete last */
+    InstSeqNum
+    lastCompletedFetchSeqNum(ThreadID thread_id) const
+    {
+        return lastCompleted[thread_id];
+    }
+
     /** Has an instruction ahead of inst that writes reg yet to complete */
     bool regWritePending(ThreadID thread_id, const RegId &reg,
         const MinorDynInstPtr &inst);

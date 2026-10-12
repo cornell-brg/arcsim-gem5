@@ -91,6 +91,19 @@ class Fetch2 : public Named
      *  there is room in the output to contain its processed data */
     bool processMoreThanOneInput;
 
+    /** See fetchFoldMasks in BaseMinorCPU.py */
+    std::vector<uint64_t> foldMasks;
+    std::vector<uint64_t> foldMatches;
+    std::vector<unsigned int> foldKinds;
+
+    /** How static_inst folds: 0 not at all, 1 into the 16-bit instruction
+     *  before it, 2 into the one after it */
+    unsigned int foldKind(const StaticInstPtr &static_inst) const;
+
+    /** The next instruction of the line being decoded, if all of it is in
+     *  that line, and its size, without taking it; null otherwise */
+    StaticInstPtr peekNext(ThreadID tid, Addr &size);
+
     /** Branch predictor passed from Python configuration */
     branch_prediction::BPredUnit &branchPredictor;
 
@@ -263,6 +276,8 @@ class SingleStageFetch2 : public Fetch2
      *  next cycle */
     std::unique_ptr<PCStateBase> decodedBranchTarget;
     ThreadID decodedBranchTid;
+    /** The fetch sequence number of the branch decoded last */
+    InstSeqNum decodedBranchSeqNum = 0;
 
     /** The branch to a register's value decoded last, whose target is
      *  still to be fetched, and the cycles left to try in; null if none */

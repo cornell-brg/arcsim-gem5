@@ -93,6 +93,7 @@ Execute::Execute(const std::string &name_, MinorCPU &cpu_,
           params.executeWaitedStoreHoldsInsts),
       executeInfo(params.numThreads,
                   ExecuteThreadInfo(params.executeCommitLimit)),
+      lastCompleted(params.numThreads, 0),
       interruptPriority(0),
       issuePriority(0),
       commitPriority(0),
@@ -1168,7 +1169,8 @@ bool
 Execute::waitsForCompletion(const ExecuteThreadInfo &thread,
     const MinorDynInstPtr &inst) const
 {
-    if (!inOrderCompletion || inst->isFault())
+    /* An instruction that takes no cycle goes with the one before it */
+    if (!inOrderCompletion || inst->isFault() || inst->freeMicroop)
         return false;
 
     /* The macro-op was admitted with its first micro-op */
@@ -1188,6 +1190,10 @@ void
 Execute::countInFlight(ExecuteThreadInfo &thread,
     const MinorDynInstPtr &inst, bool entering)
 {
+    /* An instruction that takes no cycle holds nothing up */
+    if (inst->freeMicroop)
+        return;
+
     unsigned int &count = (countsAsMemRef(inst) ?
         thread.memRefsInFlight : thread.othersInFlight);
 
@@ -1625,7 +1631,7 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
                     completed_inst = true;
                 }
 
-                if (completed_inst && at_issue) {
+                if (completed_inst && at_issue && !inst->isNoCostInst()) {
                     /* It never travels down its FU */
                     funcUnits[inst->fuIndex]->unpush();
                 } else if (completed_inst) {
@@ -1681,6 +1687,9 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
             /* Note that this includes discarded insts */
             DPRINTF(MinorExecute, "Completed inst: %s\n", *inst);
 
+            if (!inst->isBubble())
+                lastCompleted[thread_id] = inst->id.fetchSeqNum;
+
             /* Got to the end of a full instruction? */
             ex_info.lastCommitWasEndOfMacroop = inst->isFault() ||
                 inst->isLastOpInInst();
@@ -1725,7 +1734,8 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
             }
         }
 
-        if (at_issue)
+        /* One instruction at issue, beside those that take no cycle */
+        if (at_issue && !inst->isNoCostInst())
             completed_inst = false;
 
         /* Handle per-cycle instruction counting */
@@ -1864,7 +1874,10 @@ Execute::evaluate()
                 !issue_info.inFlightInsts->empty() &&
                 ((branchAtIssue && canCommitAtIssue(issue_tid,
                     issue_info.inFlightInsts->front().inst)) ||
-                 (loadAccessAtIssue && canAccessAtIssue(issue_tid))))
+                 (loadAccessAtIssue && canAccessAtIssue(issue_tid)) ||
+                 /* Something behind an instruction that takes no cycle */
+                 ((branchAtIssue || loadAccessAtIssue) &&
+                    issue_info.inFlightInsts->front().inst->freeMicroop)))
             {
                 commit(issue_tid, false, false, branch, true);
             }

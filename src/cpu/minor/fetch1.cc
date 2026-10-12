@@ -930,8 +930,16 @@ SingleStageFetch1::recvReqRetry()
     }
 }
 
+bool
+SingleStageFetch1::targetAwaited(ThreadID tid) const
+{
+    return targetRequest &&
+        execute.lastCompletedFetchSeqNum(tid) < targetBranchSeqNum;
+}
+
 void
-SingleStageFetch1::fetchBranchTarget(ThreadID tid, Addr target_addr)
+SingleStageFetch1::fetchBranchTarget(ThreadID tid, Addr target_addr,
+    InstSeqNum branch_seq_num)
 {
     Fetch1ThreadInfo &thread = fetchInfo[tid];
     Addr aligned = target_addr & ~((Addr) lineSnap - 1);
@@ -965,6 +973,7 @@ SingleStageFetch1::fetchBranchTarget(ThreadID tid, Addr target_addr)
     request->state = FetchRequest::Translated;
     request->makePacket();
     targetRequest = request;
+    targetBranchSeqNum = branch_seq_num;
 
     if (icachePort.sendTimingReq(request->packet)) {
         request->packet = NULL;
@@ -1128,16 +1137,23 @@ SingleStageFetch1::evaluate()
         fetch2->decodedBranchTarget.reset();
         fetch2->decodedRegisterBranch = nullptr;
     } else if (fetch2->decodedBranchTarget) {
-        /* The direct branch decoded last cycle is in Decode now */
+        /* The direct branch decoded last cycle is in Decode now.  The
+         *  target of an older branch not yet through Execute is kept: this
+         *  one's is fetched once that branch has fallen through */
         ThreadID tid = fetch2->decodedBranchTid;
 
-        if (fetchInfo[tid].state == FetchRunning &&
-            icacheState == IcacheRunning)
-        {
-            fetchBranchTarget(tid,
-                fetch2->decodedBranchTarget->instAddr());
+        if (!targetAwaited(tid)) {
+            if (fetchInfo[tid].state == FetchRunning &&
+                icacheState == IcacheRunning &&
+                execute.lastCompletedFetchSeqNum(tid) <
+                    fetch2->decodedBranchSeqNum)
+            {
+                fetchBranchTarget(tid,
+                    fetch2->decodedBranchTarget->instAddr(),
+                    fetch2->decodedBranchSeqNum);
+            }
+            fetch2->decodedBranchTarget.reset();
         }
-        fetch2->decodedBranchTarget.reset();
     } else if (fetch2->decodedRegisterBranch) {
         /* So is the register branch: its target can be read if nothing
          *  ahead of it still has the register to write */
@@ -1146,11 +1162,12 @@ SingleStageFetch1::evaluate()
             fetch2->decodedRegisterBranch->staticInst->srcRegIdx(0);
 
         if (fetchInfo[tid].state == FetchRunning &&
-            icacheState == IcacheRunning &&
+            icacheState == IcacheRunning && !targetAwaited(tid) &&
             !execute.regWritePending(tid, reg,
                 fetch2->decodedRegisterBranch))
         {
-            fetchBranchTarget(tid, cpu.getContext(tid)->getReg(reg));
+            fetchBranchTarget(tid, cpu.getContext(tid)->getReg(reg),
+                fetch2->decodedRegisterBranch->id.fetchSeqNum);
             fetch2->decodedRegisterBranch = nullptr;
         } else if (--fetch2->decodedRegisterTries == 0) {
             fetch2->decodedRegisterBranch = nullptr;

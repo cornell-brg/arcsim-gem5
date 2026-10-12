@@ -366,6 +366,22 @@ class BaseMinorCPU(BaseCPU):
         " cycle, when every older instruction has been issued and none"
         " still has that register to write",
     )
+    fetchFoldMasks = VectorParam.UInt64(
+        [],
+        "With fetchFoldMatches and fetchFoldKinds: instructions that take"
+        " no cycle of their own beside a 16-bit neighbour in the same"
+        " fetched word (folding, or limited dual issue).  The patterns are"
+        " tested in order, and the first with (ext_mach_inst & mask) =="
+        " match gives the instruction's kind",
+    )
+    fetchFoldMatches = VectorParam.UInt64([], "see fetchFoldMasks")
+    fetchFoldKinds = VectorParam.Unsigned(
+        [],
+        "see fetchFoldMasks: 0 for an instruction that does not fold, 1 for"
+        " one that folds into the 16-bit instruction before it, 2 for one"
+        " that folds into the 16-bit instruction after it.  Needs"
+        " decodeInputWidth and executeInputWidth of at least 2",
+    )
     fetchReadAheadLimit = Param.Unsigned(
         0,
         "With singleFetchStage: no sequential fetch starts while this many"

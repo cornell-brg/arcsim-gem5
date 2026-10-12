@@ -93,6 +93,10 @@ class Decode : public Named
     /** See executeFreeUpdateMicroops in BaseMinorCPU.py */
     bool freeUpdateMicroops;
 
+    /** An output holds one instruction, and with it those that take no
+     *  cycle of their own (executeFreeUpdateMicroops, fetchFoldMasks) */
+    bool packFreeInsts;
+
     /** Is static_inst a micro-op that takes no cycle of its own under
      *  freeUpdateMicroops */
     static bool isFreeUpdate(const StaticInstPtr &static_inst);
