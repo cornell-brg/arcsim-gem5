@@ -472,6 +472,9 @@ class SingleStageFetch1 : public Fetch1
      *  This bypasses the executeBranchDelay latch for 0-cycle redirect. */
     Latch<BranchData>::Input eToF1Input;
 
+    /** See fetchBranchSpeculation in BaseMinorCPU.py */
+    bool branchSpeculation;
+
     /** A direct branch's target line, fetched in the cycle the branch is
      *  in Decode (fetchBranchTargetAtDecode); null if none */
     FetchRequestPtr targetRequest;

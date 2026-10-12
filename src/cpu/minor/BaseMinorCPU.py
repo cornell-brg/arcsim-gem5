@@ -362,13 +362,21 @@ class BaseMinorCPU(BaseCPU):
         " branch's target line is fetched in the cycle after the fetch stage"
         " decodes it (the branch's Decode cycle), beside the sequential"
         " stream, and starts the new stream if Execute takes the branch, as"
-        " on cores that compute direct targets in decode.  The lines of two"
-        " branches Execute has yet to complete are kept, the second only"
-        " behind a conditional branch.  The line after a squash-after"
-        " instruction is fetched in the same way.  A target line is"
-        " fetched on speculation (its request is flagged a prefetch), and"
-        " nothing more of the sequential stream is fetched once an"
-        " unconditional branch has been decoded",
+        " on cores that compute direct targets in decode",
+    )
+    fetchBranchSpeculation = Param.Bool(
+        False,
+        "With fetchBranchTargetAtDecode: the target lines of two branches"
+        " Execute has yet to complete are kept, the second only behind a"
+        " conditional branch, where otherwise each decoded branch's target"
+        " fetch replaces the last.  The line after a squash-after"
+        " instruction is fetched in the same way.  Nothing more of the"
+        " sequential stream is fetched once an unconditional branch has"
+        " been decoded.  A target line, and what is fetched of the stream"
+        " behind any other branch Execute has yet to complete, is fetched"
+        " on speculation: its request is flagged a prefetch, which the"
+        " memory system may decline with an error, and a declined line is"
+        " fetched again once it is sure to be wanted",
     )
     fetchRegisterTargetAtDecode = Param.Bool(
         False,
@@ -575,6 +583,16 @@ class BaseMinorCPU(BaseCPU):
         " cycle rather than one cycle later, when nothing it has to wait"
         " for is still in flight: answered within that cycle, it completes"
         " in the next, as on cores whose load takes one cycle",
+    )
+
+    executeAlignedTransfers = Param.Bool(
+        False,
+        "An access takes a cycle for each naturally aligned bus transfer of"
+        " up to 4 bytes it is made as, and nothing issues in the cycles"
+        " after its first: a load one transfer for each 32-bit word it"
+        " touches, a store one for each aligned piece (3 for a word one"
+        " byte past a word boundary), as on cores that split unaligned"
+        " accesses, and those of more than a word, on a 32-bit bus",
     )
 
     enableIdling = Param.Bool(

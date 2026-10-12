@@ -80,6 +80,7 @@ Execute::Execute(const std::string &name_, MinorCPU &cpu_,
       allowEarlyMemIssue(params.executeAllowEarlyMemoryIssue),
       branchAtIssue(params.executeBranchAtIssue),
       loadAccessAtIssue(params.executeLoadAccessAtIssue),
+      alignedTransfers(params.executeAlignedTransfers),
       inOrderCompletion(params.executeInOrderCompletion),
       dynamicLatencyHoldsInst(params.executeDynamicLatencyHoldsInst),
       lastBackgroundResult(0),
@@ -554,6 +555,10 @@ Execute::issue(ThreadID thread_id)
 
     /* Early termination if we have no instructions */
     if (!insts_in)
+        return 0;
+
+    /* An access is still making its bus transfers */
+    if (cpu.curCycle() < issueHeldUntil)
         return 0;
 
     /* Start from the first FU */
@@ -1209,6 +1214,47 @@ Execute::countInFlight(ExecuteThreadInfo &thread,
     } else {
         assert(count != 0);
         count--;
+    }
+}
+
+void
+Execute::holdIssueForTransfers(bool is_load, Addr addr, unsigned int size)
+{
+    if (!alignedTransfers)
+        return;
+
+    unsigned int transfers = 0;
+
+    if (is_load) {
+        /* Whole words are read */
+        if (size != 0)
+            transfers = ((addr + size - 1) >> 2) - (addr >> 2) + 1;
+    } else {
+        /* Each piece written is as large as its address and what is left
+         *  allow */
+        Addr at = addr;
+        unsigned int left = size;
+
+        while (left != 0) {
+            unsigned int piece = 4;
+
+            while (piece > left || at % piece != 0)
+                piece /= 2;
+
+            at += piece;
+            left -= piece;
+            transfers++;
+        }
+    }
+
+    if (transfers > 1) {
+        /* An access made in the pass for the instructions issued this
+         *  cycle makes its second transfer in the next */
+        Cycles until = cpu.curCycle() + Cycles(transfers - 1) +
+            Cycles(committingAtIssue ? 1 : 0);
+
+        if (until > issueHeldUntil)
+            issueHeldUntil = until;
     }
 }
 
@@ -1880,7 +1926,9 @@ Execute::evaluate()
          *  without overwriting them */
         DPRINTF(MinorInterrupt, "Execute skipping a cycle to allow old"
             " branch to complete\n");
-    } else if (lsq.storeHoldsInsts()) {
+    } else if (lsq.storeHoldsInsts() && cpu.curCycle() > issueHeldUntil) {
+        /* Not for the transfers of a store that issue is already held
+         *  for */
         DPRINTF(MinorExecute, "Holding instructions while the bus makes a"
             " store wait\n");
         store_holds_insts = true;
@@ -1951,7 +1999,9 @@ Execute::evaluate()
                  ((branchAtIssue || loadAccessAtIssue) &&
                     issue_info.inFlightInsts->front().inst->freeMicroop)))
             {
+                committingAtIssue = true;
                 commit(issue_tid, false, false, branch, true);
+                committingAtIssue = false;
             }
         }
 
@@ -2045,6 +2095,7 @@ Execute::evaluate()
        head_inst_might_commit || /* Could possible commit the next inst */
        lsq.needsToTick() || /* Must step the dcache port */
        cpu.curCycle() < lastBackgroundResult || /* A result to wait for */
+       cpu.curCycle() < issueHeldUntil || /* Bus transfers to wait for */
        store_holds_insts || /* Held this cycle, try again */
        interrupted; /* There are pending interrupts */
 

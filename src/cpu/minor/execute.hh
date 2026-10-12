@@ -122,6 +122,16 @@ class Execute : public Named
     /** See executeLoadAccessAtIssue in BaseMinorCPU.py */
     bool loadAccessAtIssue;
 
+    /** See executeAlignedTransfers in BaseMinorCPU.py */
+    bool alignedTransfers;
+
+    /** Nothing issues before this cycle: an access of several bus
+     *  transfers is still making them */
+    Cycles issueHeldUntil{0};
+
+    /** The commit pass for instructions issued this cycle is running */
+    bool committingAtIssue = false;
+
     /** See executeInOrderCompletion in BaseMinorCPU.py */
     bool inOrderCompletion;
 
@@ -358,6 +368,13 @@ class Execute : public Named
     /** Can inst, issued this cycle, be committed in the same cycle
      *  under branchAtIssue */
     bool canCommitAtIssue(ThreadID thread_id, const MinorDynInstPtr &inst);
+
+  public:
+    /** Under alignedTransfers, hold issue for the bus transfers after
+     *  the first of an access now going to memory */
+    void holdIssueForTransfers(bool is_load, Addr addr, unsigned int size);
+
+  protected:
 
     /** Is inst, the oldest in flight, followed by a branch folded into it
      *  that reads nothing inst writes? */

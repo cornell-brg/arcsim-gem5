@@ -67,10 +67,6 @@ _SEL = _t32(0xFFF0F0F0, 0xFAA0F080)
 # Parallel add and subtract, UQSUB8 and its kin (first halfword 1111 1010
 # 1xxx nnnn; second 1111 dddd 0xxx mmmm)
 _PARALLEL = _t32(0xFF80F080, 0xFA80F000)
-# LDRD and STRD (first halfword 1110 100P U1WL nnnn), with an offset or
-# pre-index, and with a post-index
-_LDRD = [_t32(0xFF500000, 0xE9500000), _t32(0xFF700000, 0xE8700000)]
-_STRD = [_t32(0xFF500000, 0xE9400000), _t32(0xFF700000, 0xE8600000)]
 # DSB and DMB (second halfword 1000 1111 010x xxxx)
 _DSB_DMB = _t32(0xFFFFFFE0, 0xF3BF8F40)
 # VMRS APSR_nzcv, FPSCR
@@ -355,28 +351,7 @@ class M33MemFU(MinorFU):
     # load's or store's address is made from are source operands; the
     # register a store writes to memory is not, and can come a cycle later
     # [RP2350 datasheet 3.7.4.9.5, 3.7.4.9.6].
-    # LDRD and STRD take a cycle for each register. Both of LDRD's are
-    # taken as ready when it ends.
     timings = [
-        MinorFUTiming(
-            description="M33Strd",
-            srcRegsRelativeLats=[1, 2],
-            extraCommitLat=1,
-            **pattern,
-        )
-        for pattern in _STRD
-    ]
-    timings += [
-        MinorFUTiming(
-            description="M33Ldrd",
-            srcRegsRelativeLats=[1],
-            extraCommitLat=1,
-            extraIssueLat=1,
-            **pattern,
-        )
-        for pattern in _LDRD
-    ]
-    timings += [
         MinorFUTiming(
             description="M33Store",
             srcRegsRelativeLats=[1, 2],
@@ -459,6 +434,10 @@ class CortexM33CPU(ArmMMinorCPU):
     # a conditional branch's target is fetched while its condition
     # resolves.
     fetchBranchTargetAtDecode = True
+    # The targets of two branches are kept, and what is fetched behind a
+    # branch not yet resolved is fetched on speculation: RP2350XIP reads
+    # no line from flash for it.
+    fetchBranchSpeculation = True
     # So is the target of BX and BLX, read from its register: any taken
     # branch that is not a load costs 2 cycles [RP2350 datasheet
     # 3.7.4.9.7].
@@ -514,6 +493,11 @@ class CortexM33CPU(ArmMMinorCPU):
     # datasheet 3.7.4.9.5]. One that uses the loaded value waits a cycle
     # more (M33MemFU).
     executeLoadAccessAtIssue = True
+    # An access is made as aligned transfers on the 32-bit bus, a cycle
+    # each: two for LDRD and STRD [RP2350 datasheet 3.7.4.9.5] and for a
+    # word load across a word boundary, three for a word store one byte
+    # past one.
+    executeAlignedTransfers = True
     # SDIV/UDIV's data-dependent cycles (M33IntDivFU) stall the pipeline
     # like any other multi-cycle instruction.
     executeDynamicLatencyHoldsInst = True

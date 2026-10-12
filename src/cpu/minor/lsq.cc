@@ -1607,6 +1607,8 @@ LSQ::pushRequest(MinorDynInstPtr inst, bool isLoad, uint8_t *data,
         return inst->translationFault;
     }
 
+    execute.holdIssueForTransfers(isLoad, addr, size);
+
     bool needs_burst = transferNeedsBurst(addr, size, lineWidth);
 
     if (needs_burst && inst->staticInst->isAtomic()) {
