@@ -100,6 +100,12 @@ class Fetch2 : public Named
      *  before it, 2 into the one after it */
     unsigned int foldKind(const StaticInstPtr &static_inst) const;
 
+    /** Does next fold into first, the 16-bit instruction before it?  Not
+     *  into one of several micro-ops, whose last has no room beside it,
+     *  nor a branch into a branch */
+    bool foldsInto(const StaticInstPtr &next,
+        const StaticInstPtr &first) const;
+
     /** The next instruction of the line being decoded, if all of it is in
      *  that line, and its size, without taking it; null otherwise */
     StaticInstPtr peekNext(ThreadID tid, Addr &size);
@@ -272,12 +278,18 @@ class SingleStageFetch2 : public Fetch2
     bool registerTargetAtDecode;
 
   public:
-    /** Target of the direct branch decoded this cycle, to be fetched
-     *  next cycle */
+    /** The oldest unconditional branch decoded in this stream, which
+     *  ends the stream's sequential fetches; null if none */
+    MinorDynInstPtr sureBranch;
+
+    /** The youngest branch decoded in this stream; null if none */
+    MinorDynInstPtr lastBranch;
+
+    /** The direct branch decoded this cycle and its target, to be
+     *  fetched next cycle */
     std::unique_ptr<PCStateBase> decodedBranchTarget;
+    MinorDynInstPtr decodedBranch;
     ThreadID decodedBranchTid;
-    /** The fetch sequence number of the branch decoded last */
-    InstSeqNum decodedBranchSeqNum = 0;
 
     /** The branch to a register's value decoded last, whose target is
      *  still to be fetched, and the cycles left to try in; null if none */

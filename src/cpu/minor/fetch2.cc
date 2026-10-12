@@ -343,6 +343,26 @@ Fetch2::foldKind(const StaticInstPtr &static_inst) const
     return 0;
 }
 
+bool
+Fetch2::foldsInto(const StaticInstPtr &next,
+    const StaticInstPtr &first) const
+{
+    /* Some decoders mark a branch only by its kind, not IsControl */
+    auto is_branch = [](const StaticInstPtr &static_inst) {
+        return static_inst->isControl() || static_inst->isDirectCtrl() ||
+            static_inst->isIndirectCtrl() || static_inst->isCondCtrl() ||
+            static_inst->isUncondCtrl();
+    };
+
+    if (foldKind(next) != 1 || first->isMacroop())
+        return false;
+
+    /* A branch sure to be taken has nothing after it, and one target is
+     *  fetched for the instructions decoded in a cycle */
+    return !is_branch(first) ||
+        (!first->isUncondCtrl() && !is_branch(next));
+}
+
 StaticInstPtr
 Fetch2::peekNext(ThreadID tid, Addr &size)
 {
@@ -406,6 +426,11 @@ Fetch2::decodeInstructions(BranchData &prediction_out)
         bool folding = !foldMasks.empty();
         bool fold_second = false;
         bool second_is_free = false;
+        /* The first instruction ended its fetched word: whether the next
+         *  word's first folds with it is still to be seen */
+        bool fold_pending = false;
+        /* The first instruction was the first of its stream */
+        bool first_branched_to = false;
 
         /* Pack instructions into the output while we can.  This may involve
          * using more than one input line.  Note that lineWidth will be 0
@@ -414,7 +439,8 @@ Fetch2::decodeInstructions(BranchData &prediction_out)
             (line_in->isFault() ||
                 fetch_info.inputIndex < line_in->lineWidth) && /* More input */
             output_index < outputWidth && /* More output to fill */
-            (!folding || output_index == 0 || fold_second) &&
+            (!folding || output_index == 0 || fold_second ||
+                fold_pending) &&
             prediction_out.isBubble() /* No predicted branch */)
         {
             ThreadContext *thread = cpu.getContext(line_in->id.threadId);
@@ -432,7 +458,39 @@ Fetch2::decodeInstructions(BranchData &prediction_out)
             bool set_pc =
                 fetch_info.lastStreamSeqNum != line_in->id.streamSeqNum;
 
-            if (!discard_line && (!fetch_info.havePC || set_pc)) {
+            if (fold_pending) {
+                /* An instruction folds into a 16-bit one in the word
+                 *  before its own only if that one was not branched to */
+                MinorDynInstPtr first = insts_out.insts[0];
+                Addr next_size = 0;
+                StaticInstPtr next = NULL;
+
+                fold_pending = false;
+
+                if (!discard_line && !set_pc && !line_in->isFault())
+                    next = peekNext(tid, next_size);
+
+                if (next && !first_branched_to &&
+                    foldsInto(next, first->staticInst))
+                {
+                    fold_second = true;
+                    second_is_free = true;
+                } else if (next && next_size == 2 &&
+                    foldKind(first->staticInst) == 2)
+                {
+                    fold_second = true;
+                    second_is_free = false;
+                    first->freeMicroop = true;
+                }
+
+                if (!fold_second)
+                    break;
+            }
+
+            bool new_stream = !discard_line &&
+                (!fetch_info.havePC || set_pc);
+
+            if (new_stream) {
                 /* Set the inputIndex to be the MachInst-aligned offset
                  *  from lineBaseAddr of the new PC value */
                 fetch_info.inputIndex =
@@ -615,7 +673,9 @@ Fetch2::decodeInstructions(BranchData &prediction_out)
                     Addr next_size = 0;
                     StaticInstPtr next = peekNext(tid, next_size);
 
-                    if (next && size == 2 && foldKind(next) == 1) {
+                    if (next && size == 2 &&
+                        foldsInto(next, dyn_inst->staticInst))
+                    {
                         fold_second = true;
                         second_is_free = true;
                     } else if (next && next_size == 2 &&
@@ -624,6 +684,13 @@ Fetch2::decodeInstructions(BranchData &prediction_out)
                         fold_second = true;
                         second_is_free = false;
                         dyn_inst->freeMicroop = true;
+                    } else if (!next && size == 2 &&
+                        !dyn_inst->staticInst->isMacroop() &&
+                        fetch_info.pc->instAddr() %
+                            decoder->moreBytesSize() == 0)
+                    {
+                        fold_pending = true;
+                        first_branched_to = new_stream;
                     }
                 }
 
@@ -828,10 +895,26 @@ SingleStageFetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
          *  Decode, anything else waits for Execute */
         const StaticInstPtr &static_inst = inst->staticInst;
 
+        /* Nothing more of this stream is fetched once a branch sure to be
+         *  taken has been decoded, and what is fetched behind any other
+         *  branch is fetched on speculation */
+        if (static_inst->isUncondCtrl() && !static_inst->isMemRef() &&
+            !static_inst->isMicroop() && !sureBranch)
+        {
+            sureBranch = inst;
+        }
+
+        if (static_inst->isControl() || static_inst->isDirectCtrl() ||
+            static_inst->isIndirectCtrl() || static_inst->isCondCtrl() ||
+            static_inst->isUncondCtrl())
+        {
+            lastBranch = inst;
+        }
+
         if (static_inst->isDirectCtrl()) {
             decodedBranchTarget = static_inst->branchTarget(*inst->pc);
             decodedBranchTid = inst->id.threadId;
-            decodedBranchSeqNum = inst->id.fetchSeqNum;
+            decodedBranch = inst;
         } else if (registerTargetAtDecode &&
             static_inst->isIndirectCtrl() && !static_inst->isMemRef() &&
             !static_inst->isMicroop() && static_inst->numSrcRegs() == 1 &&
@@ -842,7 +925,15 @@ SingleStageFetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
             decodedRegisterBranch = inst;
             decodedRegisterTries = 3;
             decodedBranchTid = inst->id.threadId;
-            decodedBranchSeqNum = inst->id.fetchSeqNum;
+        } else if (static_inst->isSquashAfter() &&
+            !static_inst->isMacroop() && !static_inst->isMicroop())
+        {
+            /* The stream starts again after it, as after a branch to
+             *  the next instruction */
+            set(decodedBranchTarget, *inst->pc);
+            static_inst->advancePC(*decodedBranchTarget);
+            decodedBranchTid = inst->id.threadId;
+            decodedBranch = inst;
         }
         return;
     }

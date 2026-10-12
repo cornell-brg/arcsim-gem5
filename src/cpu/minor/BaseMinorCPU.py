@@ -362,7 +362,13 @@ class BaseMinorCPU(BaseCPU):
         " branch's target line is fetched in the cycle after the fetch stage"
         " decodes it (the branch's Decode cycle), beside the sequential"
         " stream, and starts the new stream if Execute takes the branch, as"
-        " on cores that compute direct targets in decode",
+        " on cores that compute direct targets in decode.  The lines of two"
+        " branches Execute has yet to complete are kept, the second only"
+        " behind a conditional branch.  The line after a squash-after"
+        " instruction is fetched in the same way.  A target line is"
+        " fetched on speculation (its request is flagged a prefetch), and"
+        " nothing more of the sequential stream is fetched once an"
+        " unconditional branch has been decoded",
     )
     fetchRegisterTargetAtDecode = Param.Bool(
         False,
@@ -374,10 +380,12 @@ class BaseMinorCPU(BaseCPU):
     fetchFoldMasks = VectorParam.UInt64(
         [],
         "With fetchFoldMatches and fetchFoldKinds: instructions that take"
-        " no cycle of their own beside a 16-bit neighbour in the same"
-        " fetched word (folding, or limited dual issue).  The patterns are"
-        " tested in order, and the first with (ext_mach_inst & mask) =="
-        " match gives the instruction's kind",
+        " no cycle of their own beside a 16-bit neighbour (folding, or"
+        " limited dual issue): one in the same fetched word, or the last of"
+        " the word before if that one was not branched to.  Nothing folds"
+        " into an instruction of several micro-ops, nor a branch into a"
+        " branch.  The patterns are tested in order, and the first with"
+        " (ext_mach_inst & mask) == match gives the instruction's kind",
     )
     fetchFoldMatches = VectorParam.UInt64([], "see fetchFoldMasks")
     fetchFoldKinds = VectorParam.Unsigned(
