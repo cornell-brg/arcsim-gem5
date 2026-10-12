@@ -434,6 +434,10 @@ class CortexM33CPU(ArmMMinorCPU):
     # a conditional branch's target is fetched while its condition
     # resolves.
     fetchBranchTargetAtDecode = True
+    # The targets of two branches are kept, and what is fetched behind a
+    # branch not yet resolved is fetched on speculation: RP2350XIP reads
+    # no line from flash for it.
+    fetchBranchSpeculation = True
     # So is the target of BX and BLX, read from its register: any taken
     # branch that is not a load costs 2 cycles [RP2350 datasheet
     # 3.7.4.9.7].

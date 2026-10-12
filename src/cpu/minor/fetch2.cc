@@ -875,6 +875,7 @@ SingleStageFetch2::SingleStageFetch2(const std::string &name,
     Fetch2(name, cpu_, params, inp_, branchInp_, predictionOut_, out_,
         next_stage_input_buffer),
     branchTargetAtDecode(params.fetchBranchTargetAtDecode),
+    branchSpeculation(params.fetchBranchSpeculation),
     registerTargetAtDecode(params.fetchRegisterTargetAtDecode),
     decodedBranchTid(InvalidThreadID)
 {
@@ -898,15 +899,17 @@ SingleStageFetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
         /* Nothing more of this stream is fetched once a branch sure to be
          *  taken has been decoded, and what is fetched behind any other
          *  branch is fetched on speculation */
-        if (static_inst->isUncondCtrl() && !static_inst->isMemRef() &&
-            !static_inst->isMicroop() && !sureBranch)
+        if (branchSpeculation && static_inst->isUncondCtrl() &&
+            !static_inst->isMemRef() && !static_inst->isMicroop() &&
+            !sureBranch)
         {
             sureBranch = inst;
         }
 
-        if (static_inst->isControl() || static_inst->isDirectCtrl() ||
-            static_inst->isIndirectCtrl() || static_inst->isCondCtrl() ||
-            static_inst->isUncondCtrl())
+        if (branchSpeculation &&
+            (static_inst->isControl() || static_inst->isDirectCtrl() ||
+             static_inst->isIndirectCtrl() || static_inst->isCondCtrl() ||
+             static_inst->isUncondCtrl()))
         {
             lastBranch = inst;
         }
@@ -925,7 +928,7 @@ SingleStageFetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
             decodedRegisterBranch = inst;
             decodedRegisterTries = 3;
             decodedBranchTid = inst->id.threadId;
-        } else if (static_inst->isSquashAfter() &&
+        } else if (branchSpeculation && static_inst->isSquashAfter() &&
             !static_inst->isMacroop() && !static_inst->isMicroop())
         {
             /* The stream starts again after it, as after a branch to

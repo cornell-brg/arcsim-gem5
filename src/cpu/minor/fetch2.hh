@@ -273,6 +273,9 @@ class SingleStageFetch2 : public Fetch2
     /** See fetchBranchTargetAtDecode in BaseMinorCPU.py */
     bool branchTargetAtDecode;
 
+    /** See fetchBranchSpeculation in BaseMinorCPU.py */
+    bool branchSpeculation;
+
   public:
     /** See fetchRegisterTargetAtDecode in BaseMinorCPU.py */
     bool registerTargetAtDecode;

@@ -1015,7 +1015,7 @@ SingleStageFetch1::fetchBranchTarget(ThreadID tid, Addr target_addr,
      *  beside this one */
     abandonTargetRequest(olderTargetRequest);
 
-    if (targetAwaited(tid)) {
+    if (branchSpeculation && targetAwaited(tid)) {
         olderTargetRequest = targetRequest;
         olderTargetBranchSeqNum = targetBranchSeqNum;
         targetRequest = NULL;
@@ -1048,7 +1048,8 @@ SingleStageFetch1::fetchBranchTarget(ThreadID tid, Addr target_addr,
 
     /* A read on speculation: the memory system may answer that the line
      *  is not at hand rather than go to fetch it */
-    request->request->setFlags(Request::PREFETCH);
+    if (branchSpeculation)
+        request->request->setFlags(Request::PREFETCH);
 
     request->state = FetchRequest::Translated;
     request->makePacket();
@@ -1154,6 +1155,7 @@ SingleStageFetch1::SingleStageFetch1(const std::string &name_,
     fetch2(fetch2_),
     execute(execute_),
     eToF1Input(eToF1Input_),
+    branchSpeculation(params.fetchBranchSpeculation),
     targetRequest(NULL),
     olderTargetRequest(NULL),
     readAheadLimit(params.fetchReadAheadLimit)
@@ -1234,7 +1236,17 @@ SingleStageFetch1::evaluate()
          *  through */
         ThreadID tid = fetch2->decodedBranchTid;
 
-        if (canFetchTarget(tid)) {
+        if (!branchSpeculation) {
+            /* Each decoded branch's target fetch replaces the last */
+            if (fetchInfo[tid].state == FetchRunning &&
+                icacheState == IcacheRunning)
+            {
+                fetchBranchTarget(tid,
+                    fetch2->decodedBranchTarget->instAddr(),
+                    fetch2->decodedBranch);
+            }
+            fetch2->decodedBranchTarget.reset();
+        } else if (canFetchTarget(tid)) {
             if (fetchInfo[tid].state == FetchRunning &&
                 icacheState == IcacheRunning &&
                 execute.lastCompletedFetchSeqNum(tid) <
@@ -1254,7 +1266,8 @@ SingleStageFetch1::evaluate()
             fetch2->decodedRegisterBranch->staticInst->srcRegIdx(0);
 
         if (fetchInfo[tid].state == FetchRunning &&
-            icacheState == IcacheRunning && canFetchTarget(tid) &&
+            icacheState == IcacheRunning &&
+            (branchSpeculation ? canFetchTarget(tid) : !targetAwaited(tid)) &&
             !execute.regWritePending(tid, reg,
                 fetch2->decodedRegisterBranch))
         {
