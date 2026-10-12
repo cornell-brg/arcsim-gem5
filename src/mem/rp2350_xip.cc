@@ -21,6 +21,8 @@ RP2350XIP::XIPStats::XIPStats(RP2350XIP &xip)
                "Lines read by continuing the last transfer"),
       ADD_STAT(bankWaits, statistics::units::Count::get(),
                "Accesses that waited for a bank"),
+      ADD_STAT(declined, statistics::units::Count::get(),
+               "Speculative reads of lines not in the cache, not made"),
       ADD_STAT(invalidations, statistics::units::Count::get(),
                "Lines invalidated by maintenance writes")
 {
@@ -183,6 +185,22 @@ RP2350XIP::receive(PacketPtr pkt)
     access->endLine = lineOf(pkt->getAddr() + pkt->getSize() - 1);
     access->requestor = pkt->requestorId();
     DPRINTF(RP2350XIP, "%s %#x\n", pkt->cmdString(), pkt->getAddr());
+    // No line is read from flash for a read made on speculation: it is
+    // answered at once as not there.
+    if (pkt->req->isPrefetch()) {
+        for (Addr line = access->nextLine; line <= access->endLine;
+             line += LineBytes)
+        {
+            if (!lookup(line)) {
+                ++xipStats.declined;
+                pkt->makeResponse();
+                pkt->setBadAddress();
+                port.schedTimingResp(pkt, curTick());
+                --outstanding;
+                return true;
+            }
+        }
+    }
     Manager &manager = managers[access->requestor];
     if (manager.waiting || !manager.held.empty() ||
         curTick() < manager.freeAt)

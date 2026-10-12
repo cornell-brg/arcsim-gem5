@@ -20,6 +20,11 @@ class RP2350XIP(AbstractMemory):
     whole lines, several ahead, gets them at the rate of one that fetches
     a word at a time.
 
+    A read made on speculation (one whose request is flagged a prefetch,
+    as the core's early fetch of a branch target is) reads no line from
+    flash: if its line is not in the cache it is answered at once with an
+    error.
+
     The QMI makes one transfer at a time, in the order they were asked for.
     A transfer whose line follows the last one's in address order, while
     the chip select is still held, only clocks out the data

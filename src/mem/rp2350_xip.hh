@@ -133,6 +133,7 @@ class RP2350XIP : public AbstractMemory
         statistics::Scalar misses;
         statistics::Scalar chained;
         statistics::Scalar bankWaits;
+        statistics::Scalar declined;
         statistics::Scalar invalidations;
         XIPStats(RP2350XIP &xip);
     } xipStats;
