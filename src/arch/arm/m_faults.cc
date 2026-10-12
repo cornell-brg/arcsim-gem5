@@ -316,6 +316,10 @@ ArmMFault::invoke(ThreadContext *tc, const StaticInstPtr &inst)
         // Async: already activated by updatePending(), proceed.
     }
 
+    // Exception entry opens the local exclusive monitor (DDI0403E
+    // A3.4.4), so a store-exclusive in the interrupted code fails.
+    tc->getIsaPtr()->globalClearExclusive();
+
     // ---- 1. Determine pre-exception state ----
 
     XPSR xpsr = tc->readMiscRegNoEffect(MISCREG_M_XPSR);

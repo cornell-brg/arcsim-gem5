@@ -182,6 +182,28 @@ m_profile_test(
     "test_coproc_nocp.elf",
     extra_args=["--cpu-type", "timing"],
 )
+for cpu_type in ("atomic", "timing", "minor"):
+    m_profile_test(
+        f"v8m_exclusive_{cpu_type}",
+        "test_v8m_exclusive.elf",
+        extra_args=["--cpu-type", cpu_type, "--release", "m33"],
+    )
+    m_profile_test(
+        f"it_fp_load_store_{cpu_type}",
+        "test_it_fp_load_store.elf",
+        extra_args=["--cpu-type", cpu_type],
+    )
+for cpu_type in ("timing", "minor"):
+    m_profile_test(
+        f"nvic_pend_enable_{cpu_type}",
+        "test_nvic_pend_enable.elf",
+        extra_args=["--cpu-type", cpu_type],
+    )
+m_profile_test(
+    "v8m_exclusive_undefined",
+    "test_v8m_exclusive_undefined.elf",
+    extra_args=["--cpu-type", "timing"],
+)
 m_profile_test(
     "coproc_rp2350",
     "test_coproc_rp2350.elf",
@@ -230,6 +252,97 @@ def m_profile_rp2350_test(name, firmware_name, ok_message, slow_sio=False):
 # The RP2350 GPIO coprocessor and SIO against values recorded on silicon
 m_profile_rp2350_test(
     "rp2350_gpioc", "test_rp2350_gpioc.elf", r"RP2350_GPIOC_OK"
+)
+
+
+def m_profile_rp2350_sdk_test(name, firmware_name, ok_message, sram_model):
+    """Register a test that runs Pico SDK firmware (programs/rp2350_sdk) on
+    the RP2350 board's Arm proxy (configs/run_rp2350_sdk.py) and passes when
+    it prints ok_message."""
+    firmware_path = joinpath(
+        config.base_dir, "tests", "gem5", "m_profile_tests", "programs",
+        "rp2350_sdk", firmware_name,
+    )
+    if not os.path.exists(firmware_path):
+        return
+    gem5_verify_config(
+        name=f"m_profile_{name}_{sram_model}",
+        verifiers=[verifier.MatchRegex(re.compile(ok_message))],
+        fixtures=(),
+        config=joinpath(
+            config.base_dir, "tests", "gem5", "m_profile_tests", "configs",
+            "run_rp2350_sdk.py",
+        ),
+        config_args=[
+            "--firmware", firmware_path, "--sram-model", sram_model,
+        ],
+        valid_isas=(constants.all_compiled_tag,),
+        valid_hosts=constants.supported_hosts,
+        length=constants.quick_tag,
+    )
+
+
+for sram_model in ("legacy", "banked"):
+    m_profile_rp2350_sdk_test(
+        "rp2350_sdk_locks", "sdk_locks.elf", r"RP2350_SDK_LOCKS_OK",
+        sram_model,
+    )
+
+
+def m_profile_rp2350_dma_test(name, firmware_name, ok_message, run_config,
+                              sram_model, xip_model="legacy"):
+    """Register a test that runs firmware on the RP2350 board's Arm proxy
+    with its DMA, through configs/<run_config>, and passes when it prints
+    ok_message."""
+    firmware_path = joinpath(
+        config.base_dir, "tests", "gem5", "m_profile_tests", "programs",
+        firmware_name,
+    )
+    if not os.path.exists(firmware_path):
+        return
+    run_args = ["--firmware", firmware_path, "--sram-model", sram_model]
+    if run_config == "run_rp2350_sdk.py":
+        run_args += ["--dma", "--xip-model", xip_model]
+    gem5_verify_config(
+        name=f"m_profile_{name}_{sram_model}",
+        verifiers=[verifier.MatchRegex(re.compile(ok_message))],
+        fixtures=(),
+        config=joinpath(
+            config.base_dir, "tests", "gem5", "m_profile_tests", "configs",
+            run_config,
+        ),
+        config_args=run_args,
+        valid_isas=(constants.all_compiled_tag,),
+        valid_hosts=constants.supported_hosts,
+        length=constants.quick_tag,
+    )
+
+
+for sram_model in ("legacy", "banked"):
+    m_profile_rp2350_dma_test(
+        "rp2350_dma", "test_rp2350_dma.elf", r"RP2350_DMA_OK",
+        "run_rp2350_sdk.py", sram_model,
+    )
+    m_profile_rp2350_dma_test(
+        "rp2350_dma_dreq", "test_rp2350_dma_dreq.elf",
+        r"RP2350_DMA_DREQ_OK", "run_rp2350_dma_dreq.py", sram_model,
+    )
+    # Flash timing and the DMA beside it, with the values a Pico 2 gives
+    m_profile_rp2350_dma_test(
+        "rp2350_xip", "test_rp2350_xip.elf", r"RP2350_XIP_OK",
+        "run_rp2350_sdk.py", sram_model, xip_model="qmi",
+    )
+    # The core fetches only a few words past a branch, as a Pico 2
+    m_profile_rp2350_dma_test(
+        "rp2350_fetch_ahead", "test_rp2350_fetch_ahead.elf",
+        r"RP2350_FETCH_AHEAD_OK", "run_rp2350_sdk.py", sram_model,
+        xip_model="qmi",
+    )
+# A store that loses its bank holds the core, with the cycles a Pico 2 gives;
+# only the banked SRAM has banks to lose
+m_profile_rp2350_dma_test(
+    "rp2350_store_wait", "test_rp2350_store_wait.elf",
+    r"RP2350_STORE_WAIT_OK", "run_rp2350_sdk.py", "banked",
 )
 # GPIO coprocessor instructions stay in program order with SIO accesses on
 # the Minor-based Arm proxy

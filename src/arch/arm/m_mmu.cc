@@ -50,6 +50,31 @@ namespace ArmISA
 // MTLB — pass-through TLB (identity translation, no protection)
 // ---------------------------------------------------------------------------
 
+// A data access to one of the default memory map's device regions
+// (DDI0403E B3.1): the peripherals at 0x40000000-0x5FFFFFFF, external
+// devices at 0xA0000000-0xDFFFFFFF, and the private peripheral bus and
+// vendor space from 0xE0000000. A device access has side effects, so it
+// happens in program order: a pipelined CPU model neither holds such a
+// store in its store buffer nor answers a later load from it, and does
+// not start such a load ahead of older instructions.
+//
+// Loads from the private peripheral bus are left as they were: with its
+// stores out of the store buffer they already see them, and the cycle
+// counter's loads bound every measured window, whose length a change in
+// when they start would move.
+static void
+markDeviceAccess(const RequestPtr &req, BaseMMU::Mode mode)
+{
+    if (mode == BaseMMU::Execute)
+        return;
+    const Addr addr = req->getVaddr();
+    const bool peripheral = addr >= 0x40000000 && addr < 0x60000000;
+    const bool external = addr >= 0xA0000000 && addr < 0xE0000000;
+    const bool ppb = addr >= 0xE0000000 && addr <= 0xFFFFFFFF;
+    if (peripheral || external || (ppb && mode == BaseMMU::Write))
+        req->setFlags(Request::STRICT_ORDER | Request::UNCACHEABLE);
+}
+
 Fault
 MTLB::translateAtomic(const RequestPtr &req, ThreadContext *tc,
                       BaseMMU::Mode mode)
@@ -101,6 +126,7 @@ MTLB::translateAtomic(const RequestPtr &req, ThreadContext *tc,
     // M-profile: VA == PA, no translation.
     // TODO: Add MPU permission checks here when the MPU is modelled.
     req->setPaddr(vaddr);
+    markDeviceAccess(req, mode);
     return NoFault;
 }
 
@@ -140,6 +166,7 @@ MTLB::translateTiming(const RequestPtr &req, ThreadContext *tc,
 
     // Pass-through: complete immediately with identity translation.
     req->setPaddr(vaddr);
+    markDeviceAccess(req, mode);
     translation->finish(NoFault, req, tc, mode);
 }
 

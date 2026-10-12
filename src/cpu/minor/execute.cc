@@ -79,6 +79,7 @@ Execute::Execute(const std::string &name_, MinorCPU &cpu_,
       setTraceTimeOnIssue(params.executeSetTraceTimeOnIssue),
       allowEarlyMemIssue(params.executeAllowEarlyMemoryIssue),
       branchAtIssue(params.executeBranchAtIssue),
+      loadAccessAtIssue(params.executeLoadAccessAtIssue),
       inOrderCompletion(params.executeInOrderCompletion),
       dynamicLatencyHoldsInst(params.executeDynamicLatencyHoldsInst),
       lastBackgroundResult(0),
@@ -88,9 +89,11 @@ Execute::Execute(const std::string &name_, MinorCPU &cpu_,
           params.executeLSQRequestsQueueSize,
           params.executeLSQTransfersQueueSize,
           params.executeLSQStoreBufferSize,
-          params.executeLSQMaxStoreBufferStoresPerCycle),
+          params.executeLSQMaxStoreBufferStoresPerCycle,
+          params.executeWaitedStoreHoldsInsts),
       executeInfo(params.numThreads,
                   ExecuteThreadInfo(params.executeCommitLimit)),
+      lastCompleted(params.numThreads, 0),
       interruptPriority(0),
       issuePriority(0),
       commitPriority(0),
@@ -713,6 +716,13 @@ Execute::issue(ThreadID thread_id)
                                 timing->extraCommitLatExpr;
                             extra_assumed_lat =
                                 timing->extraAssumedLat;
+
+                            /* A reader issues one cycle before a source's
+                             *  return cycle at the earliest */
+                            if (timing->resultUsePenalty != Cycles(0)) {
+                                inst->resultDelay =
+                                    timing->resultUsePenalty + Cycles(1);
+                            }
                         }
 
                         issued_mem_ref = inst->isMemRef();
@@ -769,6 +779,13 @@ Execute::issue(ThreadID thread_id)
 
                         /* Issue to FU */
                         fu->push(fu_inst);
+
+                        /* The FU stays busy longer for this inst. */
+                        if (timing && timing->extraIssueLat != Cycles(0)) {
+                            fu->nextInsertCycle = cpu.curCycle() +
+                                fu->description.issueLat +
+                                timing->extraIssueLat;
+                        }
                         /* And start the countdown on activity to allow
                          *  this instruction to get to the end of its FU */
                         cpu.activityRecorder->activity();
@@ -806,12 +823,14 @@ Execute::issue(ThreadID thread_id)
                         Cycles result_cycle = cpu.curCycle() +
                             fu->description.opLat +
                             extra_dest_retire_lat +
-                            extra_assumed_lat;
+                            extra_assumed_lat +
+                            inst->resultDelay;
 
                         scoreboard[thread_id].markupInstDests(inst,
                             result_cycle,
                             cpu.getContext(thread_id),
-                            issued_mem_ref && extra_assumed_lat == Cycles(0));
+                            issued_mem_ref && extra_assumed_lat == Cycles(0) &&
+                            inst->resultDelay == Cycles(0));
 
                         if (fu->description.resultAfterCommit &&
                             result_cycle > lastBackgroundResult)
@@ -857,7 +876,8 @@ Execute::issue(ThreadID thread_id)
             if (issued_mem_ref)
                 num_mem_insts_issued++;
 
-            if (!discarded && !inst->isBubble()) {
+            /* A free micro-op is issued beyond the limit */
+            if (!discarded && !inst->isBubble() && !inst->freeMicroop) {
                 num_insts_issued++;
 
                 if (num_insts_issued == issueLimit)
@@ -885,8 +905,11 @@ Execute::issue(ThreadID thread_id)
         /* We still have instructions */
         fu_index != numFuncUnits && /* Not visited all FUs */
         issued && /* We've not yet failed to issue an instruction */
-        num_insts_issued != issueLimit && /* Still allowed to issue */
-        num_mem_insts_issued != memoryIssueLimit);
+        ((num_insts_issued != issueLimit && /* Still allowed to issue */
+          num_mem_insts_issued != memoryIssueLimit) ||
+         /* or nothing to issue, or a micro-op that needs no allowance */
+         insts_in->insts[thread.inputIndex]->isBubble() ||
+         insts_in->insts[thread.inputIndex]->freeMicroop));
 
     return num_insts_issued;
 }
@@ -1153,7 +1176,8 @@ bool
 Execute::waitsForCompletion(const ExecuteThreadInfo &thread,
     const MinorDynInstPtr &inst) const
 {
-    if (!inOrderCompletion || inst->isFault())
+    /* An instruction that takes no cycle goes with the one before it */
+    if (!inOrderCompletion || inst->isFault() || inst->freeMicroop)
         return false;
 
     /* The macro-op was admitted with its first micro-op */
@@ -1173,6 +1197,10 @@ void
 Execute::countInFlight(ExecuteThreadInfo &thread,
     const MinorDynInstPtr &inst, bool entering)
 {
+    /* An instruction that takes no cycle holds nothing up */
+    if (inst->freeMicroop)
+        return;
+
     unsigned int &count = (countsAsMemRef(inst) ?
         thread.memRefsInFlight : thread.othersInFlight);
 
@@ -1182,6 +1210,56 @@ Execute::countInFlight(ExecuteThreadInfo &thread,
         assert(count != 0);
         count--;
     }
+}
+
+bool
+Execute::leadsFoldedBranch(ThreadID thread_id, const MinorDynInstPtr &inst)
+{
+    const ExecuteThreadInfo &ex_info = executeInfo[thread_id];
+    MinorDynInstPtr branch;
+    unsigned int index = 0;
+
+    ex_info.inFlightInsts->forEach(
+        [&](const QueuedInst &in_flight) {
+            if (index++ == 1)
+                branch = in_flight.inst;
+        });
+
+    if (!branch || !branch->isInst() || !branch->freeMicroop ||
+        branch->id.streamSeqNum != ex_info.streamSeqNum ||
+        inst->resultDelay != Cycles(0))
+    {
+        return false;
+    }
+
+    const StaticInstPtr &static_inst = inst->staticInst;
+    const StaticInstPtr &branch_inst = branch->staticInst;
+
+    /* Some decoders mark a branch only by its kind, not IsControl */
+    bool is_branch = branch_inst->isControl() ||
+        branch_inst->isDirectCtrl() || branch_inst->isIndirectCtrl() ||
+        branch_inst->isCondCtrl() || branch_inst->isUncondCtrl();
+
+    if (!is_branch || branch_inst->isMemRef() || static_inst->isMicroop() ||
+        static_inst->isSerializing() || static_inst->isNonSpeculative())
+    {
+        return false;
+    }
+
+    /* The branch waits for nothing that inst writes: its flags, if it is
+     *  conditional, or its register */
+    auto *isa = cpu.getContext(thread_id)->getIsaPtr();
+
+    for (unsigned int dest = 0; dest < static_inst->numDestRegs(); dest++) {
+        RegId written = static_inst->destRegIdx(dest).flatten(*isa);
+
+        for (unsigned int src = 0; src < branch_inst->numSrcRegs(); src++) {
+            if (branch_inst->srcRegIdx(src).flatten(*isa) == written)
+                return false;
+        }
+    }
+
+    return true;
 }
 
 bool
@@ -1204,8 +1282,10 @@ Execute::canCommitAtIssue(ThreadID thread_id, const MinorDynInstPtr &inst)
         static_inst->isCondCtrl() || static_inst->isUncondCtrl() ||
         static_inst->isSquashAfter();
 
+    /* A branch, or an instruction with a branch folded into it that it
+     *  does not hold up: the two take one cycle between them */
     if (static_inst->isMemRef() || static_inst->isQuiesce() ||
-        !can_redirect)
+        (!can_redirect && !leadsFoldedBranch(thread_id, inst)))
     {
         return false;
     }
@@ -1225,6 +1305,86 @@ Execute::canCommitAtIssue(ThreadID thread_id, const MinorDynInstPtr &inst)
         fu->alreadyPushed() && fu->back().inst == inst &&
         inst->extraCommitDelay == Cycles(0) &&
         !inst->extraCommitDelayExpr;
+}
+
+bool
+Execute::regWritePending(ThreadID thread_id, const RegId &reg,
+    const MinorDynInstPtr &inst)
+{
+    auto *isa = cpu.getContext(thread_id)->getIsaPtr();
+    RegId flat_reg = reg.flatten(*isa);
+
+    if (scoreboard[thread_id].writePending(flat_reg))
+        return true;
+
+    /* What an instruction not yet issued writes is not on the scoreboard */
+    bool pending = false;
+    bool reached_inst = false;
+    /* The input's first element may be part issued */
+    unsigned int first = executeInfo[thread_id].inputIndex;
+
+    inputBuffer[thread_id].forEach(
+        [&](const ForwardInstData &insts) {
+            unsigned int i = first;
+
+            first = 0;
+            for (; i < insts.width(); i++) {
+                const MinorDynInstPtr &waiting = insts.insts[i];
+
+                if (waiting == inst)
+                    reached_inst = true;
+
+                if (reached_inst || pending || !waiting->isInst())
+                    continue;
+
+                const StaticInstPtr &static_inst = waiting->staticInst;
+
+                for (unsigned int dest = 0;
+                    dest < static_inst->numDestRegs(); dest++)
+                {
+                    if (static_inst->destRegIdx(dest).flatten(*isa) ==
+                        flat_reg)
+                    {
+                        pending = true;
+                    }
+                }
+            }
+        });
+
+    return pending;
+}
+
+bool
+Execute::canAccessAtIssue(ThreadID thread_id)
+{
+    const ExecuteThreadInfo &ex_info = executeInfo[thread_id];
+
+    if (ex_info.inFUMemInsts->empty() || ex_info.inFlightInsts->empty() ||
+        !lsq.canRequest())
+    {
+        return false;
+    }
+
+    /* Memory references go to the LSQ in order */
+    const MinorDynInstPtr &inst = ex_info.inFUMemInsts->front().inst;
+
+    if (inst->isBubble() || inst->isFault() || inst->inLSQ ||
+        !inst->canEarlyIssue || !inst->staticInst->isLoad() ||
+        inst->id.streamSeqNum != ex_info.streamSeqNum ||
+        inst->fuIndex >= numFuncUnits)
+    {
+        return false;
+    }
+
+    /* Only a load pushed into a single-cycle FU this cycle, with the
+     *  instructions its address depends on complete */
+    FUPipeline *fu = funcUnits[inst->fuIndex];
+
+    return fu->description.opLat == Cycles(1) &&
+        fu->alreadyPushed() && fu->back().inst == inst &&
+        !inst->extraCommitDelayExpr &&
+        ex_info.inFlightInsts->front().inst->id.execSeqNum >
+            inst->instToWaitFor;
 }
 
 void
@@ -1263,6 +1423,10 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
     /* Has an instruction been completed?  Once this becomes false, we stop
      *  trying to complete instructions. */
     bool completed_inst = true;
+
+    /* The instruction committed at issue has a branch folded into it,
+     *  which follows it */
+    bool leads_folded_branch = false;
 
     /* Number of insts committed this cycle to check against commitLimit */
     unsigned int num_insts_committed = 0;
@@ -1329,7 +1493,8 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
             /* Branch as there was a change in PC */
             updateBranchData(thread_id, BranchData::UnpredictedBranch,
                 MinorDynInst::bubble(), thread->pcState(), branch);
-        } else if (mem_response &&
+        } else if (mem_response && !at_issue &&
+            inst->minimumCommitCycle <= now &&
             num_mem_refs_committed < memoryCommitLimit)
         {
             /* Try to commit from the memory responses next */
@@ -1414,6 +1579,19 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
                         *inst);
                     try_to_commit = true;
                     completed_inst = true;
+                    leads_folded_branch = leadsFoldedBranch(thread_id, inst);
+                } else if (loadAccessAtIssue &&
+                    canAccessAtIssue(thread_id))
+                {
+                    /* Use this, possibly out of order, load as the one
+                     *  to send to the LSQ */
+                    inst = ex_info.inFUMemInsts->front().inst;
+
+                    DPRINTF(MinorExecute, "Issuing mem ref at issue"
+                        " inst: %s\n", *inst);
+                    try_to_commit = true;
+                    early_memory_issue = true;
+                    completed_inst = true;
                 }
             }
 
@@ -1485,9 +1663,15 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
 
                     /* Move the extraCommitDelay from the instruction
                      *  into the minimumCommitCycle */
+                    /* A load that goes to memory in its issue cycle
+                     *  takes the extra cycles before it completes, not
+                     *  before its access */
+                    bool access_at_issue = at_issue && early_memory_issue;
+
                     if (inst->extraCommitDelay != Cycles(0)) {
                         inst->minimumCommitCycle = cpu.curCycle() +
-                            inst->extraCommitDelay;
+                            inst->extraCommitDelay +
+                            Cycles(access_at_issue ? 1 : 0);
                         inst->extraCommitDelay = Cycles(0);
                     }
 
@@ -1502,7 +1686,9 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
                             " as there are incomplete barriers in flight\n",
                             *inst);
                         completed_inst = false;
-                    } else if (inst->minimumCommitCycle > now) {
+                    } else if (inst->minimumCommitCycle > now &&
+                        !access_at_issue)
+                    {
                         DPRINTF(MinorExecute, "Not committing inst: %s yet"
                             " as it wants to be stalled for %d more cycles\n",
                             *inst, inst->minimumCommitCycle - now);
@@ -1517,7 +1703,7 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
                     completed_inst = true;
                 }
 
-                if (completed_inst && at_issue) {
+                if (completed_inst && at_issue && !inst->isNoCostInst()) {
                     /* It never travels down its FU */
                     funcUnits[inst->fuIndex]->unpush();
                 } else if (completed_inst) {
@@ -1573,6 +1759,9 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
             /* Note that this includes discarded insts */
             DPRINTF(MinorExecute, "Completed inst: %s\n", *inst);
 
+            if (!inst->isBubble())
+                lastCompleted[thread_id] = inst->id.fetchSeqNum;
+
             /* Got to the end of a full instruction? */
             ex_info.lastCommitWasEndOfMacroop = inst->isFault() ||
                 inst->isLastOpInInst();
@@ -1600,13 +1789,25 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
             if (result_after_commit) {
                 scoreboard[thread_id].clearInstDests(inst, false,
                     cpu.curCycle());
+            } else if (!inst->isFault() &&
+                inst->resultDelay != Cycles(0))
+            {
+                Cycles result_cycle = cpu.curCycle() + inst->resultDelay;
+
+                scoreboard[thread_id].setReturnCycle(inst, result_cycle);
+                scoreboard[thread_id].clearInstDests(inst, false,
+                    cpu.curCycle());
+
+                if (result_cycle > lastBackgroundResult)
+                    lastBackgroundResult = result_cycle;
             } else {
                 scoreboard[thread_id].clearInstDests(inst,
                     inst->isMemRef());
             }
         }
 
-        if (at_issue)
+        /* One instruction at issue, beside those that take no cycle */
+        if (at_issue && !inst->isNoCostInst() && !leads_folded_branch)
             completed_inst = false;
 
         /* Handle per-cycle instruction counting */
@@ -1661,6 +1862,7 @@ Execute::evaluate()
     BranchData &branch = *out.inputWire;
 
     unsigned int num_issued = 0;
+    bool store_holds_insts = false;
 
     /* Do all the cycle-wise activities for dcachePort here to potentially
      *  free up input spaces in the LSQ's requests queue */
@@ -1678,6 +1880,10 @@ Execute::evaluate()
          *  without overwriting them */
         DPRINTF(MinorInterrupt, "Execute skipping a cycle to allow old"
             " branch to complete\n");
+    } else if (lsq.storeHoldsInsts()) {
+        DPRINTF(MinorExecute, "Holding instructions while the bus makes a"
+            " store wait\n");
+        store_holds_insts = true;
     } else {
         ThreadID commit_tid = getCommittingThread();
 
@@ -1735,17 +1941,24 @@ Execute::evaluate()
 
             ExecuteThreadInfo &issue_info = executeInfo[issue_tid];
 
-            if (branchAtIssue && num_issued != 0 && !interrupted &&
-                branch.isBubble() &&
+            if (num_issued != 0 && !interrupted && branch.isBubble() &&
                 issue_info.drainState == NotDraining &&
                 !issue_info.inFlightInsts->empty() &&
-                canCommitAtIssue(issue_tid,
-                    issue_info.inFlightInsts->front().inst))
+                ((branchAtIssue && canCommitAtIssue(issue_tid,
+                    issue_info.inFlightInsts->front().inst)) ||
+                 (loadAccessAtIssue && canAccessAtIssue(issue_tid)) ||
+                 /* Something behind an instruction that takes no cycle */
+                 ((branchAtIssue || loadAccessAtIssue) &&
+                    issue_info.inFlightInsts->front().inst->freeMicroop)))
             {
                 commit(issue_tid, false, false, branch, true);
             }
         }
 
+        /* A store's address phase is in the cycle it commits, and a load
+         *  that waited behind it for the store buffer follows it out */
+        if (lsq.waitedStoreHoldsInsts)
+            lsq.step();
     }
 
     /* Run logic to step functional units + decide if we are active on the next
@@ -1832,6 +2045,7 @@ Execute::evaluate()
        head_inst_might_commit || /* Could possible commit the next inst */
        lsq.needsToTick() || /* Must step the dcache port */
        cpu.curCycle() < lastBackgroundResult || /* A result to wait for */
+       store_holds_insts || /* Held this cycle, try again */
        interrupted; /* There are pending interrupts */
 
     if (!need_to_tick) {

@@ -63,6 +63,7 @@ namespace minor
 {
 
 class SingleStageFetch2;
+class Execute;
 
 /** A stage responsible for fetching "lines" from memory and passing
  *  them to Fetch2 */
@@ -146,6 +147,10 @@ class Fetch1 : public Named
         /** Fill in a fault if one happens during fetch, check this by
          *  picking apart the response packet */
         Fault fault;
+
+        /** Sent on speculation and declined by the memory system: to be
+         *  sent again once it is sure to be wanted */
+        bool declined = false;
 
         /** Make a packet to use with the memory transaction */
         void makePacket();
@@ -316,6 +321,10 @@ class Fetch1 : public Named
      *  this value, it's better to code without knowledge of the number
      *  of outstanding accesses */
     unsigned int numFetchesInMemorySystem;
+
+    /** Line fetches are flagged as prefetches, which the memory system
+     *  may decline with an error */
+    bool sendOnSpeculation = false;
     /** Number of requests inside the ITLB rather than in the queues.
      *  All requests so located *must* have reserved space in the
      *  transfers queue */
@@ -449,6 +458,9 @@ class SingleStageFetch1 : public Fetch1
 {
   protected:
     SingleStageFetch2 *fetch2;
+
+    /** Asked whether a register branch's target can be read in Decode */
+    Execute &execute;
     BranchData lastPrediction;
 
     /** Direct access to the eToF1 latch INPUT wire.
@@ -464,19 +476,57 @@ class SingleStageFetch1 : public Fetch1
      *  in Decode (fetchBranchTargetAtDecode); null if none */
     FetchRequestPtr targetRequest;
 
+    /** The fetch sequence number of the branch targetRequest is for, and
+     *  whether that branch is conditional */
+    InstSeqNum targetBranchSeqNum = 0;
+    bool targetBranchMayFallThrough = false;
+
+    /** The target line of the branch before that one, kept while Execute
+     *  has yet to complete both; null if none */
+    FetchRequestPtr olderTargetRequest;
+    InstSeqNum olderTargetBranchSeqNum = 0;
+
     /** Target requests given up while still in the memory system */
     std::vector<FetchRequestPtr> abandonedTargetRequests;
 
-    /** Fetch the line holding target beside the sequential stream */
-    void fetchBranchTarget(ThreadID tid, const PCStateBase &target);
+    /** The port refused a branch target request, which is not resent:
+     *  nothing more may be sent until the port's retry arrives */
+    bool targetRefused = false;
 
-    /** Give up targetRequest */
-    void abandonTargetRequest();
+    /** No sequential fetch starts while this many bytes of the stream, or
+     *  more, are fetched or on their way and not yet decoded (0: no
+     *  limit) */
+    unsigned int readAheadLimit;
 
-    /** If execute_branch goes to the line targetRequest holds, make it
+    /** Is the stream fetched as far ahead of decode as readAheadLimit
+     *  allows? */
+    bool readAheadFull();
+
+    /** Fetch the line holding target_addr, the target of branch, beside
+     *  the sequential stream */
+    void fetchBranchTarget(ThreadID tid, Addr target_addr,
+        const MinorDynInstPtr &branch);
+
+    /** Send again the line fetches the memory system declined, unless
+     *  the stream is still fetched on speculation; those of a stream
+     *  since left are dropped */
+    void resendDeclined(bool on_speculation);
+
+    /** Is targetRequest for a branch Execute has yet to complete? */
+    bool targetAwaited(ThreadID tid) const;
+
+    /** Can another branch's target be fetched?  Not behind a branch
+     *  sure to be taken, nor while Execute has yet to complete the
+     *  branches of both target requests */
+    bool canFetchTarget(ThreadID tid) const;
+
+    /** Give up a target request */
+    void abandonTargetRequest(FetchRequestPtr &target_request);
+
+    /** If execute_branch goes to the line target_request holds, make it
      *  the new stream's first line in line_out and return true */
-    bool takeTargetLine(const BranchData &execute_branch,
-        ForwardLineData &line_out);
+    bool takeTargetLine(FetchRequestPtr &target_request,
+        const BranchData &execute_branch, ForwardLineData &line_out);
 
   public:
     SingleStageFetch1(const std::string &name_,
@@ -487,7 +537,8 @@ class SingleStageFetch1 : public Fetch1
         Latch<BranchData>::Output prediction_,
         std::vector<InputBuffer<ForwardLineData>> &next_stage_input_buffer,
         SingleStageFetch2 *fetch2_,
-        Latch<BranchData>::Input eToF1Input_);
+        Latch<BranchData>::Input eToF1Input_,
+        Execute &execute_);
 
     ~SingleStageFetch1() override = default;
 

@@ -231,6 +231,14 @@ class MinorDynInst : public RefCounted
      *  to account for delay in absolute time */
     Cycles minimumCommitCycle{0};
 
+    /** A micro-op that takes no cycle of its own
+     *  (executeFreeUpdateMicroops) */
+    bool freeMicroop = false;
+
+    /** With a resultUsePenalty: cycles from this instruction's commit
+     *  to the return cycle of its results (0: none) */
+    Cycles resultDelay{0};
+
     /** Flat register indices so that, when clearing the scoreboard, we
      *  have the same register indices as when the instruction was marked
      *  up */

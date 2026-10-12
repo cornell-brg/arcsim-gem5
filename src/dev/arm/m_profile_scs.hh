@@ -99,6 +99,10 @@ class MProfileSCS : public BasicPioDevice
       bool inPendingQueue;
       bool inActiveQueue;
 
+      // The level of the interrupt's line, for a device that drives one
+      // (setIrqLevel()).
+      bool level = false;
+
       Interrupt(bool active, bool enabled, bool pending, int16_t priority,
                 uint32_t interruptNum, bool inPendingQueue, bool inActiveQueue)
           : active(active), enabled(enabled), pending(pending),
@@ -246,14 +250,32 @@ class MProfileSCS : public BasicPioDevice
     void sendInt(uint32_t irq);
     void clearInt(uint32_t irq);
 
+    /**
+     * A device's level-sensitive interrupt line. The interrupt becomes
+     * pending when the line goes high, stays pending if it goes low
+     * again before it is taken, and becomes pending again if the line
+     * is still high when its handler returns (DDI0403E B3.4.1).
+     */
+    void setIrqLevel(uint32_t irq, bool level);
+
     // -- CPU-side interface (called by MProfileInterrupts) --
 
+    /**
+     * Whether a pending exception could be taken now. Asking does not
+     * take it: a CPU model may ask on cycles where it cannot enter an
+     * exception (the Minor CPU, with a memory access in flight), and the
+     * exception stays pending until updatePending() promotes it.
+     */
     bool hasDeliverableIRQ();
+
+    /**
+     * The exception hasDeliverableIRQ() answers for, or -1.
+     */
+    int deliverableIRQ();
 
     /**
      * Whether any enabled exception is pending, whatever PRIMASK, BASEPRI
      * and FAULTMASK say: what wakes WFI (Armv8-M, WFI wakeup events).
-     * Unlike hasDeliverableIRQ(), it changes no state.
      */
     bool hasPendingEnabledIRQ() const;
     int acknowledgeIRQ();

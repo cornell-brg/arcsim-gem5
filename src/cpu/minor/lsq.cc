@@ -830,6 +830,17 @@ LSQ::StoreBuffer::forwardStoreData(LSQRequestPtr load,
     std::memcpy(load_packet_data, store_packet_data, load_size);
 }
 
+bool
+LSQ::StoreBuffer::hasWaitedStore() const
+{
+    for (const auto &slot : slots) {
+        if (!slot->isComplete() && slot->storeSentTick < curTick())
+            return true;
+    }
+
+    return false;
+}
+
 void
 LSQ::StoreBuffer::countIssuedStore(LSQRequestPtr request)
 {
@@ -1233,6 +1244,8 @@ LSQ::tryToSend(LSQRequestPtr request)
                 /* Fully or partially issued a request in the store
                  *  buffer */
                 request->setState(LSQRequest::StoreBufferIssuing);
+                if (request->storeSentTick == MaxTick)
+                    request->storeSentTick = curTick();
                 break;
               default:
                 panic("Unrecognized LSQ request state %d.", request->state);
@@ -1405,7 +1418,8 @@ LSQ::LSQ(std::string name_, std::string dcache_port_name_,
     unsigned int in_memory_system_limit, unsigned int line_width,
     unsigned int requests_queue_size, unsigned int transfers_queue_size,
     unsigned int store_buffer_size,
-    unsigned int store_buffer_cycle_store_limit) :
+    unsigned int store_buffer_cycle_store_limit,
+    bool waited_store_holds_insts) :
     Named(name_),
     cpu(cpu_),
     execute(execute_),
@@ -1423,7 +1437,8 @@ LSQ::LSQ(std::string name_, std::string dcache_port_name_,
     numStoresInTransfers(0),
     numAccessesIssuedToMemory(0),
     retryRequest(NULL),
-    cacheBlockMask(~(cpu_.cacheLineSize() - 1))
+    cacheBlockMask(~(cpu_.cacheLineSize() - 1)),
+    waitedStoreHoldsInsts(waited_store_holds_insts)
 {
     if (in_memory_system_limit < 1) {
         fatal("%s: executeMaxAccessesInMemory must be >= 1 (%d)\n", name_,

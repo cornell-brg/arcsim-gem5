@@ -1,0 +1,112 @@
+
+test_nvic_pend_enable.elf:     file format elf32-littlearm
+
+SYMBOL TABLE:
+08000000 l    d  .isr_vector	00000000 .isr_vector
+08000050 l    d  .text	00000000 .text
+08000100 l    d  .rodata	00000000 .rodata
+20000000 l    d  .data	00000000 .data
+20000000 l    d  .bss	00000000 .bss
+00000000 l    d  .ARM.attributes	00000000 .ARM.attributes
+00000000 l    df *ABS*	00000000 test_nvic_pend_enable.o
+20000100 l       *ABS*	00000000 TEST_RESULT
+20000104 l       *ABS*	00000000 TEST_SUBTEST
+cafecafe l       *ABS*	00000000 PASS_VAL
+deaddead l       *ABS*	00000000 FAIL_VAL
+20000200 l       *ABS*	00000000 BUF
+20000300 l       *ABS*	00000000 IRQS
+e000e100 l       *ABS*	00000000 NVIC_ISER
+e000e180 l       *ABS*	00000000 NVIC_ICER
+e000e200 l       *ABS*	00000000 NVIC_ISPR
+08000000 l       .isr_vector	00000000 __isr_vector
+080000d4 l     F .text	00000000 default_handler
+080000ca l     F .text	00000000 Irq3_Handler
+080000b6 l       .text	00000000 fail
+080000c0 l       .text	00000000 done
+08000050 g     F .text	00000000 Reset_Handler
+20020000 g       *ABS*	00000000 _estack
+
+
+
+Disassembly of section .text:
+
+08000050 <Reset_Handler>:
+ 8000050:	4c21      	ldr	r4, [pc, #132]	@ (80000d8 <default_handler+0x4>)
+ 8000052:	4d22      	ldr	r5, [pc, #136]	@ (80000dc <default_handler+0x8>)
+ 8000054:	2000      	movs	r0, #0
+ 8000056:	6028      	str	r0, [r5, #0]
+ 8000058:	f8df 8084 	ldr.w	r8, [pc, #132]	@ 80000e0 <default_handler+0xc>
+ 800005c:	f8df 9084 	ldr.w	r9, [pc, #132]	@ 80000e4 <default_handler+0x10>
+ 8000060:	2608      	movs	r6, #8
+ 8000062:	2701      	movs	r7, #1
+ 8000064:	f8c9 6000 	str.w	r6, [r9]
+ 8000068:	2310      	movs	r3, #16
+ 800006a:	6820      	ldr	r0, [r4, #0]
+ 800006c:	6060      	str	r0, [r4, #4]
+ 800006e:	f8c8 6000 	str.w	r6, [r8]
+ 8000072:	68a1      	ldr	r1, [r4, #8]
+ 8000074:	60e1      	str	r1, [r4, #12]
+ 8000076:	bf00      	nop
+ 8000078:	bf00      	nop
+ 800007a:	3b01      	subs	r3, #1
+ 800007c:	d1f5      	bne.n	800006a <Reset_Handler+0x1a>
+ 800007e:	6828      	ldr	r0, [r5, #0]
+ 8000080:	2810      	cmp	r0, #16
+ 8000082:	d118      	bne.n	80000b6 <fail>
+ 8000084:	2702      	movs	r7, #2
+ 8000086:	4818      	ldr	r0, [pc, #96]	@ (80000e8 <default_handler+0x14>)
+ 8000088:	6006      	str	r6, [r0, #0]
+ 800008a:	f8c8 6000 	str.w	r6, [r8]
+ 800008e:	bf00      	nop
+ 8000090:	bf00      	nop
+ 8000092:	bf00      	nop
+ 8000094:	bf00      	nop
+ 8000096:	6828      	ldr	r0, [r5, #0]
+ 8000098:	2810      	cmp	r0, #16
+ 800009a:	d10c      	bne.n	80000b6 <fail>
+ 800009c:	f8c9 6000 	str.w	r6, [r9]
+ 80000a0:	bf00      	nop
+ 80000a2:	bf00      	nop
+ 80000a4:	bf00      	nop
+ 80000a6:	bf00      	nop
+ 80000a8:	6828      	ldr	r0, [r5, #0]
+ 80000aa:	2811      	cmp	r0, #17
+ 80000ac:	d103      	bne.n	80000b6 <fail>
+ 80000ae:	480f      	ldr	r0, [pc, #60]	@ (80000ec <default_handler+0x18>)
+ 80000b0:	490f      	ldr	r1, [pc, #60]	@ (80000f0 <default_handler+0x1c>)
+ 80000b2:	6008      	str	r0, [r1, #0]
+ 80000b4:	e004      	b.n	80000c0 <done>
+
+080000b6 <fail>:
+ 80000b6:	480f      	ldr	r0, [pc, #60]	@ (80000f4 <default_handler+0x20>)
+ 80000b8:	490d      	ldr	r1, [pc, #52]	@ (80000f0 <default_handler+0x1c>)
+ 80000ba:	6008      	str	r0, [r1, #0]
+ 80000bc:	490e      	ldr	r1, [pc, #56]	@ (80000f8 <default_handler+0x24>)
+ 80000be:	600f      	str	r7, [r1, #0]
+
+080000c0 <done>:
+ 80000c0:	f04f 0018 	mov.w	r0, #24
+ 80000c4:	490d      	ldr	r1, [pc, #52]	@ (80000fc <default_handler+0x28>)
+ 80000c6:	beab      	bkpt	0x00ab
+ 80000c8:	e7fe      	b.n	80000c8 <done+0x8>
+
+080000ca <Irq3_Handler>:
+ 80000ca:	4804      	ldr	r0, [pc, #16]	@ (80000dc <default_handler+0x8>)
+ 80000cc:	6801      	ldr	r1, [r0, #0]
+ 80000ce:	3101      	adds	r1, #1
+ 80000d0:	6001      	str	r1, [r0, #0]
+ 80000d2:	4770      	bx	lr
+
+080000d4 <default_handler>:
+ 80000d4:	e7fe      	b.n	80000d4 <default_handler>
+ 80000d6:	0000      	.short	0x0000
+ 80000d8:	20000200 	.word	0x20000200
+ 80000dc:	20000300 	.word	0x20000300
+ 80000e0:	e000e200 	.word	0xe000e200
+ 80000e4:	e000e100 	.word	0xe000e100
+ 80000e8:	e000e180 	.word	0xe000e180
+ 80000ec:	cafecafe 	.word	0xcafecafe
+ 80000f0:	20000100 	.word	0x20000100
+ 80000f4:	deaddead 	.word	0xdeaddead
+ 80000f8:	20000104 	.word	0x20000104
+ 80000fc:	00020026 	.word	0x00020026

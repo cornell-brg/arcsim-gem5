@@ -688,75 +688,105 @@ MDecoder::tryMProfileDecode32(ExtMachInst mach_inst)
     }
 
     // ================================================================
-    // LDREX / LDREXB / LDREXH — exclusive load
+    // Exclusive, load-acquire and store-release instructions
     // ================================================================
-    // The ISA-generated LDREX instruction classes call
+    // The ISA-generated exclusive-load classes call
     // ArmISA::ISA::getSelfDebug() which static_cast<ISA*>(getIsaPtr()).
     // On M-profile the ISA is MISA (not a subclass of ISA), so the
-    // cast is undefined behavior.  Intercept here and return
-    // M-profile-specific LDREX classes that skip the SelfDebug call.
+    // cast is undefined behavior and gem5 segfaults.  The generated
+    // exclusive-store classes are missing initiateAcc and panic under
+    // MinorCPU.  Intercept every exclusive here and return the
+    // M-profile-specific classes.
     //
-    // LDREX  T1: inst[31:20]=0xE85
-    // LDREXB T1: inst[31:20]=0xE8D, inst[7:4]=0x4
-    // LDREXH T1: inst[31:20]=0xE8D, inst[7:4]=0x5
+    // LDREX  T1: inst[31:20]=0xE85, imm8 at [7:0] (shifted left 2)
+    // STREX  T1: inst[31:20]=0xE84, Rd at [11:8], imm8 at [7:0]
+    //            ARM ARM A7.7.49, A7.7.221
+    //
+    // The others share inst[31:20]=0xE8D (loads) and 0xE8C (stores),
+    // Rn at [19:16], Rt at [15:12], Rd (a store-exclusive's status) at
+    // [3:0], and are told apart by inst[7:4] (DDI0553 C2.4):
+    //   0x4 LDREXB / STREXB      0x5 LDREXH / STREXH
+    //   0x8 LDAB   / STLB        0x9 LDAH   / STLH      0xA LDA   / STL
+    //   0xC LDAEXB / STLEXB      0xD LDAEXH / STLEXH    0xE LDAEX / STLEX
+    //   0x7, 0xF: the doubleword exclusives, which M-profile lacks
+    //   0x0, 0x1 (loads): TBB, TBH
+    // The 0x8-0xE rows are ARMv8-M's and UNDEFINED before it; every
+    // other row is unallocated.
     {
         const uint32_t op_high = bits(inst, 31, 20);
+        const RegIndex rn = (RegIndex)bits(inst, 19, 16);
+        const RegIndex rt = (RegIndex)bits(inst, 15, 12);
         if (op_high == 0xE85) {
             // LDREX Rt, [Rn, #imm]
-            const RegIndex rt = (RegIndex)bits(inst, 15, 12);
-            const RegIndex rn = (RegIndex)bits(inst, 19, 16);
             const uint32_t imm8 = bits(inst, 7, 0) << 2;
             return new LdrexMProfile(mach_inst, rt, rn, imm8, 4);
         }
-        if (op_high == 0xE8D) {
-            const uint32_t op_low = bits(inst, 7, 4);
-            if (op_low == 0x4) {
-                // LDREXB Rt, [Rn]
-                const RegIndex rt = (RegIndex)bits(inst, 15, 12);
-                const RegIndex rn = (RegIndex)bits(inst, 19, 16);
-                return new LdrexMProfile(mach_inst, rt, rn, 0, 1);
-            }
-            if (op_low == 0x5) {
-                // LDREXH Rt, [Rn]
-                const RegIndex rt = (RegIndex)bits(inst, 15, 12);
-                const RegIndex rn = (RegIndex)bits(inst, 19, 16);
-                return new LdrexMProfile(mach_inst, rt, rn, 0, 2);
-            }
-        }
-        // ---- STREX / STREXB / STREXH ----
-        // M-profile-specific routing — the auto-generated A-profile
-        // STREX class is missing initiateAcc and panics under
-        // MinorCPU. ARM ARM A7.7.221 / A7.7.222 / A7.7.223:
-        //   STREX  T1: inst[31:20]=0xE84
-        //                Rd at [11:8], Rt at [15:12], Rn at [19:16],
-        //                imm8 at [7:0] (shifted left 2 = byte offset)
-        //   STREXB T1: inst[31:20]=0xE8C, inst[7:4]=0x4
-        //                Rd at [3:0],  Rt at [15:12], Rn at [19:16]
-        //   STREXH T1: inst[31:20]=0xE8C, inst[7:4]=0x5
-        //                Rd at [3:0],  Rt at [15:12], Rn at [19:16]
         if (op_high == 0xE84) {
+            // Rt = 0b1111 is ARMv8-M's TT / TTT / TTA / TTAT, which
+            // needs the security extension's state
+            if (rt == int_reg::Pc)
+                return new MProfileUnmodelled(mach_inst, "TT");
             // STREX Rd, Rt, [Rn, #imm]
             const RegIndex rd = (RegIndex)bits(inst, 11, 8);
-            const RegIndex rt = (RegIndex)bits(inst, 15, 12);
-            const RegIndex rn = (RegIndex)bits(inst, 19, 16);
             const uint32_t imm8 = bits(inst, 7, 0) << 2;
             return new StrexMProfile(mach_inst, rd, rt, rn, imm8, 4);
         }
-        if (op_high == 0xE8C) {
+        if (op_high == 0xE8D || op_high == 0xE8C) {
+            const bool load = op_high == 0xE8D;
             const uint32_t op_low = bits(inst, 7, 4);
-            if (op_low == 0x4) {
-                // STREXB Rd, Rt, [Rn]
-                const RegIndex rd = (RegIndex)bits(inst, 3, 0);
-                const RegIndex rt = (RegIndex)bits(inst, 15, 12);
-                const RegIndex rn = (RegIndex)bits(inst, 19, 16);
-                return new StrexMProfile(mach_inst, rd, rt, rn, 0, 1);
-            }
-            if (op_low == 0x5) {
-                // STREXH Rd, Rt, [Rn]
-                const RegIndex rd = (RegIndex)bits(inst, 3, 0);
-                const RegIndex rt = (RegIndex)bits(inst, 15, 12);
-                const RegIndex rn = (RegIndex)bits(inst, 19, 16);
-                return new StrexMProfile(mach_inst, rd, rt, rn, 0, 2);
+            const RegIndex rd = (RegIndex)bits(inst, 3, 0);
+            // Access size of the byte, halfword and word rows
+            static const unsigned sizes[4] = {1, 2, 4, 0};
+            const unsigned size = sizes[op_low & 0x3];
+            const bool v8m = has(ArmExtension::M_PROFILE_ARMV8M);
+
+            switch (op_low) {
+              case 0x4:
+              case 0x5:
+                // LDREXB / LDREXH Rt, [Rn]; STREXB / STREXH Rd, Rt, [Rn]
+                if (load)
+                    return new LdrexMProfile(mach_inst, rt, rn, 0, size);
+                return new StrexMProfile(mach_inst, rd, rt, rn, 0, size);
+
+              case 0x8:
+              case 0x9:
+              case 0xa:
+                // LDAB / LDAH / LDA, STLB / STLH / STL: the A-profile
+                // classes are ordinary loads and stores with barrier
+                // flags, and run as they are
+                if (!v8m) {
+                    return new MProfileUndefined(mach_inst,
+                        "load-acquire/store-release before ARMv8-M");
+                }
+                break;
+
+              case 0xc:
+              case 0xd:
+              case 0xe:
+                // LDAEXB / LDAEXH / LDAEX Rt, [Rn];
+                // STLEXB / STLEXH / STLEX Rd, Rt, [Rn]
+                if (!v8m) {
+                    return new MProfileUndefined(mach_inst,
+                        "load-acquire/store-release before ARMv8-M");
+                }
+                if (load) {
+                    return new LdrexMProfile(mach_inst, rt, rn, 0, size,
+                                             true);
+                }
+                return new StrexMProfile(mach_inst, rd, rt, rn, 0, size,
+                                         true);
+
+              case 0x7:
+              case 0xf:
+                return new MProfileUndefined(mach_inst,
+                    "doubleword exclusive");
+
+              default:
+                // TBB / TBH go to the A-profile decoder
+                if (load && op_low <= 0x1)
+                    break;
+                return new MProfileUndefined(mach_inst,
+                    "unallocated exclusive encoding");
             }
         }
     }

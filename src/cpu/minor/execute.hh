@@ -119,6 +119,9 @@ class Execute : public Named
      *  effect in the cycle it issues when nothing older is in flight */
     bool branchAtIssue;
 
+    /** See executeLoadAccessAtIssue in BaseMinorCPU.py */
+    bool loadAccessAtIssue;
+
     /** See executeInOrderCompletion in BaseMinorCPU.py */
     bool inOrderCompletion;
 
@@ -244,6 +247,9 @@ class Execute : public Named
 
     std::vector<ExecuteThreadInfo> executeInfo;
 
+    /** See lastCompletedFetchSeqNum */
+    std::vector<InstSeqNum> lastCompleted;
+
     ThreadID interruptPriority;
     ThreadID issuePriority;
     ThreadID commitPriority;
@@ -353,6 +359,27 @@ class Execute : public Named
      *  under branchAtIssue */
     bool canCommitAtIssue(ThreadID thread_id, const MinorDynInstPtr &inst);
 
+    /** Is inst, the oldest in flight, followed by a branch folded into it
+     *  that reads nothing inst writes? */
+    bool leadsFoldedBranch(ThreadID thread_id, const MinorDynInstPtr &inst);
+
+    /** Can the load issued this cycle go to memory in the same cycle
+     *  under loadAccessAtIssue */
+    bool canAccessAtIssue(ThreadID thread_id);
+
+  public:
+    /** The fetch sequence number of the instruction to complete last */
+    InstSeqNum
+    lastCompletedFetchSeqNum(ThreadID thread_id) const
+    {
+        return lastCompleted[thread_id];
+    }
+
+    /** Has an instruction ahead of inst that writes reg yet to complete */
+    bool regWritePending(ThreadID thread_id, const RegId &reg,
+        const MinorDynInstPtr &inst);
+
+  protected:
     /** Set the drain state (with useful debugging messages) */
     void setDrainState(ThreadID thread_id, DrainState state);
 
