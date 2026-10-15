@@ -283,6 +283,7 @@ const std::array<const char *, NUM_MISCREGS> MiscRegNames = {{
     [MISCREG_HPMCOUNTER31H]  = "HPMCOUNTER31H",
 
     [MISCREG_JVT] = "JVT",
+    [MISCREG_MCOUNTINHIBIT] = "MCOUNTINHIBIT",
 
     [MISCREG_FFLAGS_EXE]    = "FFLAGS_EXE",
 }};
@@ -297,13 +298,18 @@ RegClass vecPredRegClass(VecPredRegClass, VecPredRegClassName, 0,
 RegClass matRegClass(MatRegClass, MatRegClassName, 0, debug::MatRegs);
 RegClass ccRegClass(CCRegClass, CCRegClassName, 0, debug::IntRegs);
 
+// mcountinhibit's bits for mcycle and minstret
+constexpr RegVal MCOUNTINHIBIT_CY = 1 << 0;
+constexpr RegVal MCOUNTINHIBIT_IR = 1 << 2;
+
 } // anonymous namespace
 
 ISA::ISA(const Params &p) : BaseISA(p, "riscv"),
     _rvType(p.riscv_type), enableRvv(p.enable_rvv), vlen(p.vlen), elen(p.elen),
     _privilegeModeSet(p.privilege_mode_set),
     _wfiResumeOnPending(p.wfi_resume_on_pending), _enableZcd(p.enable_Zcd),
-    _enableSmrnmi(p.enable_Smrnmi)
+    _enableSmrnmi(p.enable_Smrnmi), _xh3irq(p.xh3irq),
+    _enableXh3bextm(p.enable_Xh3bextm)
 {
     _regClasses.push_back(&intRegClass);
     _regClasses.push_back(&floatRegClass);
@@ -430,6 +436,7 @@ void ISA::clear()
     // triggers, starting at zero. simply set a different value here.
     miscRegFile[MISCREG_TSELECT] = 1;
     miscRegFile[MISCREG_NMIE] = enableSmrnmi() ? 0 : 1;
+    heldCycle = heldInstret = cycleOffset = instretOffset = 0;
 }
 
 Fault
@@ -498,6 +505,22 @@ ISA::readMiscRegNoEffect(RegIndex idx) const
     return miscRegFile[idx];
 }
 
+uint64_t
+ISA::cycleCount() const
+{
+    if (miscRegFile[MISCREG_MCOUNTINHIBIT] & MCOUNTINHIBIT_CY)
+        return heldCycle;
+    return tc->getCpuPtr()->curCycle() - cycleOffset;
+}
+
+uint64_t
+ISA::instretCount() const
+{
+    if (miscRegFile[MISCREG_MCOUNTINHIBIT] & MCOUNTINHIBIT_IR)
+        return heldInstret;
+    return tc->getCpuPtr()->totalInsts() - instretOffset;
+}
+
 RegVal
 ISA::readMiscReg(RegIndex idx)
 {
@@ -505,9 +528,9 @@ ISA::readMiscReg(RegIndex idx)
       case MISCREG_HARTID:
         return tc->contextId();
       case MISCREG_CYCLE:
-            return static_cast<RegVal>(tc->getCpuPtr()->curCycle());
+            return static_cast<RegVal>(cycleCount());
       case MISCREG_CYCLEH:
-            return bits<RegVal>(tc->getCpuPtr()->curCycle(), 63, 32);
+            return bits<RegVal>(cycleCount(), 63, 32);
       case MISCREG_TIME: {
           RiscvSystem *sys = dynamic_cast<RiscvSystem *>(tc->getSystemPtr());
           panic_if(!sys, "read MISCREG_TIME not in RiscvSystem");
@@ -519,9 +542,9 @@ ISA::readMiscReg(RegIndex idx)
           return bits(sys->tryReadMtime(), 63, 32);
       }
       case MISCREG_INSTRET:
-            return static_cast<RegVal>(tc->getCpuPtr()->totalInsts());
+            return static_cast<RegVal>(instretCount());
       case MISCREG_INSTRETH:
-            return bits<RegVal>(tc->getCpuPtr()->totalInsts(), 63, 32);
+            return bits<RegVal>(instretCount(), 63, 32);
       case MISCREG_IP:
         {
             auto ic = dynamic_cast<RiscvISA::Interrupts *>(
@@ -966,6 +989,26 @@ ISA::setMiscReg(RegIndex idx, RegVal val)
           case MISCREG_JVT:
             {
                 setMiscRegNoEffect(idx, rvSext(val));
+            }
+            break;
+          case MISCREG_MCOUNTINHIBIT:
+            {
+                // Only CY and IR: gem5's hpm counters are stand-ins for
+                // the cycle count, so their bits read as zero.
+                const RegVal inhibit = val & (MCOUNTINHIBIT_CY |
+                                              MCOUNTINHIBIT_IR);
+                const RegVal was = readMiscRegNoEffect(idx);
+                const uint64_t cycles = tc->getCpuPtr()->curCycle();
+                const uint64_t insts = tc->getCpuPtr()->totalInsts();
+                if ((inhibit & ~was) & MCOUNTINHIBIT_CY)
+                    heldCycle = cycles - cycleOffset;
+                else if ((was & ~inhibit) & MCOUNTINHIBIT_CY)
+                    cycleOffset = cycles - heldCycle;
+                if ((inhibit & ~was) & MCOUNTINHIBIT_IR)
+                    heldInstret = insts - instretOffset;
+                else if ((was & ~inhibit) & MCOUNTINHIBIT_IR)
+                    instretOffset = insts - heldInstret;
+                setMiscRegNoEffect(idx, inhibit);
             }
             break;
 
