@@ -299,6 +299,11 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
                    sram_latency_ns=sram_latency_ns,
                    scratch_bank_bandwidth=scratch_bank_bandwidth,
                    sram_model=sram_model, dma=dma, xip_model=xip_model)
+    # Hazard3 testbench print/exit registers at 0xc0000000 (tb_cxxrtl_io.h),
+    # so firmware built for rtl-sim runs unchanged.
+    from m5.objects import Hazard3TbIO
+    board.tb_io = Hazard3TbIO(pio_latency="1ns")
+    board.tb_io.pio = board.sram_bus.mem_side_ports
     if board._banked_sram:
         board.icode_router.mem_side_ports = board.sram.port
     board.mem_mode = "timing"

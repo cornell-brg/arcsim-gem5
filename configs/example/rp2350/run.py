@@ -1,6 +1,7 @@
 """Run a bare-metal RP2350 benchmark with an Arm or RISC-V core proxy."""
 
 import argparse
+import sys
 from pathlib import Path
 
 import m5
@@ -10,6 +11,9 @@ from m5.stats import reset as stats_reset
 
 from board import SCRATCH_BANK_BANDWIDTH, make_board, memory_models
 
+# Firmware output (Hazard3TbIO) goes straight to the file descriptor; line
+# buffering keeps this script's prints in order with it under -r.
+sys.stdout.reconfigure(line_buffering=True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--core", choices=("arm-m4-proxy", "hazard3-proxy"),
@@ -93,6 +97,7 @@ else:
     print(f"SRAM model=legacy; scratch bank effective bandwidth={args.scratch_bank_bandwidth}")
 roi_start = None
 roi_number = 0
+exit_code = 0
 while m5.curTick() < args.tick_limit:
     event = m5.simulate(args.tick_limit - m5.curTick())
     cause = event.getCause()
@@ -109,9 +114,15 @@ while m5.curTick() < args.tick_limit:
         print(f"ROI {roi_number} end={m5.curTick()} ticks={m5.curTick()-roi_start}")
         roi_start = None
         roi_number += 1
+    elif cause == "simulate() limit reached":
+        # Stats are dumped at exit, as for a guest exit.
+        print(f"Tick limit reached @ {m5.curTick()} without guest exit")
+        # As rtl-sim on a timeout.
+        exit_code = -1
+        break
     else:
         print(f"Exiting @ tick {m5.curTick()} because {cause}")
+        # The guest's code (e.g. Hazard3TbIO's EXIT), as rtl-sim returns it.
+        exit_code = event.getCode()
         break
-else:
-    stats_dump()
-    print(f"Tick limit reached @ {m5.curTick()} without guest exit")
+sys.exit(exit_code)
