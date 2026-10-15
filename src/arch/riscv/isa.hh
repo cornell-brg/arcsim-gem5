@@ -130,6 +130,9 @@ class ISA : public BaseISA
     // Hazard3's interrupt controller, or null when the core has none
     Xh3irq *_xh3irq;
 
+    // Hazard3's bit extract multiple (h3.bextm, h3.bextmi)
+    bool _enableXh3bextm;
+
     // mcountinhibit: while CY (IR) is set, mcycle (minstret) reads the value
     // it had when the bit was set; otherwise it reads the CPU's count less
     // the cycles (instructions) that passed while it was held.
@@ -226,6 +229,8 @@ class ISA : public BaseISA
     bool enableSmrnmi() { return _enableSmrnmi; }
 
     Xh3irq *xh3irq() const { return _xh3irq; }
+
+    bool enableXh3bextm() const { return _enableXh3bextm; }
 
     virtual Addr getFaultHandlerAddr(
         RegIndex idx, uint64_t cause, bool intr) const;

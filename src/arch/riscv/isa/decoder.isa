@@ -1333,6 +1333,33 @@ decode QUADRANT default Unknown::unknown() {
             }
         }
 
+        // custom-0: Hazard3's bit extract multiple (Xh3bextm). rd is rs1
+        // shifted right by rs2[4:0] (h3.bextm) or shamt (h3.bextmi), masked
+        // to its size + 1 low bits; bits 31:29 and 25 are reserved zero.
+        0x02: decode FUNCT3 {
+            0x0: ROp::h3_bextm({{
+                auto isa = static_cast<RiscvISA::ISA*>(
+                    xc->tcBase()->getIsaPtr());
+                if (!isa->enableXh3bextm() || bits(machInst, 31, 29) ||
+                        bits(machInst, 25)) {
+                    return std::make_shared<IllegalInstFault>(
+                            "h3.bextm needs Xh3bextm", machInst);
+                }
+                Rd = (rvZext(Rs1) >> Rs2<4:0>) &
+                     mask(bits(machInst, 28, 26) + 1);
+            }});
+            0x4: IOp::h3_bextmi({{
+                auto isa = static_cast<RiscvISA::ISA*>(
+                    xc->tcBase()->getIsaPtr());
+                if (!isa->enableXh3bextm() || bits(machInst, 31, 29) ||
+                        bits(machInst, 25)) {
+                    return std::make_shared<IllegalInstFault>(
+                            "h3.bextmi needs Xh3bextm", machInst);
+                }
+                Rd = (rvZext(Rs1) >> imm) & mask(bits(machInst, 28, 26) + 1);
+            }}, imm_type = uint64_t, imm_code = {{ imm = SHAMT5; }});
+        }
+
         0x03: decode FUNCT3 {
             format FenceOp {
                 0x0: fence({{

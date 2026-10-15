@@ -134,6 +134,11 @@ class RiscvISA(BaseISA):
         "Hazard3's interrupt controller (Xh3irq); None means the core has "
         "no Xh3irq and its CSRs are illegal",
     )
+    enable_Xh3bextm = Param.Bool(
+        False,
+        "Hazard3's bit extract multiple (h3.bextm, h3.bextmi, in custom-0); "
+        "off, their encodings are illegal",
+    )
 
     wfi_resume_on_pending = Param.Bool(
         False,

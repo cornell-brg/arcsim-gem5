@@ -315,6 +315,9 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         # Hazard3 has Zcmp (cm.push/cm.pop) and no FPU; gem5 decodes Zcmp only
         # with Zcd, whose encodings it reuses, turned off.
         enable_Zcd=False,
+        # Hazard3's bit extract multiple, which the Pico SDK's float
+        # routines use.
+        enable_Xh3bextm=True,
     )]
     # Hazard3's interrupt controller, with the RP2350's 52 IRQs and 4 priority
     # bits (arcsim-soc's config_rp2350_default.vh). Devices reach it through
