@@ -549,6 +549,8 @@ enum CSRIndex
     CSR_MEIPA        = 0xBE1,
     CSR_MEIFA        = 0xBE2,
     CSR_MEIPRA       = 0xBE3,
+    CSR_MEINEXT      = 0xBE4,
+    CSR_MEICONTEXT   = 0xBE5,
 
     // H-extension (RV64) CSRs
 
@@ -1262,6 +1264,10 @@ const std::unordered_map<int, CSRMetadata> CSRData = {
         {"meifa", -1, rvTypeFlags(RV32), isaExtsFlags(), false, true}},
     {CSR_MEIPRA,
         {"meipra", -1, rvTypeFlags(RV32), isaExtsFlags(), false, true}},
+    {CSR_MEINEXT,
+        {"meinext", -1, rvTypeFlags(RV32), isaExtsFlags(), false, true}},
+    {CSR_MEICONTEXT,
+        {"meicontext", -1, rvTypeFlags(RV32), isaExtsFlags(), false, true}},
 
     // H-extension CSR -> MISCREG mappings
     {CSR_MTINST,

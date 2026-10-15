@@ -372,7 +372,10 @@ def template CSRExecute {{
         %(op_rd)s;
 
         // The source operand: Xh3irq's array CSRs take their window from it.
+        // Xh3irq also needs whether this is a clear (csrrc, csrrci) and, on
+        // the write, whether the instruction read the CSR.
         RegVal raw = %(src)s;
+        const bool csr_clear = (machInst.funct3 & 0x3) == 0x3;
 
         RegVal data = 0;
         auto lowestAllowedMode = (PrivilegeMode)bits(csr, 9, 8);
@@ -437,7 +440,7 @@ def template CSRExecute {{
                     return hpm_fault;
             }
             data = csr_data_it->second.requireXh3irq ?
-                rvZext(isa->xh3irq()->read(csr, raw)) :
+                rvZext(isa->xh3irq()->read(csr, raw, csr_clear)) :
                 rvZext(isa->readCSR(xc, csr));
         }
 
@@ -451,7 +454,8 @@ def template CSRExecute {{
             DPRINTF(RiscvMisc, "Writing %#x to CSR %s.\n",
                     data, csrName);
             if (csr_data_it->second.requireXh3irq)
-                isa->xh3irq()->write(csr, raw, data);
+                isa->xh3irq()->write(csr, raw, data, csr_clear,
+                                     %(read_cond)s);
             else
                 isa->writeCSR(xc, csr, data);
         }
