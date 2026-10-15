@@ -73,6 +73,8 @@ enum FPUStatus
 
 using VPUStatus = FPUStatus;
 
+class Xh3irq;
+
 class ISA : public BaseISA
 {
   protected:
@@ -124,6 +126,9 @@ class ISA : public BaseISA
      * Set true to make NMI recoverable
      */
     bool _enableSmrnmi;
+
+    // Hazard3's interrupt controller, or null when the core has none
+    Xh3irq *_xh3irq;
 
   public:
     using Params = RiscvISAParams;
@@ -209,6 +214,8 @@ class ISA : public BaseISA
     bool enableZcd() { return _enableZcd; }
 
     bool enableSmrnmi() { return _enableSmrnmi; }
+
+    Xh3irq *xh3irq() const { return _xh3irq; }
 
     virtual Addr getFaultHandlerAddr(
         RegIndex idx, uint64_t cause, bool intr) const;

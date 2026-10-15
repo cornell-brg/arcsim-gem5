@@ -542,6 +542,12 @@ enum CSRIndex
 
     CSR_JVT          = 0x017,
 
+    // Hazard3's interrupt controller (Xh3irq)
+    CSR_MEIEA        = 0xBE0,
+    CSR_MEIPA        = 0xBE1,
+    CSR_MEIFA        = 0xBE2,
+    CSR_MEIPRA       = 0xBE3,
+
     // H-extension (RV64) CSRs
 
     CSR_MTINST = 0x34A,
@@ -585,6 +591,7 @@ struct CSRMetadata
     const uint64_t rvTypes;
     const uint64_t isaExts;
     const bool requireSmrnmi = false;
+    const bool requireXh3irq = false;
 };
 
 template <typename... T>
@@ -1239,6 +1246,17 @@ const std::unordered_map<int, CSRMetadata> CSRData = {
 
     {CSR_JVT,
         {"jvt", MISCREG_JVT, rvTypeFlags(RV64, RV32), isaExtsFlags()}},
+
+    // Xh3irq's CSRs are read and written by its controller (see
+    // arch/riscv/xh3irq.hh), not the register file: no physical index.
+    {CSR_MEIEA,
+        {"meiea", -1, rvTypeFlags(RV32), isaExtsFlags(), false, true}},
+    {CSR_MEIPA,
+        {"meipa", -1, rvTypeFlags(RV32), isaExtsFlags(), false, true}},
+    {CSR_MEIFA,
+        {"meifa", -1, rvTypeFlags(RV32), isaExtsFlags(), false, true}},
+    {CSR_MEIPRA,
+        {"meipra", -1, rvTypeFlags(RV32), isaExtsFlags(), false, true}},
 
     // H-extension CSR -> MISCREG mappings
     {CSR_MTINST,

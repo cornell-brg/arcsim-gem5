@@ -65,6 +65,7 @@ Source('remote_gdb.cc', tags=['riscv isa'])
 Source('semihosting.cc', tags=['riscv isa'])
 Source('system.cc', tags=['riscv isa'])
 Source('tlb.cc', tags=['riscv isa'])
+Source('xh3irq.cc', tags=['riscv isa'])
 
 Source('linux/se_workload.cc', tags=['riscv isa'])
 Source('linux/fs_workload.cc', tags=['riscv isa'])
@@ -117,6 +118,11 @@ SimObject(
 SimObject(
     'RiscvTLB.py',
     sim_objects=['RiscvPagetableWalker', 'RiscvTLB'],
+    tags=['riscv isa']
+)
+SimObject(
+    'Xh3irq.py',
+    sim_objects=['Xh3irq', 'Xh3irqLine'],
     tags=['riscv isa']
 )
 

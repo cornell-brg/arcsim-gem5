@@ -316,6 +316,12 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         # with Zcd, whose encodings it reuses, turned off.
         enable_Zcd=False,
     )]
+    # Hazard3's interrupt controller, with the RP2350's 52 IRQs and 4 priority
+    # bits (arcsim-soc's config_rp2350_default.vh). Devices reach it through
+    # Xh3irqLine.
+    from m5.objects.Xh3irq import Xh3irq
+    board.xh3irq = Xh3irq(num_irqs=52, priority_bits=4)
+    board.cpu.isa[0].xh3irq = board.xh3irq
     board.cpu.decodeInputWidth = 1
     board.cpu.executeInputWidth = 1
     board.cpu.executeIssueLimit = 1

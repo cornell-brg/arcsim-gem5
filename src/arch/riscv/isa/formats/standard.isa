@@ -363,8 +363,16 @@ def template CSRExecute {{
                     machInst);
         }
 
+        if (csr_data_it->second.requireXh3irq && !isa->xh3irq()) {
+            return std::make_shared<IllegalInstFault>(
+                    csprintf("%s requires Xh3irq\n", csrName), machInst);
+        }
+
         %(op_decl)s;
         %(op_rd)s;
+
+        // The source operand: Xh3irq's array CSRs take their window from it.
+        RegVal raw = %(src)s;
 
         RegVal data = 0;
         auto lowestAllowedMode = (PrivilegeMode)bits(csr, 9, 8);
@@ -428,7 +436,9 @@ def template CSRExecute {{
                 if (hpm_fault != NoFault)
                     return hpm_fault;
             }
-            data = rvZext(isa->readCSR(xc, csr));
+            data = csr_data_it->second.requireXh3irq ?
+                rvZext(isa->xh3irq()->read(csr, raw)) :
+                rvZext(isa->readCSR(xc, csr));
         }
 
         %(code)s;
@@ -440,7 +450,10 @@ def template CSRExecute {{
             }
             DPRINTF(RiscvMisc, "Writing %#x to CSR %s.\n",
                     data, csrName);
-            isa->writeCSR(xc, csr, data);
+            if (csr_data_it->second.requireXh3irq)
+                isa->xh3irq()->write(csr, raw, data);
+            else
+                isa->writeCSR(xc, csr, data);
         }
         %(op_wb)s;
         return NoFault;
@@ -545,10 +558,10 @@ def format SystemOp(code, *opt_flags) {{
     exec_output = BasicExecute.subst(iop)
 }};
 
-def format CSROp(code, read_cond, write_cond, *opt_flags) {{
+def format CSROp(code, read_cond, write_cond, src, *opt_flags) {{
     iop = InstObjParams(name, Name, 'CSROp',
         {'code': code, 'read_cond': read_cond,
-         'write_cond': write_cond}, opt_flags)
+         'write_cond': write_cond, 'src': src}, opt_flags)
     header_output = BasicDeclare.subst(iop)
     decoder_output = BasicConstructor.subst(iop)
     decode_block = BasicDecode.subst(iop)

@@ -42,6 +42,7 @@
 
 from m5.objects.BaseISA import BaseISA
 from m5.params import (
+    NULL,
     Enum,
     Param,
     UInt32,
@@ -127,6 +128,11 @@ class RiscvISA(BaseISA):
     )
     enable_Smrnmi = Param.Bool(
         False, "Resumable non-maskable interrupt in FS mode"
+    )
+    xh3irq = Param.Xh3irq(
+        NULL,
+        "Hazard3's interrupt controller (Xh3irq); None means the core has "
+        "no Xh3irq and its CSRs are illegal",
     )
 
     wfi_resume_on_pending = Param.Bool(
