@@ -310,7 +310,9 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     board.cpu = RiscvMinorCPU(cpu_id=0)
     board.cpu.clk_domain = board.clk_domain
     board.cpu.isa = [RiscvISA(
-        riscv_type="RV32", enable_rvv=False, privilege_mode_set="M",
+        # M and U modes, as Hazard3 on the RP2350 and in arcsim-soc
+        # (U_MODE = 1 in config_rp2350_default.vh).
+        riscv_type="RV32", enable_rvv=False, privilege_mode_set="MU",
         enable_Zicbom_fs=False, enable_Zicboz_fs=False,
         # Hazard3 has Zcmp (cm.push/cm.pop) and no FPU; gem5 decodes Zcmp only
         # with Zcd, whose encodings it reuses, turned off.
