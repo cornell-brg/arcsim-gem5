@@ -6336,6 +6336,12 @@ decode QUADRANT default Unknown::unknown() {
                             status.mpv = 0; // H-extension
 
                             xc->setMiscReg(MISCREG_STATUS, status);
+                            // Hazard3's interrupt controller restores its
+                            // preemption priorities.
+                            auto isa = static_cast<RiscvISA::ISA*>(
+                                xc->tcBase()->getIsaPtr());
+                            if (isa->xh3irq())
+                                isa->xh3irq()->trapExit();
                             // TODO: is rvSext mandated by the spec?
                             NPC = rvSext(xc->readMiscReg(MISCREG_MEPC));
                         }

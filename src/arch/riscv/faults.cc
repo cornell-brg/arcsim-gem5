@@ -37,6 +37,7 @@
 #include "arch/riscv/pmp.hh"
 #include "arch/riscv/regs/misc.hh"
 #include "arch/riscv/utility.hh"
+#include "arch/riscv/xh3irq.hh"
 #include "cpu/base.hh"
 #include "cpu/thread_context.hh"
 #include "debug/Faults.hh"
@@ -233,6 +234,11 @@ RiscvFault::invoke(ThreadContext *tc, const StaticInstPtr &inst)
         } else {
             tc->setMiscReg(MISCREG_STATUS, status);
         }
+        // Hazard3's interrupt controller saves its preemption priorities on
+        // entry to the external interrupt.
+        if (prv == PRV_M && !is_rnmi && isa->xh3irq())
+            isa->xh3irq()->trapEnter(isInterrupt() &&
+                                     _code == INT_EXT_MACHINE);
         // Temporarily mask NMI while we're in NMI handler. Otherweise, the
         // checkNonMaskableInterrupt will always return true and we'll be
         // stucked in an infinite loop.

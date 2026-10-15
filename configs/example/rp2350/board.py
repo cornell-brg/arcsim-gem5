@@ -299,8 +299,8 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
                    sram_latency_ns=sram_latency_ns,
                    scratch_bank_bandwidth=scratch_bank_bandwidth,
                    sram_model=sram_model, dma=dma, xip_model=xip_model)
-    # Hazard3 testbench print/exit registers at 0xc0000000 (tb_cxxrtl_io.h),
-    # so firmware built for rtl-sim runs unchanged.
+    # Hazard3 testbench IO registers (print, exit, IRQs, timer) at 0xc0000000
+    # (tb_cxxrtl_io.h), so firmware built for rtl-sim runs unchanged.
     from m5.objects import Hazard3TbIO
     board.tb_io = Hazard3TbIO(pio_latency="1ns")
     board.tb_io.pio = board.sram_bus.mem_side_ports
@@ -310,7 +310,9 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     board.cpu = RiscvMinorCPU(cpu_id=0)
     board.cpu.clk_domain = board.clk_domain
     board.cpu.isa = [RiscvISA(
-        riscv_type="RV32", enable_rvv=False, privilege_mode_set="M",
+        # M and U modes, as Hazard3 on the RP2350 and in arcsim-soc
+        # (U_MODE = 1 in config_rp2350_default.vh).
+        riscv_type="RV32", enable_rvv=False, privilege_mode_set="MU",
         enable_Zicbom_fs=False, enable_Zicboz_fs=False,
         # Hazard3 has Zcmp (cm.push/cm.pop) and no FPU; gem5 decodes Zcmp only
         # with Zcd, whose encodings it reuses, turned off.
@@ -325,6 +327,20 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     from m5.objects.Xh3irq import Xh3irq
     board.xh3irq = Xh3irq(num_irqs=52, priority_bits=4)
     board.cpu.isa[0].xh3irq = board.xh3irq
+    # The testbench IO block's interrupts, wired as rtl-sim wires them:
+    # SET_IRQ's 32 bits to IRQs 0 to 31, its soft IRQ to mip.msip and its
+    # timer to mip.mtip.
+    from m5.objects import RiscvIntLine
+    from m5.objects.Xh3irq import Xh3irqLine
+    board.tb_irq_lines = [
+        Xh3irqLine(controller=board.xh3irq, irq_num=n) for n in range(32)
+    ]
+    for line in board.tb_irq_lines:
+        board.tb_io.irq = line.pin
+    board.tb_soft_irq_line = RiscvIntLine(int_num=3)
+    board.tb_io.soft_irq = board.tb_soft_irq_line.pin
+    board.tb_timer_irq_line = RiscvIntLine(int_num=7)
+    board.tb_io.timer_irq = board.tb_timer_irq_line.pin
     board.cpu.decodeInputWidth = 1
     board.cpu.executeInputWidth = 1
     board.cpu.executeIssueLimit = 1
