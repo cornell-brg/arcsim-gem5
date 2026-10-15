@@ -291,6 +291,7 @@ enum MiscRegIndex
     MISCREG_HPMCOUNTER30H,
     MISCREG_HPMCOUNTER31H,
     MISCREG_JVT,
+    MISCREG_MCOUNTINHIBIT,
 
     NUM_PHYS_MISCREGS,
     MISCREG_FFLAGS_EXE = NUM_PHYS_MISCREGS,
@@ -398,6 +399,7 @@ enum CSRIndex
     CSR_MTVEC = 0x305,
     CSR_MCOUNTEREN = 0x306,
     CSR_MSTATUSH = 0x310, // rv32 only
+    CSR_MCOUNTINHIBIT = 0x320,
     CSR_MSCRATCH = 0x340,
     CSR_MEPC = 0x341,
     CSR_MCAUSE = 0x342,
@@ -854,6 +856,9 @@ const std::unordered_map<int, CSRMetadata> CSRData = {
         {"mtvec", MISCREG_MTVEC, rvTypeFlags(RV64, RV32), isaExtsFlags()}},
     {CSR_MCOUNTEREN,
         {"mcounteren", MISCREG_MCOUNTEREN, rvTypeFlags(RV64, RV32),
+         isaExtsFlags()}},
+    {CSR_MCOUNTINHIBIT,
+        {"mcountinhibit", MISCREG_MCOUNTINHIBIT, rvTypeFlags(RV64, RV32),
          isaExtsFlags()}},
     {CSR_MSTATUSH,
         {"mstatush", MISCREG_MSTATUSH, rvTypeFlags(RV32), isaExtsFlags()}},

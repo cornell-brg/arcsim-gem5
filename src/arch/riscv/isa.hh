@@ -130,6 +130,16 @@ class ISA : public BaseISA
     // Hazard3's interrupt controller, or null when the core has none
     Xh3irq *_xh3irq;
 
+    // mcountinhibit: while CY (IR) is set, mcycle (minstret) reads the value
+    // it had when the bit was set; otherwise it reads the CPU's count less
+    // the cycles (instructions) that passed while it was held.
+    uint64_t heldCycle = 0;
+    uint64_t heldInstret = 0;
+    uint64_t cycleOffset = 0;
+    uint64_t instretOffset = 0;
+    uint64_t cycleCount() const;
+    uint64_t instretCount() const;
+
   public:
     using Params = RiscvISAParams;
 
