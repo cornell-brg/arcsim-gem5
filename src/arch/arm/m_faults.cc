@@ -28,6 +28,7 @@
 
 #include "arch/arm/m_faults.hh"
 
+#include "arch/arm/m_interrupts.hh"
 #include "arch/arm/m_mmu.hh"
 #include "arch/arm/m_system.hh"
 #include "arch/arm/pcstate.hh"
@@ -395,6 +396,26 @@ ArmMFault::invoke(ThreadContext *tc, const StaticInstPtr &inst)
     DPRINTF(Faults, "M-profile exception entry: %s (exc %d) "
             "handler=%#x SP=%#x LR=%#x\n",
             name(), _excNumber, handlerAddr & ~0x1, newSP, excReturn);
+}
+
+// ---------------------------------------------------------------------------
+// MProfileExcReturnFetch::invoke — exception return from a fetch
+// ---------------------------------------------------------------------------
+
+void
+MProfileExcReturnFetch::invoke(ThreadContext *tc, const StaticInstPtr &inst)
+{
+    // Deactivate and unstack; excReturn() leaves the return address in
+    // the next PC, as for an instruction that advances afterwards.  A
+    // fault does not advance, so advance here: the PC becomes the return
+    // address.
+    auto *mintr = dynamic_cast<MProfileInterrupts *>(
+        tc->getCpuPtr()->getInterruptController(tc->threadId()));
+    assert(mintr && "M-profile CPU must use MProfileInterrupts");
+    mintr->excReturn(tc, excReturn);
+    auto pc = tc->pcState().as<PCState>();
+    pc.advance();
+    tc->pcState(pc);
 }
 
 // ---------------------------------------------------------------------------
