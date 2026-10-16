@@ -521,6 +521,24 @@ ISA::instretCount() const
     return tc->getCpuPtr()->totalInsts() - instretOffset;
 }
 
+void
+ISA::writeCycleCount(uint64_t value)
+{
+    if (miscRegFile[MISCREG_MCOUNTINHIBIT] & MCOUNTINHIBIT_CY)
+        heldCycle = value;
+    else
+        cycleOffset = tc->getCpuPtr()->curCycle() - value;
+}
+
+void
+ISA::writeInstretCount(uint64_t value)
+{
+    if (miscRegFile[MISCREG_MCOUNTINHIBIT] & MCOUNTINHIBIT_IR)
+        heldInstret = value;
+    else
+        instretOffset = tc->getCpuPtr()->totalInsts() - value;
+}
+
 RegVal
 ISA::readMiscReg(RegIndex idx)
 {
@@ -725,7 +743,21 @@ ISA::setMiscRegNoEffect(RegIndex idx, RegVal val)
 void
 ISA::setMiscReg(RegIndex idx, RegVal val)
 {
-    if (idx >= MISCREG_CYCLE && idx <= MISCREG_HPMCOUNTER31) {
+    // mcycle and minstret (and on RV32 their high halves, mcycleh and
+    // minstreth): the low or high 32 bits on RV32, all 64 on RV64.
+    const uint64_t low = mask(32);
+    if (idx == MISCREG_CYCLE) {
+        writeCycleCount(rvType() == RV32
+                        ? (cycleCount() & ~low) | (val & low) : val);
+    } else if (idx == MISCREG_CYCLEH) {
+        writeCycleCount((uint64_t(val & low) << 32) | (cycleCount() & low));
+    } else if (idx == MISCREG_INSTRET) {
+        writeInstretCount(rvType() == RV32
+                          ? (instretCount() & ~low) | (val & low) : val);
+    } else if (idx == MISCREG_INSTRETH) {
+        writeInstretCount((uint64_t(val & low) << 32) |
+                          (instretCount() & low));
+    } else if (idx >= MISCREG_CYCLE && idx <= MISCREG_HPMCOUNTER31) {
         // Ignore writes to HPM counters for now
         warn("Ignoring write to miscreg %s.\n", MiscRegNames[idx]);
     } else {
