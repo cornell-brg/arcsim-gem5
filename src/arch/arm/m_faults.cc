@@ -412,8 +412,13 @@ MProfileExcReturnFetch::invoke(ThreadContext *tc, const StaticInstPtr &inst)
     auto *mintr = dynamic_cast<MProfileInterrupts *>(
         tc->getCpuPtr()->getInterruptController(tc->threadId()));
     assert(mintr && "M-profile CPU must use MProfileInterrupts");
-    mintr->excReturn(tc, excReturn);
     auto pc = tc->pcState().as<PCState>();
+    const Addr at = pc.instAddr();
+    panic_if(at < 0xFFFFFFF0 || at > 0xFFFFFFFF,
+             "M-profile exception return invoked at PC %#x, not an "
+             "EXC_RETURN address", at);
+    mintr->excReturn(tc, (uint32_t)at);
+    pc = tc->pcState().as<PCState>();
     pc.advance();
     tc->pcState(pc);
 }

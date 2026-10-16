@@ -214,16 +214,15 @@ class MProfileReset : public ArmMFault
  * happens when the fault is invoked, which a pipelined CPU does only for
  * the oldest instruction on the path it commits.  A fetch made ahead of
  * that (the next sequential address, or down a mispredicted path) is
- * discarded with its stream and has no effect.
+ * discarded with its stream and has no effect.  The EXC_RETURN value is
+ * the PC of the instruction the fault is invoked for: a fetch made ahead
+ * past the top of the address space (after 0xFFFFFFFC) reports this fault
+ * too, and a CPU may carry it on the instruction at the PC it fetched
+ * ahead for.
  */
 class MProfileExcReturnFetch : public FaultBase
 {
-  protected:
-    const uint32_t excReturn;
-
   public:
-    explicit MProfileExcReturnFetch(uint32_t exc_return)
-        : excReturn(exc_return) {}
 
     FaultName name() const override { return "M-profile exception return"; }
     void invoke(ThreadContext *tc,

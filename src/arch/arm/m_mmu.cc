@@ -88,9 +88,11 @@ MTLB::translateAtomic(const RequestPtr &req, ThreadContext *tc,
     // nothing else: the return happens when the fault is invoked, so a
     // CPU that fetches ahead (the next address, a predicted path) and
     // later discards that fetch leaves the architectural state alone.
-    if (mode == BaseMMU::Execute &&
-        (vaddr & 0xFFFFFFF0) == 0xFFFFFFF0) {
-        return std::make_shared<MProfileExcReturnFetch>((uint32_t)vaddr);
+    // A fetch past the top of the 32-bit space is one made ahead of a
+    // fetch from 0xFFFFFFFC (the return to thread mode on the process
+    // stack): it reports the same fault, for the same PC.
+    if (mode == BaseMMU::Execute && vaddr >= 0xFFFFFFF0) {
+        return std::make_shared<MProfileExcReturnFetch>();
     }
 
     // M-profile: VA == PA, no translation.
@@ -109,11 +111,9 @@ MTLB::translateTiming(const RequestPtr &req, ThreadContext *tc,
 
     // EXC_RETURN detection — the same as translateAtomic(): the fetch
     // only reports the fault.
-    if (mode == BaseMMU::Execute &&
-        (vaddr & 0xFFFFFFF0) == 0xFFFFFFF0) {
-        translation->finish(
-            std::make_shared<MProfileExcReturnFetch>((uint32_t)vaddr),
-            req, tc, mode);
+    if (mode == BaseMMU::Execute && vaddr >= 0xFFFFFFF0) {
+        translation->finish(std::make_shared<MProfileExcReturnFetch>(),
+                            req, tc, mode);
         return;
     }
 
