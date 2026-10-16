@@ -220,6 +220,15 @@ ArmMFault::pushExceptionFrame(ThreadContext *tc,
     XPSR xpsr = tc->readMiscRegNoEffect(MISCREG_M_XPSR);
     xpsr.t  = pcState.thumb() ? 1 : 0;  // xPSR[24] = T (Thumb)
 
+    // IT state (DDI0403E B1.4.2: EPSR.ICI/IT, xPSR[26:25] and [15:10]).
+    // gem5 keeps it in PCState, not in MISCREG_M_XPSR (as A-profile
+    // faults.cc does for the saved CPSR), so stack the live state: an
+    // exception taken inside an IT block must resume the block's
+    // remaining conditional instructions as conditional.
+    ITSTATE it = pcState.itstate();
+    xpsr.iciIt2 = it.top6;
+    xpsr.iciIt1 = it.bottom2;
+
     // Stack alignment (DDI0403E B1.5.6):
     // If STKALIGN is set and SP is not 8-byte aligned, insert 4 bytes
     // of padding and record it in xPSR.frameptralign (bit 9) so that
