@@ -83,7 +83,7 @@ board.exit_on_work_items = True
 root = Root(full_system=True, system=board)
 m5.instantiate()
 print(f"RP2350 core={args.core} cpu_id=0 clock=150MHz")
-print("XIP=0x10000000+4MiB cache=16KiB/2-way/8B")
+print("XIP=0x10000000+16MiB cache=16KiB/2-way/8B")
 if args.xip_model == "qmi":
     print("XIP model=qmi: two cache banks, flash interface timing of a Pico 2")
 else:

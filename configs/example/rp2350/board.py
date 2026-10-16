@@ -19,7 +19,7 @@ from m5.objects import (
 
 CLOCK = "150MHz"
 XIP_BASE = 0x10000000
-XIP_SIZE = "16MiB"  # Pico 2's fitted external flash
+XIP_SIZE = "16MiB"  # flash
 
 # Physical windows; the legacy model lumps each striped group together.
 SRAM_REGIONS = (
