@@ -1,0 +1,3329 @@
+
+test_fp_stacking_rp2350.elf:     file format elf32-littlearm
+
+SYMBOL TABLE:
+20010000 l    d  .text	00000000 .text
+00000000 l    d  .ARM.attributes	00000000 .ARM.attributes
+00000000 l    df *ABS*	00000000 test_fp_stacking_rp2350.o
+00000001 l       *ABS*	00000000 RP2350
+e000ed04 l       *ABS*	00000000 ICSR
+e000ed14 l       *ABS*	00000000 CCR
+e000ed1c l       *ABS*	00000000 SHPR2
+e000ed20 l       *ABS*	00000000 SHPR3
+e000ed88 l       *ABS*	00000000 CPACR
+e000ef34 l       *ABS*	00000000 FPCCR
+e000ef38 l       *ABS*	00000000 FPCAR
+e000ef3c l       *ABS*	00000000 FPDSCR
+20000100 l       *ABS*	00000000 RESULT
+20000104 l       *ABS*	00000000 SUBTEST
+20000108 l       *ABS*	00000000 CHECK
+20000200 l       *ABS*	00000000 REC
+20000280 l       *ABS*	00000000 MODE
+20008000 l       *ABS*	00000000 PSP_TOP
+5e5e5e5e l       *ABS*	00000000 SENT
+6340009f l       *ABS*	00000000 THREAD_FPSCR
+9080001b l       *ABS*	00000000 CLOB_FPSCR
+50000004 l       *ABS*	00000000 SVC_FPSCR
+02c00000 l       *ABS*	00000000 DEF_FPSCR
+70000000 l       *ABS*	00000000 CLOB_TAG
+78000000 l       *ABS*	00000000 SVC_TAG
+00000000 l       *ABS*	00000000 R_LR
+00000004 l       *ABS*	00000000 R_SP
+00000008 l       *ABS*	00000000 R_CTRL
+0000000c l       *ABS*	00000000 R_FPCCR
+00000010 l       *ABS*	00000000 R_FPCAR
+00000014 l       *ABS*	00000000 R_FPSCR1
+00000018 l       *ABS*	00000000 R_FPCCR1
+0000001c l       *ABS*	00000000 R_CTRL1
+00000020 l       *ABS*	00000000 R_XPSR
+00000024 l       *ABS*	00000000 R_SVC_LR
+00000028 l       *ABS*	00000000 R_SVC_SP
+0000002c l       *ABS*	00000000 R_NEST_OK
+00000030 l       *ABS*	00000000 R_PSP
+200127a4 l     F .text	00000000 fault_handler
+200126e8 l     F .text	00000000 SVC_Handler
+20012468 l     F .text	00000000 PendSV_Handler
+2001241a l       .text	00000000 fail
+200127aa l       .text	00000000 ok_message
+20012436 l       .text	00000000 done
+200127cc l     F .text	00000000 print_hex
+200127ba l       .text	00000000 fail_message
+20012656 l       .text	00000000 pendsv_done
+20012652 l       .text	00000000 pendsv_pop
+20000300 l       *ABS*	00000000 hexbuf
+20010040 g     F .text	00000000 Reset_Handler
+
+
+
+Disassembly of section .text:
+
+20010000 <Reset_Handler-0x40>:
+20010000:	20040000 	.word	0x20040000
+20010004:	20010041 	.word	0x20010041
+20010008:	200127a5 	.word	0x200127a5
+2001000c:	200127a5 	.word	0x200127a5
+20010010:	200127a5 	.word	0x200127a5
+20010014:	200127a5 	.word	0x200127a5
+20010018:	200127a5 	.word	0x200127a5
+2001001c:	200127a5 	.word	0x200127a5
+20010020:	200127a5 	.word	0x200127a5
+20010024:	200127a5 	.word	0x200127a5
+20010028:	200127a5 	.word	0x200127a5
+2001002c:	200126e9 	.word	0x200126e9
+20010030:	200127a5 	.word	0x200127a5
+20010034:	200127a5 	.word	0x200127a5
+20010038:	20012469 	.word	0x20012469
+2001003c:	200127a5 	.word	0x200127a5
+
+20010040 <Reset_Handler>:
+20010040:	480a      	ldr	r0, [pc, #40]	@ (2001006c <Reset_Handler+0x2c>)
+20010042:	6801      	ldr	r1, [r0, #0]
+20010044:	f441 0170 	orr.w	r1, r1, #15728640	@ 0xf00000
+20010048:	6001      	str	r1, [r0, #0]
+2001004a:	f3bf 8f4f 	dsb	sy
+2001004e:	f3bf 8f6f 	isb	sy
+20010052:	4807      	ldr	r0, [pc, #28]	@ (20010070 <Reset_Handler+0x30>)
+20010054:	f44f 017f 	mov.w	r1, #16711680	@ 0xff0000
+20010058:	6001      	str	r1, [r0, #0]
+2001005a:	4806      	ldr	r0, [pc, #24]	@ (20010074 <Reset_Handler+0x34>)
+2001005c:	2100      	movs	r1, #0
+2001005e:	6001      	str	r1, [r0, #0]
+20010060:	4805      	ldr	r0, [pc, #20]	@ (20010078 <Reset_Handler+0x38>)
+20010062:	f04f 7130 	mov.w	r1, #46137344	@ 0x2c00000
+20010066:	6001      	str	r1, [r0, #0]
+20010068:	e008      	b.n	2001007c <Reset_Handler+0x3c>
+2001006a:	0000      	.short	0x0000
+2001006c:	e000ed88 	.word	0xe000ed88
+20010070:	e000ed20 	.word	0xe000ed20
+20010074:	e000ed1c 	.word	0xe000ed1c
+20010078:	e000ef3c 	.word	0xe000ef3c
+2001007c:	2701      	movs	r7, #1
+2001007e:	f8df 04cc 	ldr.w	r0, [pc, #1228]	@ 2001054c <Reset_Handler+0x50c>
+20010082:	f04f 4140 	mov.w	r1, #3221225472	@ 0xc0000000
+20010086:	6001      	str	r1, [r0, #0]
+20010088:	f3bf 8f4f 	dsb	sy
+2001008c:	f3bf 8f6f 	isb	sy
+20010090:	f8df 04bc 	ldr.w	r0, [pc, #1212]	@ 20010550 <Reset_Handler+0x510>
+20010094:	2101      	movs	r1, #1
+20010096:	6001      	str	r1, [r0, #0]
+20010098:	46e8      	mov	r8, sp
+2001009a:	f1a8 0068 	sub.w	r0, r8, #104	@ 0x68
+2001009e:	f04f 315e 	mov.w	r1, #1583242846	@ 0x5e5e5e5e
+200100a2:	221a      	movs	r2, #26
+200100a4:	f840 1b04 	str.w	r1, [r0], #4
+200100a8:	3a01      	subs	r2, #1
+200100aa:	d1fb      	bne.n	200100a4 <Reset_Handler+0x64>
+200100ac:	f04f 4082 	mov.w	r0, #1090519040	@ 0x41000000
+200100b0:	ee00 0a10 	vmov	s0, r0
+200100b4:	f8df 049c 	ldr.w	r0, [pc, #1180]	@ 20010554 <Reset_Handler+0x514>
+200100b8:	ee00 0a90 	vmov	s1, r0
+200100bc:	f8df 0498 	ldr.w	r0, [pc, #1176]	@ 20010558 <Reset_Handler+0x518>
+200100c0:	ee01 0a10 	vmov	s2, r0
+200100c4:	f8df 0494 	ldr.w	r0, [pc, #1172]	@ 2001055c <Reset_Handler+0x51c>
+200100c8:	ee01 0a90 	vmov	s3, r0
+200100cc:	f8df 0490 	ldr.w	r0, [pc, #1168]	@ 20010560 <Reset_Handler+0x520>
+200100d0:	ee02 0a10 	vmov	s4, r0
+200100d4:	f8df 048c 	ldr.w	r0, [pc, #1164]	@ 20010564 <Reset_Handler+0x524>
+200100d8:	ee02 0a90 	vmov	s5, r0
+200100dc:	f8df 0488 	ldr.w	r0, [pc, #1160]	@ 20010568 <Reset_Handler+0x528>
+200100e0:	ee03 0a10 	vmov	s6, r0
+200100e4:	f8df 0484 	ldr.w	r0, [pc, #1156]	@ 2001056c <Reset_Handler+0x52c>
+200100e8:	ee03 0a90 	vmov	s7, r0
+200100ec:	f8df 0480 	ldr.w	r0, [pc, #1152]	@ 20010570 <Reset_Handler+0x530>
+200100f0:	ee04 0a10 	vmov	s8, r0
+200100f4:	f8df 047c 	ldr.w	r0, [pc, #1148]	@ 20010574 <Reset_Handler+0x534>
+200100f8:	ee04 0a90 	vmov	s9, r0
+200100fc:	f8df 0478 	ldr.w	r0, [pc, #1144]	@ 20010578 <Reset_Handler+0x538>
+20010100:	ee05 0a10 	vmov	s10, r0
+20010104:	f8df 0474 	ldr.w	r0, [pc, #1140]	@ 2001057c <Reset_Handler+0x53c>
+20010108:	ee05 0a90 	vmov	s11, r0
+2001010c:	f8df 0470 	ldr.w	r0, [pc, #1136]	@ 20010580 <Reset_Handler+0x540>
+20010110:	ee06 0a10 	vmov	s12, r0
+20010114:	f8df 046c 	ldr.w	r0, [pc, #1132]	@ 20010584 <Reset_Handler+0x544>
+20010118:	ee06 0a90 	vmov	s13, r0
+2001011c:	f8df 0468 	ldr.w	r0, [pc, #1128]	@ 20010588 <Reset_Handler+0x548>
+20010120:	ee07 0a10 	vmov	s14, r0
+20010124:	f8df 0464 	ldr.w	r0, [pc, #1124]	@ 2001058c <Reset_Handler+0x54c>
+20010128:	ee07 0a90 	vmov	s15, r0
+2001012c:	f8df 0460 	ldr.w	r0, [pc, #1120]	@ 20010590 <Reset_Handler+0x550>
+20010130:	ee08 0a10 	vmov	s16, r0
+20010134:	f8df 045c 	ldr.w	r0, [pc, #1116]	@ 20010594 <Reset_Handler+0x554>
+20010138:	ee08 0a90 	vmov	s17, r0
+2001013c:	f8df 0458 	ldr.w	r0, [pc, #1112]	@ 20010598 <Reset_Handler+0x558>
+20010140:	ee09 0a10 	vmov	s18, r0
+20010144:	f8df 0454 	ldr.w	r0, [pc, #1108]	@ 2001059c <Reset_Handler+0x55c>
+20010148:	ee09 0a90 	vmov	s19, r0
+2001014c:	f8df 0450 	ldr.w	r0, [pc, #1104]	@ 200105a0 <Reset_Handler+0x560>
+20010150:	ee0a 0a10 	vmov	s20, r0
+20010154:	f8df 044c 	ldr.w	r0, [pc, #1100]	@ 200105a4 <Reset_Handler+0x564>
+20010158:	ee0a 0a90 	vmov	s21, r0
+2001015c:	f8df 0448 	ldr.w	r0, [pc, #1096]	@ 200105a8 <Reset_Handler+0x568>
+20010160:	ee0b 0a10 	vmov	s22, r0
+20010164:	f8df 0444 	ldr.w	r0, [pc, #1092]	@ 200105ac <Reset_Handler+0x56c>
+20010168:	ee0b 0a90 	vmov	s23, r0
+2001016c:	f8df 0440 	ldr.w	r0, [pc, #1088]	@ 200105b0 <Reset_Handler+0x570>
+20010170:	ee0c 0a10 	vmov	s24, r0
+20010174:	f8df 043c 	ldr.w	r0, [pc, #1084]	@ 200105b4 <Reset_Handler+0x574>
+20010178:	ee0c 0a90 	vmov	s25, r0
+2001017c:	f8df 0438 	ldr.w	r0, [pc, #1080]	@ 200105b8 <Reset_Handler+0x578>
+20010180:	ee0d 0a10 	vmov	s26, r0
+20010184:	f8df 0434 	ldr.w	r0, [pc, #1076]	@ 200105bc <Reset_Handler+0x57c>
+20010188:	ee0d 0a90 	vmov	s27, r0
+2001018c:	f8df 0430 	ldr.w	r0, [pc, #1072]	@ 200105c0 <Reset_Handler+0x580>
+20010190:	ee0e 0a10 	vmov	s28, r0
+20010194:	f8df 042c 	ldr.w	r0, [pc, #1068]	@ 200105c4 <Reset_Handler+0x584>
+20010198:	ee0e 0a90 	vmov	s29, r0
+2001019c:	f8df 0428 	ldr.w	r0, [pc, #1064]	@ 200105c8 <Reset_Handler+0x588>
+200101a0:	ee0f 0a10 	vmov	s30, r0
+200101a4:	f8df 0424 	ldr.w	r0, [pc, #1060]	@ 200105cc <Reset_Handler+0x58c>
+200101a8:	ee0f 0a90 	vmov	s31, r0
+200101ac:	f8df 0420 	ldr.w	r0, [pc, #1056]	@ 200105d0 <Reset_Handler+0x590>
+200101b0:	eee1 0a10 	vmsr	fpscr, r0
+200101b4:	f8df 041c 	ldr.w	r0, [pc, #1052]	@ 200105d4 <Reset_Handler+0x594>
+200101b8:	f04f 5180 	mov.w	r1, #268435456	@ 0x10000000
+200101bc:	6001      	str	r1, [r0, #0]
+200101be:	f3bf 8f4f 	dsb	sy
+200101c2:	f3bf 8f6f 	isb	sy
+200101c6:	f04f 0601 	mov.w	r6, #1
+200101ca:	45c5      	cmp	sp, r8
+200101cc:	f042 8125 	bne.w	2001241a <fail>
+200101d0:	f04f 0602 	mov.w	r6, #2
+200101d4:	ee10 0a10 	vmov	r0, s0
+200101d8:	f04f 4182 	mov.w	r1, #1090519040	@ 0x41000000
+200101dc:	4288      	cmp	r0, r1
+200101de:	f042 811c 	bne.w	2001241a <fail>
+200101e2:	ee10 0a90 	vmov	r0, s1
+200101e6:	49db      	ldr	r1, [pc, #876]	@ (20010554 <Reset_Handler+0x514>)
+200101e8:	4288      	cmp	r0, r1
+200101ea:	f042 8116 	bne.w	2001241a <fail>
+200101ee:	ee11 0a10 	vmov	r0, s2
+200101f2:	49d9      	ldr	r1, [pc, #868]	@ (20010558 <Reset_Handler+0x518>)
+200101f4:	4288      	cmp	r0, r1
+200101f6:	f042 8110 	bne.w	2001241a <fail>
+200101fa:	ee11 0a90 	vmov	r0, s3
+200101fe:	49d7      	ldr	r1, [pc, #860]	@ (2001055c <Reset_Handler+0x51c>)
+20010200:	4288      	cmp	r0, r1
+20010202:	f042 810a 	bne.w	2001241a <fail>
+20010206:	ee12 0a10 	vmov	r0, s4
+2001020a:	49d5      	ldr	r1, [pc, #852]	@ (20010560 <Reset_Handler+0x520>)
+2001020c:	4288      	cmp	r0, r1
+2001020e:	f042 8104 	bne.w	2001241a <fail>
+20010212:	ee12 0a90 	vmov	r0, s5
+20010216:	49d3      	ldr	r1, [pc, #844]	@ (20010564 <Reset_Handler+0x524>)
+20010218:	4288      	cmp	r0, r1
+2001021a:	f042 80fe 	bne.w	2001241a <fail>
+2001021e:	ee13 0a10 	vmov	r0, s6
+20010222:	49d1      	ldr	r1, [pc, #836]	@ (20010568 <Reset_Handler+0x528>)
+20010224:	4288      	cmp	r0, r1
+20010226:	f042 80f8 	bne.w	2001241a <fail>
+2001022a:	ee13 0a90 	vmov	r0, s7
+2001022e:	49cf      	ldr	r1, [pc, #828]	@ (2001056c <Reset_Handler+0x52c>)
+20010230:	4288      	cmp	r0, r1
+20010232:	f042 80f2 	bne.w	2001241a <fail>
+20010236:	ee14 0a10 	vmov	r0, s8
+2001023a:	49cd      	ldr	r1, [pc, #820]	@ (20010570 <Reset_Handler+0x530>)
+2001023c:	4288      	cmp	r0, r1
+2001023e:	f042 80ec 	bne.w	2001241a <fail>
+20010242:	ee14 0a90 	vmov	r0, s9
+20010246:	49cb      	ldr	r1, [pc, #812]	@ (20010574 <Reset_Handler+0x534>)
+20010248:	4288      	cmp	r0, r1
+2001024a:	f042 80e6 	bne.w	2001241a <fail>
+2001024e:	ee15 0a10 	vmov	r0, s10
+20010252:	49c9      	ldr	r1, [pc, #804]	@ (20010578 <Reset_Handler+0x538>)
+20010254:	4288      	cmp	r0, r1
+20010256:	f042 80e0 	bne.w	2001241a <fail>
+2001025a:	ee15 0a90 	vmov	r0, s11
+2001025e:	49c7      	ldr	r1, [pc, #796]	@ (2001057c <Reset_Handler+0x53c>)
+20010260:	4288      	cmp	r0, r1
+20010262:	f042 80da 	bne.w	2001241a <fail>
+20010266:	ee16 0a10 	vmov	r0, s12
+2001026a:	49c5      	ldr	r1, [pc, #788]	@ (20010580 <Reset_Handler+0x540>)
+2001026c:	4288      	cmp	r0, r1
+2001026e:	f042 80d4 	bne.w	2001241a <fail>
+20010272:	ee16 0a90 	vmov	r0, s13
+20010276:	49c3      	ldr	r1, [pc, #780]	@ (20010584 <Reset_Handler+0x544>)
+20010278:	4288      	cmp	r0, r1
+2001027a:	f042 80ce 	bne.w	2001241a <fail>
+2001027e:	ee17 0a10 	vmov	r0, s14
+20010282:	49c1      	ldr	r1, [pc, #772]	@ (20010588 <Reset_Handler+0x548>)
+20010284:	4288      	cmp	r0, r1
+20010286:	f042 80c8 	bne.w	2001241a <fail>
+2001028a:	ee17 0a90 	vmov	r0, s15
+2001028e:	49bf      	ldr	r1, [pc, #764]	@ (2001058c <Reset_Handler+0x54c>)
+20010290:	4288      	cmp	r0, r1
+20010292:	f042 80c2 	bne.w	2001241a <fail>
+20010296:	ee18 0a10 	vmov	r0, s16
+2001029a:	49bd      	ldr	r1, [pc, #756]	@ (20010590 <Reset_Handler+0x550>)
+2001029c:	4288      	cmp	r0, r1
+2001029e:	f042 80bc 	bne.w	2001241a <fail>
+200102a2:	ee18 0a90 	vmov	r0, s17
+200102a6:	49bb      	ldr	r1, [pc, #748]	@ (20010594 <Reset_Handler+0x554>)
+200102a8:	4288      	cmp	r0, r1
+200102aa:	f042 80b6 	bne.w	2001241a <fail>
+200102ae:	ee19 0a10 	vmov	r0, s18
+200102b2:	49b9      	ldr	r1, [pc, #740]	@ (20010598 <Reset_Handler+0x558>)
+200102b4:	4288      	cmp	r0, r1
+200102b6:	f042 80b0 	bne.w	2001241a <fail>
+200102ba:	ee19 0a90 	vmov	r0, s19
+200102be:	49b7      	ldr	r1, [pc, #732]	@ (2001059c <Reset_Handler+0x55c>)
+200102c0:	4288      	cmp	r0, r1
+200102c2:	f042 80aa 	bne.w	2001241a <fail>
+200102c6:	ee1a 0a10 	vmov	r0, s20
+200102ca:	49b5      	ldr	r1, [pc, #724]	@ (200105a0 <Reset_Handler+0x560>)
+200102cc:	4288      	cmp	r0, r1
+200102ce:	f042 80a4 	bne.w	2001241a <fail>
+200102d2:	ee1a 0a90 	vmov	r0, s21
+200102d6:	49b3      	ldr	r1, [pc, #716]	@ (200105a4 <Reset_Handler+0x564>)
+200102d8:	4288      	cmp	r0, r1
+200102da:	f042 809e 	bne.w	2001241a <fail>
+200102de:	ee1b 0a10 	vmov	r0, s22
+200102e2:	49b1      	ldr	r1, [pc, #708]	@ (200105a8 <Reset_Handler+0x568>)
+200102e4:	4288      	cmp	r0, r1
+200102e6:	f042 8098 	bne.w	2001241a <fail>
+200102ea:	ee1b 0a90 	vmov	r0, s23
+200102ee:	49af      	ldr	r1, [pc, #700]	@ (200105ac <Reset_Handler+0x56c>)
+200102f0:	4288      	cmp	r0, r1
+200102f2:	f042 8092 	bne.w	2001241a <fail>
+200102f6:	ee1c 0a10 	vmov	r0, s24
+200102fa:	49ad      	ldr	r1, [pc, #692]	@ (200105b0 <Reset_Handler+0x570>)
+200102fc:	4288      	cmp	r0, r1
+200102fe:	f042 808c 	bne.w	2001241a <fail>
+20010302:	ee1c 0a90 	vmov	r0, s25
+20010306:	49ab      	ldr	r1, [pc, #684]	@ (200105b4 <Reset_Handler+0x574>)
+20010308:	4288      	cmp	r0, r1
+2001030a:	f042 8086 	bne.w	2001241a <fail>
+2001030e:	ee1d 0a10 	vmov	r0, s26
+20010312:	49a9      	ldr	r1, [pc, #676]	@ (200105b8 <Reset_Handler+0x578>)
+20010314:	4288      	cmp	r0, r1
+20010316:	f042 8080 	bne.w	2001241a <fail>
+2001031a:	ee1d 0a90 	vmov	r0, s27
+2001031e:	49a7      	ldr	r1, [pc, #668]	@ (200105bc <Reset_Handler+0x57c>)
+20010320:	4288      	cmp	r0, r1
+20010322:	f042 807a 	bne.w	2001241a <fail>
+20010326:	ee1e 0a10 	vmov	r0, s28
+2001032a:	49a5      	ldr	r1, [pc, #660]	@ (200105c0 <Reset_Handler+0x580>)
+2001032c:	4288      	cmp	r0, r1
+2001032e:	f042 8074 	bne.w	2001241a <fail>
+20010332:	ee1e 0a90 	vmov	r0, s29
+20010336:	49a3      	ldr	r1, [pc, #652]	@ (200105c4 <Reset_Handler+0x584>)
+20010338:	4288      	cmp	r0, r1
+2001033a:	f042 806e 	bne.w	2001241a <fail>
+2001033e:	ee1f 0a10 	vmov	r0, s30
+20010342:	49a1      	ldr	r1, [pc, #644]	@ (200105c8 <Reset_Handler+0x588>)
+20010344:	4288      	cmp	r0, r1
+20010346:	f042 8068 	bne.w	2001241a <fail>
+2001034a:	ee1f 0a90 	vmov	r0, s31
+2001034e:	499f      	ldr	r1, [pc, #636]	@ (200105cc <Reset_Handler+0x58c>)
+20010350:	4288      	cmp	r0, r1
+20010352:	f042 8062 	bne.w	2001241a <fail>
+20010356:	eef1 0a10 	vmrs	r0, fpscr
+2001035a:	f04f 0603 	mov.w	r6, #3
+2001035e:	499c      	ldr	r1, [pc, #624]	@ (200105d0 <Reset_Handler+0x590>)
+20010360:	4288      	cmp	r0, r1
+20010362:	f042 805a 	bne.w	2001241a <fail>
+20010366:	489c      	ldr	r0, [pc, #624]	@ (200105d8 <Reset_Handler+0x598>)
+20010368:	6800      	ldr	r0, [r0, #0]
+2001036a:	f04f 060a 	mov.w	r6, #10
+2001036e:	f06f 0116 	mvn.w	r1, #22
+20010372:	4288      	cmp	r0, r1
+20010374:	f042 8051 	bne.w	2001241a <fail>
+20010378:	4897      	ldr	r0, [pc, #604]	@ (200105d8 <Reset_Handler+0x598>)
+2001037a:	6840      	ldr	r0, [r0, #4]
+2001037c:	f1a8 0968 	sub.w	r9, r8, #104	@ 0x68
+20010380:	f04f 060b 	mov.w	r6, #11
+20010384:	4548      	cmp	r0, r9
+20010386:	f042 8048 	bne.w	2001241a <fail>
+2001038a:	4893      	ldr	r0, [pc, #588]	@ (200105d8 <Reset_Handler+0x598>)
+2001038c:	6880      	ldr	r0, [r0, #8]
+2001038e:	f000 0006 	and.w	r0, r0, #6
+20010392:	f04f 060c 	mov.w	r6, #12
+20010396:	f04f 0100 	mov.w	r1, #0
+2001039a:	4288      	cmp	r0, r1
+2001039c:	f042 803d 	bne.w	2001241a <fail>
+200103a0:	488d      	ldr	r0, [pc, #564]	@ (200105d8 <Reset_Handler+0x598>)
+200103a2:	68c0      	ldr	r0, [r0, #12]
+200103a4:	f000 0009 	and.w	r0, r0, #9
+200103a8:	f04f 060d 	mov.w	r6, #13
+200103ac:	f04f 0109 	mov.w	r1, #9
+200103b0:	4288      	cmp	r0, r1
+200103b2:	f042 8032 	bne.w	2001241a <fail>
+200103b6:	4888      	ldr	r0, [pc, #544]	@ (200105d8 <Reset_Handler+0x598>)
+200103b8:	6900      	ldr	r0, [r0, #16]
+200103ba:	f109 0120 	add.w	r1, r9, #32
+200103be:	f04f 060e 	mov.w	r6, #14
+200103c2:	4288      	cmp	r0, r1
+200103c4:	f042 8029 	bne.w	2001241a <fail>
+200103c8:	4883      	ldr	r0, [pc, #524]	@ (200105d8 <Reset_Handler+0x598>)
+200103ca:	6940      	ldr	r0, [r0, #20]
+200103cc:	f000 60f8 	and.w	r0, r0, #130023424	@ 0x7c00000
+200103d0:	f04f 060f 	mov.w	r6, #15
+200103d4:	f04f 7130 	mov.w	r1, #46137344	@ 0x2c00000
+200103d8:	4288      	cmp	r0, r1
+200103da:	f042 801e 	bne.w	2001241a <fail>
+200103de:	487e      	ldr	r0, [pc, #504]	@ (200105d8 <Reset_Handler+0x598>)
+200103e0:	6980      	ldr	r0, [r0, #24]
+200103e2:	f000 0001 	and.w	r0, r0, #1
+200103e6:	f04f 0610 	mov.w	r6, #16
+200103ea:	f04f 0100 	mov.w	r1, #0
+200103ee:	4288      	cmp	r0, r1
+200103f0:	f042 8013 	bne.w	2001241a <fail>
+200103f4:	4878      	ldr	r0, [pc, #480]	@ (200105d8 <Reset_Handler+0x598>)
+200103f6:	69c0      	ldr	r0, [r0, #28]
+200103f8:	f000 0004 	and.w	r0, r0, #4
+200103fc:	f04f 0611 	mov.w	r6, #17
+20010400:	f04f 0104 	mov.w	r1, #4
+20010404:	4288      	cmp	r0, r1
+20010406:	f042 8008 	bne.w	2001241a <fail>
+2001040a:	f3ef 8014 	mrs	r0, CONTROL
+2001040e:	f000 0004 	and.w	r0, r0, #4
+20010412:	f04f 0612 	mov.w	r6, #18
+20010416:	f04f 0104 	mov.w	r1, #4
+2001041a:	4288      	cmp	r0, r1
+2001041c:	f041 87fd 	bne.w	2001241a <fail>
+20010420:	484a      	ldr	r0, [pc, #296]	@ (2001054c <Reset_Handler+0x50c>)
+20010422:	6800      	ldr	r0, [r0, #0]
+20010424:	f000 0001 	and.w	r0, r0, #1
+20010428:	f04f 0613 	mov.w	r6, #19
+2001042c:	f04f 0100 	mov.w	r1, #0
+20010430:	4288      	cmp	r0, r1
+20010432:	f041 87f2 	bne.w	2001241a <fail>
+20010436:	f8d9 0020 	ldr.w	r0, [r9, #32]
+2001043a:	f04f 0628 	mov.w	r6, #40	@ 0x28
+2001043e:	f04f 4182 	mov.w	r1, #1090519040	@ 0x41000000
+20010442:	4288      	cmp	r0, r1
+20010444:	f041 87e9 	bne.w	2001241a <fail>
+20010448:	f8d9 0024 	ldr.w	r0, [r9, #36]	@ 0x24
+2001044c:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010450:	4940      	ldr	r1, [pc, #256]	@ (20010554 <Reset_Handler+0x514>)
+20010452:	4288      	cmp	r0, r1
+20010454:	f041 87e1 	bne.w	2001241a <fail>
+20010458:	f8d9 0028 	ldr.w	r0, [r9, #40]	@ 0x28
+2001045c:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010460:	493d      	ldr	r1, [pc, #244]	@ (20010558 <Reset_Handler+0x518>)
+20010462:	4288      	cmp	r0, r1
+20010464:	f041 87d9 	bne.w	2001241a <fail>
+20010468:	f8d9 002c 	ldr.w	r0, [r9, #44]	@ 0x2c
+2001046c:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010470:	493a      	ldr	r1, [pc, #232]	@ (2001055c <Reset_Handler+0x51c>)
+20010472:	4288      	cmp	r0, r1
+20010474:	f041 87d1 	bne.w	2001241a <fail>
+20010478:	f8d9 0030 	ldr.w	r0, [r9, #48]	@ 0x30
+2001047c:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010480:	4937      	ldr	r1, [pc, #220]	@ (20010560 <Reset_Handler+0x520>)
+20010482:	4288      	cmp	r0, r1
+20010484:	f041 87c9 	bne.w	2001241a <fail>
+20010488:	f8d9 0034 	ldr.w	r0, [r9, #52]	@ 0x34
+2001048c:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010490:	4934      	ldr	r1, [pc, #208]	@ (20010564 <Reset_Handler+0x524>)
+20010492:	4288      	cmp	r0, r1
+20010494:	f041 87c1 	bne.w	2001241a <fail>
+20010498:	f8d9 0038 	ldr.w	r0, [r9, #56]	@ 0x38
+2001049c:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200104a0:	4931      	ldr	r1, [pc, #196]	@ (20010568 <Reset_Handler+0x528>)
+200104a2:	4288      	cmp	r0, r1
+200104a4:	f041 87b9 	bne.w	2001241a <fail>
+200104a8:	f8d9 003c 	ldr.w	r0, [r9, #60]	@ 0x3c
+200104ac:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200104b0:	492e      	ldr	r1, [pc, #184]	@ (2001056c <Reset_Handler+0x52c>)
+200104b2:	4288      	cmp	r0, r1
+200104b4:	f041 87b1 	bne.w	2001241a <fail>
+200104b8:	f8d9 0040 	ldr.w	r0, [r9, #64]	@ 0x40
+200104bc:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200104c0:	492b      	ldr	r1, [pc, #172]	@ (20010570 <Reset_Handler+0x530>)
+200104c2:	4288      	cmp	r0, r1
+200104c4:	f041 87a9 	bne.w	2001241a <fail>
+200104c8:	f8d9 0044 	ldr.w	r0, [r9, #68]	@ 0x44
+200104cc:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200104d0:	4928      	ldr	r1, [pc, #160]	@ (20010574 <Reset_Handler+0x534>)
+200104d2:	4288      	cmp	r0, r1
+200104d4:	f041 87a1 	bne.w	2001241a <fail>
+200104d8:	f8d9 0048 	ldr.w	r0, [r9, #72]	@ 0x48
+200104dc:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200104e0:	4925      	ldr	r1, [pc, #148]	@ (20010578 <Reset_Handler+0x538>)
+200104e2:	4288      	cmp	r0, r1
+200104e4:	f041 8799 	bne.w	2001241a <fail>
+200104e8:	f8d9 004c 	ldr.w	r0, [r9, #76]	@ 0x4c
+200104ec:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200104f0:	4922      	ldr	r1, [pc, #136]	@ (2001057c <Reset_Handler+0x53c>)
+200104f2:	4288      	cmp	r0, r1
+200104f4:	f041 8791 	bne.w	2001241a <fail>
+200104f8:	f8d9 0050 	ldr.w	r0, [r9, #80]	@ 0x50
+200104fc:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010500:	491f      	ldr	r1, [pc, #124]	@ (20010580 <Reset_Handler+0x540>)
+20010502:	4288      	cmp	r0, r1
+20010504:	f041 8789 	bne.w	2001241a <fail>
+20010508:	f8d9 0054 	ldr.w	r0, [r9, #84]	@ 0x54
+2001050c:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010510:	491c      	ldr	r1, [pc, #112]	@ (20010584 <Reset_Handler+0x544>)
+20010512:	4288      	cmp	r0, r1
+20010514:	f041 8781 	bne.w	2001241a <fail>
+20010518:	f8d9 0058 	ldr.w	r0, [r9, #88]	@ 0x58
+2001051c:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010520:	4919      	ldr	r1, [pc, #100]	@ (20010588 <Reset_Handler+0x548>)
+20010522:	4288      	cmp	r0, r1
+20010524:	f041 8779 	bne.w	2001241a <fail>
+20010528:	f8d9 005c 	ldr.w	r0, [r9, #92]	@ 0x5c
+2001052c:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010530:	4916      	ldr	r1, [pc, #88]	@ (2001058c <Reset_Handler+0x54c>)
+20010532:	4288      	cmp	r0, r1
+20010534:	f041 8771 	bne.w	2001241a <fail>
+20010538:	f8d9 0060 	ldr.w	r0, [r9, #96]	@ 0x60
+2001053c:	f04f 0629 	mov.w	r6, #41	@ 0x29
+20010540:	4923      	ldr	r1, [pc, #140]	@ (200105d0 <Reset_Handler+0x590>)
+20010542:	4288      	cmp	r0, r1
+20010544:	f041 8769 	bne.w	2001241a <fail>
+20010548:	e048      	b.n	200105dc <Reset_Handler+0x59c>
+2001054a:	0000      	.short	0x0000
+2001054c:	e000ef34 	.word	0xe000ef34
+20010550:	20000280 	.word	0x20000280
+20010554:	41010001 	.word	0x41010001
+20010558:	41020002 	.word	0x41020002
+2001055c:	41030003 	.word	0x41030003
+20010560:	41040004 	.word	0x41040004
+20010564:	41050005 	.word	0x41050005
+20010568:	41060006 	.word	0x41060006
+2001056c:	41070007 	.word	0x41070007
+20010570:	41080008 	.word	0x41080008
+20010574:	41090009 	.word	0x41090009
+20010578:	410a000a 	.word	0x410a000a
+2001057c:	410b000b 	.word	0x410b000b
+20010580:	410c000c 	.word	0x410c000c
+20010584:	410d000d 	.word	0x410d000d
+20010588:	410e000e 	.word	0x410e000e
+2001058c:	410f000f 	.word	0x410f000f
+20010590:	41100010 	.word	0x41100010
+20010594:	41110011 	.word	0x41110011
+20010598:	41120012 	.word	0x41120012
+2001059c:	41130013 	.word	0x41130013
+200105a0:	41140014 	.word	0x41140014
+200105a4:	41150015 	.word	0x41150015
+200105a8:	41160016 	.word	0x41160016
+200105ac:	41170017 	.word	0x41170017
+200105b0:	41180018 	.word	0x41180018
+200105b4:	41190019 	.word	0x41190019
+200105b8:	411a001a 	.word	0x411a001a
+200105bc:	411b001b 	.word	0x411b001b
+200105c0:	411c001c 	.word	0x411c001c
+200105c4:	411d001d 	.word	0x411d001d
+200105c8:	411e001e 	.word	0x411e001e
+200105cc:	411f001f 	.word	0x411f001f
+200105d0:	6340009f 	.word	0x6340009f
+200105d4:	e000ed04 	.word	0xe000ed04
+200105d8:	20000200 	.word	0x20000200
+200105dc:	2702      	movs	r7, #2
+200105de:	f8df 0420 	ldr.w	r0, [pc, #1056]	@ 20010a00 <Reset_Handler+0x9c0>
+200105e2:	f04f 4100 	mov.w	r1, #2147483648	@ 0x80000000
+200105e6:	6001      	str	r1, [r0, #0]
+200105e8:	f3bf 8f4f 	dsb	sy
+200105ec:	f3bf 8f6f 	isb	sy
+200105f0:	f8df 0410 	ldr.w	r0, [pc, #1040]	@ 20010a04 <Reset_Handler+0x9c4>
+200105f4:	2101      	movs	r1, #1
+200105f6:	6001      	str	r1, [r0, #0]
+200105f8:	46e8      	mov	r8, sp
+200105fa:	f1a8 0068 	sub.w	r0, r8, #104	@ 0x68
+200105fe:	f04f 315e 	mov.w	r1, #1583242846	@ 0x5e5e5e5e
+20010602:	221a      	movs	r2, #26
+20010604:	f840 1b04 	str.w	r1, [r0], #4
+20010608:	3a01      	subs	r2, #1
+2001060a:	d1fb      	bne.n	20010604 <Reset_Handler+0x5c4>
+2001060c:	f04f 4084 	mov.w	r0, #1107296256	@ 0x42000000
+20010610:	ee00 0a10 	vmov	s0, r0
+20010614:	48fc      	ldr	r0, [pc, #1008]	@ (20010a08 <Reset_Handler+0x9c8>)
+20010616:	ee00 0a90 	vmov	s1, r0
+2001061a:	48fc      	ldr	r0, [pc, #1008]	@ (20010a0c <Reset_Handler+0x9cc>)
+2001061c:	ee01 0a10 	vmov	s2, r0
+20010620:	48fb      	ldr	r0, [pc, #1004]	@ (20010a10 <Reset_Handler+0x9d0>)
+20010622:	ee01 0a90 	vmov	s3, r0
+20010626:	48fb      	ldr	r0, [pc, #1004]	@ (20010a14 <Reset_Handler+0x9d4>)
+20010628:	ee02 0a10 	vmov	s4, r0
+2001062c:	48fa      	ldr	r0, [pc, #1000]	@ (20010a18 <Reset_Handler+0x9d8>)
+2001062e:	ee02 0a90 	vmov	s5, r0
+20010632:	48fa      	ldr	r0, [pc, #1000]	@ (20010a1c <Reset_Handler+0x9dc>)
+20010634:	ee03 0a10 	vmov	s6, r0
+20010638:	48f9      	ldr	r0, [pc, #996]	@ (20010a20 <Reset_Handler+0x9e0>)
+2001063a:	ee03 0a90 	vmov	s7, r0
+2001063e:	48f9      	ldr	r0, [pc, #996]	@ (20010a24 <Reset_Handler+0x9e4>)
+20010640:	ee04 0a10 	vmov	s8, r0
+20010644:	48f8      	ldr	r0, [pc, #992]	@ (20010a28 <Reset_Handler+0x9e8>)
+20010646:	ee04 0a90 	vmov	s9, r0
+2001064a:	48f8      	ldr	r0, [pc, #992]	@ (20010a2c <Reset_Handler+0x9ec>)
+2001064c:	ee05 0a10 	vmov	s10, r0
+20010650:	48f7      	ldr	r0, [pc, #988]	@ (20010a30 <Reset_Handler+0x9f0>)
+20010652:	ee05 0a90 	vmov	s11, r0
+20010656:	48f7      	ldr	r0, [pc, #988]	@ (20010a34 <Reset_Handler+0x9f4>)
+20010658:	ee06 0a10 	vmov	s12, r0
+2001065c:	48f6      	ldr	r0, [pc, #984]	@ (20010a38 <Reset_Handler+0x9f8>)
+2001065e:	ee06 0a90 	vmov	s13, r0
+20010662:	48f6      	ldr	r0, [pc, #984]	@ (20010a3c <Reset_Handler+0x9fc>)
+20010664:	ee07 0a10 	vmov	s14, r0
+20010668:	48f5      	ldr	r0, [pc, #980]	@ (20010a40 <Reset_Handler+0xa00>)
+2001066a:	ee07 0a90 	vmov	s15, r0
+2001066e:	48f5      	ldr	r0, [pc, #980]	@ (20010a44 <Reset_Handler+0xa04>)
+20010670:	ee08 0a10 	vmov	s16, r0
+20010674:	48f4      	ldr	r0, [pc, #976]	@ (20010a48 <Reset_Handler+0xa08>)
+20010676:	ee08 0a90 	vmov	s17, r0
+2001067a:	48f4      	ldr	r0, [pc, #976]	@ (20010a4c <Reset_Handler+0xa0c>)
+2001067c:	ee09 0a10 	vmov	s18, r0
+20010680:	48f3      	ldr	r0, [pc, #972]	@ (20010a50 <Reset_Handler+0xa10>)
+20010682:	ee09 0a90 	vmov	s19, r0
+20010686:	48f3      	ldr	r0, [pc, #972]	@ (20010a54 <Reset_Handler+0xa14>)
+20010688:	ee0a 0a10 	vmov	s20, r0
+2001068c:	48f2      	ldr	r0, [pc, #968]	@ (20010a58 <Reset_Handler+0xa18>)
+2001068e:	ee0a 0a90 	vmov	s21, r0
+20010692:	48f2      	ldr	r0, [pc, #968]	@ (20010a5c <Reset_Handler+0xa1c>)
+20010694:	ee0b 0a10 	vmov	s22, r0
+20010698:	48f1      	ldr	r0, [pc, #964]	@ (20010a60 <Reset_Handler+0xa20>)
+2001069a:	ee0b 0a90 	vmov	s23, r0
+2001069e:	48f1      	ldr	r0, [pc, #964]	@ (20010a64 <Reset_Handler+0xa24>)
+200106a0:	ee0c 0a10 	vmov	s24, r0
+200106a4:	48f0      	ldr	r0, [pc, #960]	@ (20010a68 <Reset_Handler+0xa28>)
+200106a6:	ee0c 0a90 	vmov	s25, r0
+200106aa:	48f0      	ldr	r0, [pc, #960]	@ (20010a6c <Reset_Handler+0xa2c>)
+200106ac:	ee0d 0a10 	vmov	s26, r0
+200106b0:	48ef      	ldr	r0, [pc, #956]	@ (20010a70 <Reset_Handler+0xa30>)
+200106b2:	ee0d 0a90 	vmov	s27, r0
+200106b6:	48ef      	ldr	r0, [pc, #956]	@ (20010a74 <Reset_Handler+0xa34>)
+200106b8:	ee0e 0a10 	vmov	s28, r0
+200106bc:	48ee      	ldr	r0, [pc, #952]	@ (20010a78 <Reset_Handler+0xa38>)
+200106be:	ee0e 0a90 	vmov	s29, r0
+200106c2:	48ee      	ldr	r0, [pc, #952]	@ (20010a7c <Reset_Handler+0xa3c>)
+200106c4:	ee0f 0a10 	vmov	s30, r0
+200106c8:	48ed      	ldr	r0, [pc, #948]	@ (20010a80 <Reset_Handler+0xa40>)
+200106ca:	ee0f 0a90 	vmov	s31, r0
+200106ce:	48ed      	ldr	r0, [pc, #948]	@ (20010a84 <Reset_Handler+0xa44>)
+200106d0:	eee1 0a10 	vmsr	fpscr, r0
+200106d4:	48ec      	ldr	r0, [pc, #944]	@ (20010a88 <Reset_Handler+0xa48>)
+200106d6:	f04f 5180 	mov.w	r1, #268435456	@ 0x10000000
+200106da:	6001      	str	r1, [r0, #0]
+200106dc:	f3bf 8f4f 	dsb	sy
+200106e0:	f3bf 8f6f 	isb	sy
+200106e4:	f04f 0601 	mov.w	r6, #1
+200106e8:	45c5      	cmp	sp, r8
+200106ea:	f041 8696 	bne.w	2001241a <fail>
+200106ee:	f04f 0602 	mov.w	r6, #2
+200106f2:	ee10 0a10 	vmov	r0, s0
+200106f6:	f04f 4184 	mov.w	r1, #1107296256	@ 0x42000000
+200106fa:	4288      	cmp	r0, r1
+200106fc:	f041 868d 	bne.w	2001241a <fail>
+20010700:	ee10 0a90 	vmov	r0, s1
+20010704:	49c0      	ldr	r1, [pc, #768]	@ (20010a08 <Reset_Handler+0x9c8>)
+20010706:	4288      	cmp	r0, r1
+20010708:	f041 8687 	bne.w	2001241a <fail>
+2001070c:	ee11 0a10 	vmov	r0, s2
+20010710:	49be      	ldr	r1, [pc, #760]	@ (20010a0c <Reset_Handler+0x9cc>)
+20010712:	4288      	cmp	r0, r1
+20010714:	f041 8681 	bne.w	2001241a <fail>
+20010718:	ee11 0a90 	vmov	r0, s3
+2001071c:	49bc      	ldr	r1, [pc, #752]	@ (20010a10 <Reset_Handler+0x9d0>)
+2001071e:	4288      	cmp	r0, r1
+20010720:	f041 867b 	bne.w	2001241a <fail>
+20010724:	ee12 0a10 	vmov	r0, s4
+20010728:	49ba      	ldr	r1, [pc, #744]	@ (20010a14 <Reset_Handler+0x9d4>)
+2001072a:	4288      	cmp	r0, r1
+2001072c:	f041 8675 	bne.w	2001241a <fail>
+20010730:	ee12 0a90 	vmov	r0, s5
+20010734:	49b8      	ldr	r1, [pc, #736]	@ (20010a18 <Reset_Handler+0x9d8>)
+20010736:	4288      	cmp	r0, r1
+20010738:	f041 866f 	bne.w	2001241a <fail>
+2001073c:	ee13 0a10 	vmov	r0, s6
+20010740:	49b6      	ldr	r1, [pc, #728]	@ (20010a1c <Reset_Handler+0x9dc>)
+20010742:	4288      	cmp	r0, r1
+20010744:	f041 8669 	bne.w	2001241a <fail>
+20010748:	ee13 0a90 	vmov	r0, s7
+2001074c:	49b4      	ldr	r1, [pc, #720]	@ (20010a20 <Reset_Handler+0x9e0>)
+2001074e:	4288      	cmp	r0, r1
+20010750:	f041 8663 	bne.w	2001241a <fail>
+20010754:	ee14 0a10 	vmov	r0, s8
+20010758:	49b2      	ldr	r1, [pc, #712]	@ (20010a24 <Reset_Handler+0x9e4>)
+2001075a:	4288      	cmp	r0, r1
+2001075c:	f041 865d 	bne.w	2001241a <fail>
+20010760:	ee14 0a90 	vmov	r0, s9
+20010764:	49b0      	ldr	r1, [pc, #704]	@ (20010a28 <Reset_Handler+0x9e8>)
+20010766:	4288      	cmp	r0, r1
+20010768:	f041 8657 	bne.w	2001241a <fail>
+2001076c:	ee15 0a10 	vmov	r0, s10
+20010770:	49ae      	ldr	r1, [pc, #696]	@ (20010a2c <Reset_Handler+0x9ec>)
+20010772:	4288      	cmp	r0, r1
+20010774:	f041 8651 	bne.w	2001241a <fail>
+20010778:	ee15 0a90 	vmov	r0, s11
+2001077c:	49ac      	ldr	r1, [pc, #688]	@ (20010a30 <Reset_Handler+0x9f0>)
+2001077e:	4288      	cmp	r0, r1
+20010780:	f041 864b 	bne.w	2001241a <fail>
+20010784:	ee16 0a10 	vmov	r0, s12
+20010788:	49aa      	ldr	r1, [pc, #680]	@ (20010a34 <Reset_Handler+0x9f4>)
+2001078a:	4288      	cmp	r0, r1
+2001078c:	f041 8645 	bne.w	2001241a <fail>
+20010790:	ee16 0a90 	vmov	r0, s13
+20010794:	49a8      	ldr	r1, [pc, #672]	@ (20010a38 <Reset_Handler+0x9f8>)
+20010796:	4288      	cmp	r0, r1
+20010798:	f041 863f 	bne.w	2001241a <fail>
+2001079c:	ee17 0a10 	vmov	r0, s14
+200107a0:	49a6      	ldr	r1, [pc, #664]	@ (20010a3c <Reset_Handler+0x9fc>)
+200107a2:	4288      	cmp	r0, r1
+200107a4:	f041 8639 	bne.w	2001241a <fail>
+200107a8:	ee17 0a90 	vmov	r0, s15
+200107ac:	49a4      	ldr	r1, [pc, #656]	@ (20010a40 <Reset_Handler+0xa00>)
+200107ae:	4288      	cmp	r0, r1
+200107b0:	f041 8633 	bne.w	2001241a <fail>
+200107b4:	ee18 0a10 	vmov	r0, s16
+200107b8:	49a2      	ldr	r1, [pc, #648]	@ (20010a44 <Reset_Handler+0xa04>)
+200107ba:	4288      	cmp	r0, r1
+200107bc:	f041 862d 	bne.w	2001241a <fail>
+200107c0:	ee18 0a90 	vmov	r0, s17
+200107c4:	49a0      	ldr	r1, [pc, #640]	@ (20010a48 <Reset_Handler+0xa08>)
+200107c6:	4288      	cmp	r0, r1
+200107c8:	f041 8627 	bne.w	2001241a <fail>
+200107cc:	ee19 0a10 	vmov	r0, s18
+200107d0:	499e      	ldr	r1, [pc, #632]	@ (20010a4c <Reset_Handler+0xa0c>)
+200107d2:	4288      	cmp	r0, r1
+200107d4:	f041 8621 	bne.w	2001241a <fail>
+200107d8:	ee19 0a90 	vmov	r0, s19
+200107dc:	499c      	ldr	r1, [pc, #624]	@ (20010a50 <Reset_Handler+0xa10>)
+200107de:	4288      	cmp	r0, r1
+200107e0:	f041 861b 	bne.w	2001241a <fail>
+200107e4:	ee1a 0a10 	vmov	r0, s20
+200107e8:	499a      	ldr	r1, [pc, #616]	@ (20010a54 <Reset_Handler+0xa14>)
+200107ea:	4288      	cmp	r0, r1
+200107ec:	f041 8615 	bne.w	2001241a <fail>
+200107f0:	ee1a 0a90 	vmov	r0, s21
+200107f4:	4998      	ldr	r1, [pc, #608]	@ (20010a58 <Reset_Handler+0xa18>)
+200107f6:	4288      	cmp	r0, r1
+200107f8:	f041 860f 	bne.w	2001241a <fail>
+200107fc:	ee1b 0a10 	vmov	r0, s22
+20010800:	4996      	ldr	r1, [pc, #600]	@ (20010a5c <Reset_Handler+0xa1c>)
+20010802:	4288      	cmp	r0, r1
+20010804:	f041 8609 	bne.w	2001241a <fail>
+20010808:	ee1b 0a90 	vmov	r0, s23
+2001080c:	4994      	ldr	r1, [pc, #592]	@ (20010a60 <Reset_Handler+0xa20>)
+2001080e:	4288      	cmp	r0, r1
+20010810:	f041 8603 	bne.w	2001241a <fail>
+20010814:	ee1c 0a10 	vmov	r0, s24
+20010818:	4992      	ldr	r1, [pc, #584]	@ (20010a64 <Reset_Handler+0xa24>)
+2001081a:	4288      	cmp	r0, r1
+2001081c:	f041 85fd 	bne.w	2001241a <fail>
+20010820:	ee1c 0a90 	vmov	r0, s25
+20010824:	4990      	ldr	r1, [pc, #576]	@ (20010a68 <Reset_Handler+0xa28>)
+20010826:	4288      	cmp	r0, r1
+20010828:	f041 85f7 	bne.w	2001241a <fail>
+2001082c:	ee1d 0a10 	vmov	r0, s26
+20010830:	498e      	ldr	r1, [pc, #568]	@ (20010a6c <Reset_Handler+0xa2c>)
+20010832:	4288      	cmp	r0, r1
+20010834:	f041 85f1 	bne.w	2001241a <fail>
+20010838:	ee1d 0a90 	vmov	r0, s27
+2001083c:	498c      	ldr	r1, [pc, #560]	@ (20010a70 <Reset_Handler+0xa30>)
+2001083e:	4288      	cmp	r0, r1
+20010840:	f041 85eb 	bne.w	2001241a <fail>
+20010844:	ee1e 0a10 	vmov	r0, s28
+20010848:	498a      	ldr	r1, [pc, #552]	@ (20010a74 <Reset_Handler+0xa34>)
+2001084a:	4288      	cmp	r0, r1
+2001084c:	f041 85e5 	bne.w	2001241a <fail>
+20010850:	ee1e 0a90 	vmov	r0, s29
+20010854:	4988      	ldr	r1, [pc, #544]	@ (20010a78 <Reset_Handler+0xa38>)
+20010856:	4288      	cmp	r0, r1
+20010858:	f041 85df 	bne.w	2001241a <fail>
+2001085c:	ee1f 0a10 	vmov	r0, s30
+20010860:	4986      	ldr	r1, [pc, #536]	@ (20010a7c <Reset_Handler+0xa3c>)
+20010862:	4288      	cmp	r0, r1
+20010864:	f041 85d9 	bne.w	2001241a <fail>
+20010868:	ee1f 0a90 	vmov	r0, s31
+2001086c:	4984      	ldr	r1, [pc, #528]	@ (20010a80 <Reset_Handler+0xa40>)
+2001086e:	4288      	cmp	r0, r1
+20010870:	f041 85d3 	bne.w	2001241a <fail>
+20010874:	eef1 0a10 	vmrs	r0, fpscr
+20010878:	f04f 0603 	mov.w	r6, #3
+2001087c:	4981      	ldr	r1, [pc, #516]	@ (20010a84 <Reset_Handler+0xa44>)
+2001087e:	4288      	cmp	r0, r1
+20010880:	f041 85cb 	bne.w	2001241a <fail>
+20010884:	4881      	ldr	r0, [pc, #516]	@ (20010a8c <Reset_Handler+0xa4c>)
+20010886:	6800      	ldr	r0, [r0, #0]
+20010888:	f04f 060a 	mov.w	r6, #10
+2001088c:	f06f 0116 	mvn.w	r1, #22
+20010890:	4288      	cmp	r0, r1
+20010892:	f041 85c2 	bne.w	2001241a <fail>
+20010896:	487d      	ldr	r0, [pc, #500]	@ (20010a8c <Reset_Handler+0xa4c>)
+20010898:	6840      	ldr	r0, [r0, #4]
+2001089a:	f1a8 0968 	sub.w	r9, r8, #104	@ 0x68
+2001089e:	f04f 060b 	mov.w	r6, #11
+200108a2:	4548      	cmp	r0, r9
+200108a4:	f041 85b9 	bne.w	2001241a <fail>
+200108a8:	4878      	ldr	r0, [pc, #480]	@ (20010a8c <Reset_Handler+0xa4c>)
+200108aa:	68c0      	ldr	r0, [r0, #12]
+200108ac:	f000 0001 	and.w	r0, r0, #1
+200108b0:	f04f 060d 	mov.w	r6, #13
+200108b4:	f04f 0100 	mov.w	r1, #0
+200108b8:	4288      	cmp	r0, r1
+200108ba:	f041 85ae 	bne.w	2001241a <fail>
+200108be:	4873      	ldr	r0, [pc, #460]	@ (20010a8c <Reset_Handler+0xa4c>)
+200108c0:	6940      	ldr	r0, [r0, #20]
+200108c2:	f000 60f8 	and.w	r0, r0, #130023424	@ 0x7c00000
+200108c6:	f04f 060f 	mov.w	r6, #15
+200108ca:	f04f 7130 	mov.w	r1, #46137344	@ 0x2c00000
+200108ce:	4288      	cmp	r0, r1
+200108d0:	f041 85a3 	bne.w	2001241a <fail>
+200108d4:	f3ef 8014 	mrs	r0, CONTROL
+200108d8:	f000 0004 	and.w	r0, r0, #4
+200108dc:	f04f 0612 	mov.w	r6, #18
+200108e0:	f04f 0104 	mov.w	r1, #4
+200108e4:	4288      	cmp	r0, r1
+200108e6:	f041 8598 	bne.w	2001241a <fail>
+200108ea:	f8d9 0020 	ldr.w	r0, [r9, #32]
+200108ee:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200108f2:	f04f 4184 	mov.w	r1, #1107296256	@ 0x42000000
+200108f6:	4288      	cmp	r0, r1
+200108f8:	f041 858f 	bne.w	2001241a <fail>
+200108fc:	f8d9 0024 	ldr.w	r0, [r9, #36]	@ 0x24
+20010900:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010904:	4940      	ldr	r1, [pc, #256]	@ (20010a08 <Reset_Handler+0x9c8>)
+20010906:	4288      	cmp	r0, r1
+20010908:	f041 8587 	bne.w	2001241a <fail>
+2001090c:	f8d9 0028 	ldr.w	r0, [r9, #40]	@ 0x28
+20010910:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010914:	493d      	ldr	r1, [pc, #244]	@ (20010a0c <Reset_Handler+0x9cc>)
+20010916:	4288      	cmp	r0, r1
+20010918:	f041 857f 	bne.w	2001241a <fail>
+2001091c:	f8d9 002c 	ldr.w	r0, [r9, #44]	@ 0x2c
+20010920:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010924:	493a      	ldr	r1, [pc, #232]	@ (20010a10 <Reset_Handler+0x9d0>)
+20010926:	4288      	cmp	r0, r1
+20010928:	f041 8577 	bne.w	2001241a <fail>
+2001092c:	f8d9 0030 	ldr.w	r0, [r9, #48]	@ 0x30
+20010930:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010934:	4937      	ldr	r1, [pc, #220]	@ (20010a14 <Reset_Handler+0x9d4>)
+20010936:	4288      	cmp	r0, r1
+20010938:	f041 856f 	bne.w	2001241a <fail>
+2001093c:	f8d9 0034 	ldr.w	r0, [r9, #52]	@ 0x34
+20010940:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010944:	4934      	ldr	r1, [pc, #208]	@ (20010a18 <Reset_Handler+0x9d8>)
+20010946:	4288      	cmp	r0, r1
+20010948:	f041 8567 	bne.w	2001241a <fail>
+2001094c:	f8d9 0038 	ldr.w	r0, [r9, #56]	@ 0x38
+20010950:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010954:	4931      	ldr	r1, [pc, #196]	@ (20010a1c <Reset_Handler+0x9dc>)
+20010956:	4288      	cmp	r0, r1
+20010958:	f041 855f 	bne.w	2001241a <fail>
+2001095c:	f8d9 003c 	ldr.w	r0, [r9, #60]	@ 0x3c
+20010960:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010964:	492e      	ldr	r1, [pc, #184]	@ (20010a20 <Reset_Handler+0x9e0>)
+20010966:	4288      	cmp	r0, r1
+20010968:	f041 8557 	bne.w	2001241a <fail>
+2001096c:	f8d9 0040 	ldr.w	r0, [r9, #64]	@ 0x40
+20010970:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010974:	492b      	ldr	r1, [pc, #172]	@ (20010a24 <Reset_Handler+0x9e4>)
+20010976:	4288      	cmp	r0, r1
+20010978:	f041 854f 	bne.w	2001241a <fail>
+2001097c:	f8d9 0044 	ldr.w	r0, [r9, #68]	@ 0x44
+20010980:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010984:	4928      	ldr	r1, [pc, #160]	@ (20010a28 <Reset_Handler+0x9e8>)
+20010986:	4288      	cmp	r0, r1
+20010988:	f041 8547 	bne.w	2001241a <fail>
+2001098c:	f8d9 0048 	ldr.w	r0, [r9, #72]	@ 0x48
+20010990:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20010994:	4925      	ldr	r1, [pc, #148]	@ (20010a2c <Reset_Handler+0x9ec>)
+20010996:	4288      	cmp	r0, r1
+20010998:	f041 853f 	bne.w	2001241a <fail>
+2001099c:	f8d9 004c 	ldr.w	r0, [r9, #76]	@ 0x4c
+200109a0:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200109a4:	4922      	ldr	r1, [pc, #136]	@ (20010a30 <Reset_Handler+0x9f0>)
+200109a6:	4288      	cmp	r0, r1
+200109a8:	f041 8537 	bne.w	2001241a <fail>
+200109ac:	f8d9 0050 	ldr.w	r0, [r9, #80]	@ 0x50
+200109b0:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200109b4:	491f      	ldr	r1, [pc, #124]	@ (20010a34 <Reset_Handler+0x9f4>)
+200109b6:	4288      	cmp	r0, r1
+200109b8:	f041 852f 	bne.w	2001241a <fail>
+200109bc:	f8d9 0054 	ldr.w	r0, [r9, #84]	@ 0x54
+200109c0:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200109c4:	491c      	ldr	r1, [pc, #112]	@ (20010a38 <Reset_Handler+0x9f8>)
+200109c6:	4288      	cmp	r0, r1
+200109c8:	f041 8527 	bne.w	2001241a <fail>
+200109cc:	f8d9 0058 	ldr.w	r0, [r9, #88]	@ 0x58
+200109d0:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200109d4:	4919      	ldr	r1, [pc, #100]	@ (20010a3c <Reset_Handler+0x9fc>)
+200109d6:	4288      	cmp	r0, r1
+200109d8:	f041 851f 	bne.w	2001241a <fail>
+200109dc:	f8d9 005c 	ldr.w	r0, [r9, #92]	@ 0x5c
+200109e0:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200109e4:	4916      	ldr	r1, [pc, #88]	@ (20010a40 <Reset_Handler+0xa00>)
+200109e6:	4288      	cmp	r0, r1
+200109e8:	f041 8517 	bne.w	2001241a <fail>
+200109ec:	f8d9 0060 	ldr.w	r0, [r9, #96]	@ 0x60
+200109f0:	f04f 0629 	mov.w	r6, #41	@ 0x29
+200109f4:	4923      	ldr	r1, [pc, #140]	@ (20010a84 <Reset_Handler+0xa44>)
+200109f6:	4288      	cmp	r0, r1
+200109f8:	f041 850f 	bne.w	2001241a <fail>
+200109fc:	e048      	b.n	20010a90 <Reset_Handler+0xa50>
+200109fe:	0000      	.short	0x0000
+20010a00:	e000ef34 	.word	0xe000ef34
+20010a04:	20000280 	.word	0x20000280
+20010a08:	42010001 	.word	0x42010001
+20010a0c:	42020002 	.word	0x42020002
+20010a10:	42030003 	.word	0x42030003
+20010a14:	42040004 	.word	0x42040004
+20010a18:	42050005 	.word	0x42050005
+20010a1c:	42060006 	.word	0x42060006
+20010a20:	42070007 	.word	0x42070007
+20010a24:	42080008 	.word	0x42080008
+20010a28:	42090009 	.word	0x42090009
+20010a2c:	420a000a 	.word	0x420a000a
+20010a30:	420b000b 	.word	0x420b000b
+20010a34:	420c000c 	.word	0x420c000c
+20010a38:	420d000d 	.word	0x420d000d
+20010a3c:	420e000e 	.word	0x420e000e
+20010a40:	420f000f 	.word	0x420f000f
+20010a44:	42100010 	.word	0x42100010
+20010a48:	42110011 	.word	0x42110011
+20010a4c:	42120012 	.word	0x42120012
+20010a50:	42130013 	.word	0x42130013
+20010a54:	42140014 	.word	0x42140014
+20010a58:	42150015 	.word	0x42150015
+20010a5c:	42160016 	.word	0x42160016
+20010a60:	42170017 	.word	0x42170017
+20010a64:	42180018 	.word	0x42180018
+20010a68:	42190019 	.word	0x42190019
+20010a6c:	421a001a 	.word	0x421a001a
+20010a70:	421b001b 	.word	0x421b001b
+20010a74:	421c001c 	.word	0x421c001c
+20010a78:	421d001d 	.word	0x421d001d
+20010a7c:	421e001e 	.word	0x421e001e
+20010a80:	421f001f 	.word	0x421f001f
+20010a84:	6340009f 	.word	0x6340009f
+20010a88:	e000ed04 	.word	0xe000ed04
+20010a8c:	20000200 	.word	0x20000200
+20010a90:	2703      	movs	r7, #3
+20010a92:	48c2      	ldr	r0, [pc, #776]	@ (20010d9c <Reset_Handler+0xd5c>)
+20010a94:	f04f 4140 	mov.w	r1, #3221225472	@ 0xc0000000
+20010a98:	6001      	str	r1, [r0, #0]
+20010a9a:	f3bf 8f4f 	dsb	sy
+20010a9e:	f3bf 8f6f 	isb	sy
+20010aa2:	48bf      	ldr	r0, [pc, #764]	@ (20010da0 <Reset_Handler+0xd60>)
+20010aa4:	2100      	movs	r1, #0
+20010aa6:	6001      	str	r1, [r0, #0]
+20010aa8:	46e8      	mov	r8, sp
+20010aaa:	f1a8 0068 	sub.w	r0, r8, #104	@ 0x68
+20010aae:	f04f 315e 	mov.w	r1, #1583242846	@ 0x5e5e5e5e
+20010ab2:	221a      	movs	r2, #26
+20010ab4:	f840 1b04 	str.w	r1, [r0], #4
+20010ab8:	3a01      	subs	r2, #1
+20010aba:	d1fb      	bne.n	20010ab4 <Reset_Handler+0xa74>
+20010abc:	f04f 4086 	mov.w	r0, #1124073472	@ 0x43000000
+20010ac0:	ee00 0a10 	vmov	s0, r0
+20010ac4:	48b7      	ldr	r0, [pc, #732]	@ (20010da4 <Reset_Handler+0xd64>)
+20010ac6:	ee00 0a90 	vmov	s1, r0
+20010aca:	48b7      	ldr	r0, [pc, #732]	@ (20010da8 <Reset_Handler+0xd68>)
+20010acc:	ee01 0a10 	vmov	s2, r0
+20010ad0:	48b6      	ldr	r0, [pc, #728]	@ (20010dac <Reset_Handler+0xd6c>)
+20010ad2:	ee01 0a90 	vmov	s3, r0
+20010ad6:	48b6      	ldr	r0, [pc, #728]	@ (20010db0 <Reset_Handler+0xd70>)
+20010ad8:	ee02 0a10 	vmov	s4, r0
+20010adc:	48b5      	ldr	r0, [pc, #724]	@ (20010db4 <Reset_Handler+0xd74>)
+20010ade:	ee02 0a90 	vmov	s5, r0
+20010ae2:	48b5      	ldr	r0, [pc, #724]	@ (20010db8 <Reset_Handler+0xd78>)
+20010ae4:	ee03 0a10 	vmov	s6, r0
+20010ae8:	48b4      	ldr	r0, [pc, #720]	@ (20010dbc <Reset_Handler+0xd7c>)
+20010aea:	ee03 0a90 	vmov	s7, r0
+20010aee:	48b4      	ldr	r0, [pc, #720]	@ (20010dc0 <Reset_Handler+0xd80>)
+20010af0:	ee04 0a10 	vmov	s8, r0
+20010af4:	48b3      	ldr	r0, [pc, #716]	@ (20010dc4 <Reset_Handler+0xd84>)
+20010af6:	ee04 0a90 	vmov	s9, r0
+20010afa:	48b3      	ldr	r0, [pc, #716]	@ (20010dc8 <Reset_Handler+0xd88>)
+20010afc:	ee05 0a10 	vmov	s10, r0
+20010b00:	48b2      	ldr	r0, [pc, #712]	@ (20010dcc <Reset_Handler+0xd8c>)
+20010b02:	ee05 0a90 	vmov	s11, r0
+20010b06:	48b2      	ldr	r0, [pc, #712]	@ (20010dd0 <Reset_Handler+0xd90>)
+20010b08:	ee06 0a10 	vmov	s12, r0
+20010b0c:	48b1      	ldr	r0, [pc, #708]	@ (20010dd4 <Reset_Handler+0xd94>)
+20010b0e:	ee06 0a90 	vmov	s13, r0
+20010b12:	48b1      	ldr	r0, [pc, #708]	@ (20010dd8 <Reset_Handler+0xd98>)
+20010b14:	ee07 0a10 	vmov	s14, r0
+20010b18:	48b0      	ldr	r0, [pc, #704]	@ (20010ddc <Reset_Handler+0xd9c>)
+20010b1a:	ee07 0a90 	vmov	s15, r0
+20010b1e:	48b0      	ldr	r0, [pc, #704]	@ (20010de0 <Reset_Handler+0xda0>)
+20010b20:	ee08 0a10 	vmov	s16, r0
+20010b24:	48af      	ldr	r0, [pc, #700]	@ (20010de4 <Reset_Handler+0xda4>)
+20010b26:	ee08 0a90 	vmov	s17, r0
+20010b2a:	48af      	ldr	r0, [pc, #700]	@ (20010de8 <Reset_Handler+0xda8>)
+20010b2c:	ee09 0a10 	vmov	s18, r0
+20010b30:	48ae      	ldr	r0, [pc, #696]	@ (20010dec <Reset_Handler+0xdac>)
+20010b32:	ee09 0a90 	vmov	s19, r0
+20010b36:	48ae      	ldr	r0, [pc, #696]	@ (20010df0 <Reset_Handler+0xdb0>)
+20010b38:	ee0a 0a10 	vmov	s20, r0
+20010b3c:	48ad      	ldr	r0, [pc, #692]	@ (20010df4 <Reset_Handler+0xdb4>)
+20010b3e:	ee0a 0a90 	vmov	s21, r0
+20010b42:	48ad      	ldr	r0, [pc, #692]	@ (20010df8 <Reset_Handler+0xdb8>)
+20010b44:	ee0b 0a10 	vmov	s22, r0
+20010b48:	48ac      	ldr	r0, [pc, #688]	@ (20010dfc <Reset_Handler+0xdbc>)
+20010b4a:	ee0b 0a90 	vmov	s23, r0
+20010b4e:	48ac      	ldr	r0, [pc, #688]	@ (20010e00 <Reset_Handler+0xdc0>)
+20010b50:	ee0c 0a10 	vmov	s24, r0
+20010b54:	48ab      	ldr	r0, [pc, #684]	@ (20010e04 <Reset_Handler+0xdc4>)
+20010b56:	ee0c 0a90 	vmov	s25, r0
+20010b5a:	48ab      	ldr	r0, [pc, #684]	@ (20010e08 <Reset_Handler+0xdc8>)
+20010b5c:	ee0d 0a10 	vmov	s26, r0
+20010b60:	48aa      	ldr	r0, [pc, #680]	@ (20010e0c <Reset_Handler+0xdcc>)
+20010b62:	ee0d 0a90 	vmov	s27, r0
+20010b66:	48aa      	ldr	r0, [pc, #680]	@ (20010e10 <Reset_Handler+0xdd0>)
+20010b68:	ee0e 0a10 	vmov	s28, r0
+20010b6c:	48a9      	ldr	r0, [pc, #676]	@ (20010e14 <Reset_Handler+0xdd4>)
+20010b6e:	ee0e 0a90 	vmov	s29, r0
+20010b72:	48a9      	ldr	r0, [pc, #676]	@ (20010e18 <Reset_Handler+0xdd8>)
+20010b74:	ee0f 0a10 	vmov	s30, r0
+20010b78:	48a8      	ldr	r0, [pc, #672]	@ (20010e1c <Reset_Handler+0xddc>)
+20010b7a:	ee0f 0a90 	vmov	s31, r0
+20010b7e:	48a8      	ldr	r0, [pc, #672]	@ (20010e20 <Reset_Handler+0xde0>)
+20010b80:	eee1 0a10 	vmsr	fpscr, r0
+20010b84:	48a7      	ldr	r0, [pc, #668]	@ (20010e24 <Reset_Handler+0xde4>)
+20010b86:	f04f 5180 	mov.w	r1, #268435456	@ 0x10000000
+20010b8a:	6001      	str	r1, [r0, #0]
+20010b8c:	f3bf 8f4f 	dsb	sy
+20010b90:	f3bf 8f6f 	isb	sy
+20010b94:	f04f 0601 	mov.w	r6, #1
+20010b98:	45c5      	cmp	sp, r8
+20010b9a:	f041 843e 	bne.w	2001241a <fail>
+20010b9e:	f04f 0602 	mov.w	r6, #2
+20010ba2:	ee10 0a10 	vmov	r0, s0
+20010ba6:	f04f 4186 	mov.w	r1, #1124073472	@ 0x43000000
+20010baa:	4288      	cmp	r0, r1
+20010bac:	f041 8435 	bne.w	2001241a <fail>
+20010bb0:	ee10 0a90 	vmov	r0, s1
+20010bb4:	497b      	ldr	r1, [pc, #492]	@ (20010da4 <Reset_Handler+0xd64>)
+20010bb6:	4288      	cmp	r0, r1
+20010bb8:	f041 842f 	bne.w	2001241a <fail>
+20010bbc:	ee11 0a10 	vmov	r0, s2
+20010bc0:	4979      	ldr	r1, [pc, #484]	@ (20010da8 <Reset_Handler+0xd68>)
+20010bc2:	4288      	cmp	r0, r1
+20010bc4:	f041 8429 	bne.w	2001241a <fail>
+20010bc8:	ee11 0a90 	vmov	r0, s3
+20010bcc:	4977      	ldr	r1, [pc, #476]	@ (20010dac <Reset_Handler+0xd6c>)
+20010bce:	4288      	cmp	r0, r1
+20010bd0:	f041 8423 	bne.w	2001241a <fail>
+20010bd4:	ee12 0a10 	vmov	r0, s4
+20010bd8:	4975      	ldr	r1, [pc, #468]	@ (20010db0 <Reset_Handler+0xd70>)
+20010bda:	4288      	cmp	r0, r1
+20010bdc:	f041 841d 	bne.w	2001241a <fail>
+20010be0:	ee12 0a90 	vmov	r0, s5
+20010be4:	4973      	ldr	r1, [pc, #460]	@ (20010db4 <Reset_Handler+0xd74>)
+20010be6:	4288      	cmp	r0, r1
+20010be8:	f041 8417 	bne.w	2001241a <fail>
+20010bec:	ee13 0a10 	vmov	r0, s6
+20010bf0:	4971      	ldr	r1, [pc, #452]	@ (20010db8 <Reset_Handler+0xd78>)
+20010bf2:	4288      	cmp	r0, r1
+20010bf4:	f041 8411 	bne.w	2001241a <fail>
+20010bf8:	ee13 0a90 	vmov	r0, s7
+20010bfc:	496f      	ldr	r1, [pc, #444]	@ (20010dbc <Reset_Handler+0xd7c>)
+20010bfe:	4288      	cmp	r0, r1
+20010c00:	f041 840b 	bne.w	2001241a <fail>
+20010c04:	ee14 0a10 	vmov	r0, s8
+20010c08:	496d      	ldr	r1, [pc, #436]	@ (20010dc0 <Reset_Handler+0xd80>)
+20010c0a:	4288      	cmp	r0, r1
+20010c0c:	f041 8405 	bne.w	2001241a <fail>
+20010c10:	ee14 0a90 	vmov	r0, s9
+20010c14:	496b      	ldr	r1, [pc, #428]	@ (20010dc4 <Reset_Handler+0xd84>)
+20010c16:	4288      	cmp	r0, r1
+20010c18:	f041 83ff 	bne.w	2001241a <fail>
+20010c1c:	ee15 0a10 	vmov	r0, s10
+20010c20:	4969      	ldr	r1, [pc, #420]	@ (20010dc8 <Reset_Handler+0xd88>)
+20010c22:	4288      	cmp	r0, r1
+20010c24:	f041 83f9 	bne.w	2001241a <fail>
+20010c28:	ee15 0a90 	vmov	r0, s11
+20010c2c:	4967      	ldr	r1, [pc, #412]	@ (20010dcc <Reset_Handler+0xd8c>)
+20010c2e:	4288      	cmp	r0, r1
+20010c30:	f041 83f3 	bne.w	2001241a <fail>
+20010c34:	ee16 0a10 	vmov	r0, s12
+20010c38:	4965      	ldr	r1, [pc, #404]	@ (20010dd0 <Reset_Handler+0xd90>)
+20010c3a:	4288      	cmp	r0, r1
+20010c3c:	f041 83ed 	bne.w	2001241a <fail>
+20010c40:	ee16 0a90 	vmov	r0, s13
+20010c44:	4963      	ldr	r1, [pc, #396]	@ (20010dd4 <Reset_Handler+0xd94>)
+20010c46:	4288      	cmp	r0, r1
+20010c48:	f041 83e7 	bne.w	2001241a <fail>
+20010c4c:	ee17 0a10 	vmov	r0, s14
+20010c50:	4961      	ldr	r1, [pc, #388]	@ (20010dd8 <Reset_Handler+0xd98>)
+20010c52:	4288      	cmp	r0, r1
+20010c54:	f041 83e1 	bne.w	2001241a <fail>
+20010c58:	ee17 0a90 	vmov	r0, s15
+20010c5c:	495f      	ldr	r1, [pc, #380]	@ (20010ddc <Reset_Handler+0xd9c>)
+20010c5e:	4288      	cmp	r0, r1
+20010c60:	f041 83db 	bne.w	2001241a <fail>
+20010c64:	ee18 0a10 	vmov	r0, s16
+20010c68:	495d      	ldr	r1, [pc, #372]	@ (20010de0 <Reset_Handler+0xda0>)
+20010c6a:	4288      	cmp	r0, r1
+20010c6c:	f041 83d5 	bne.w	2001241a <fail>
+20010c70:	ee18 0a90 	vmov	r0, s17
+20010c74:	495b      	ldr	r1, [pc, #364]	@ (20010de4 <Reset_Handler+0xda4>)
+20010c76:	4288      	cmp	r0, r1
+20010c78:	f041 83cf 	bne.w	2001241a <fail>
+20010c7c:	ee19 0a10 	vmov	r0, s18
+20010c80:	4959      	ldr	r1, [pc, #356]	@ (20010de8 <Reset_Handler+0xda8>)
+20010c82:	4288      	cmp	r0, r1
+20010c84:	f041 83c9 	bne.w	2001241a <fail>
+20010c88:	ee19 0a90 	vmov	r0, s19
+20010c8c:	4957      	ldr	r1, [pc, #348]	@ (20010dec <Reset_Handler+0xdac>)
+20010c8e:	4288      	cmp	r0, r1
+20010c90:	f041 83c3 	bne.w	2001241a <fail>
+20010c94:	ee1a 0a10 	vmov	r0, s20
+20010c98:	4955      	ldr	r1, [pc, #340]	@ (20010df0 <Reset_Handler+0xdb0>)
+20010c9a:	4288      	cmp	r0, r1
+20010c9c:	f041 83bd 	bne.w	2001241a <fail>
+20010ca0:	ee1a 0a90 	vmov	r0, s21
+20010ca4:	4953      	ldr	r1, [pc, #332]	@ (20010df4 <Reset_Handler+0xdb4>)
+20010ca6:	4288      	cmp	r0, r1
+20010ca8:	f041 83b7 	bne.w	2001241a <fail>
+20010cac:	ee1b 0a10 	vmov	r0, s22
+20010cb0:	4951      	ldr	r1, [pc, #324]	@ (20010df8 <Reset_Handler+0xdb8>)
+20010cb2:	4288      	cmp	r0, r1
+20010cb4:	f041 83b1 	bne.w	2001241a <fail>
+20010cb8:	ee1b 0a90 	vmov	r0, s23
+20010cbc:	494f      	ldr	r1, [pc, #316]	@ (20010dfc <Reset_Handler+0xdbc>)
+20010cbe:	4288      	cmp	r0, r1
+20010cc0:	f041 83ab 	bne.w	2001241a <fail>
+20010cc4:	ee1c 0a10 	vmov	r0, s24
+20010cc8:	494d      	ldr	r1, [pc, #308]	@ (20010e00 <Reset_Handler+0xdc0>)
+20010cca:	4288      	cmp	r0, r1
+20010ccc:	f041 83a5 	bne.w	2001241a <fail>
+20010cd0:	ee1c 0a90 	vmov	r0, s25
+20010cd4:	494b      	ldr	r1, [pc, #300]	@ (20010e04 <Reset_Handler+0xdc4>)
+20010cd6:	4288      	cmp	r0, r1
+20010cd8:	f041 839f 	bne.w	2001241a <fail>
+20010cdc:	ee1d 0a10 	vmov	r0, s26
+20010ce0:	4949      	ldr	r1, [pc, #292]	@ (20010e08 <Reset_Handler+0xdc8>)
+20010ce2:	4288      	cmp	r0, r1
+20010ce4:	f041 8399 	bne.w	2001241a <fail>
+20010ce8:	ee1d 0a90 	vmov	r0, s27
+20010cec:	4947      	ldr	r1, [pc, #284]	@ (20010e0c <Reset_Handler+0xdcc>)
+20010cee:	4288      	cmp	r0, r1
+20010cf0:	f041 8393 	bne.w	2001241a <fail>
+20010cf4:	ee1e 0a10 	vmov	r0, s28
+20010cf8:	4945      	ldr	r1, [pc, #276]	@ (20010e10 <Reset_Handler+0xdd0>)
+20010cfa:	4288      	cmp	r0, r1
+20010cfc:	f041 838d 	bne.w	2001241a <fail>
+20010d00:	ee1e 0a90 	vmov	r0, s29
+20010d04:	4943      	ldr	r1, [pc, #268]	@ (20010e14 <Reset_Handler+0xdd4>)
+20010d06:	4288      	cmp	r0, r1
+20010d08:	f041 8387 	bne.w	2001241a <fail>
+20010d0c:	ee1f 0a10 	vmov	r0, s30
+20010d10:	4941      	ldr	r1, [pc, #260]	@ (20010e18 <Reset_Handler+0xdd8>)
+20010d12:	4288      	cmp	r0, r1
+20010d14:	f041 8381 	bne.w	2001241a <fail>
+20010d18:	ee1f 0a90 	vmov	r0, s31
+20010d1c:	493f      	ldr	r1, [pc, #252]	@ (20010e1c <Reset_Handler+0xddc>)
+20010d1e:	4288      	cmp	r0, r1
+20010d20:	f041 837b 	bne.w	2001241a <fail>
+20010d24:	eef1 0a10 	vmrs	r0, fpscr
+20010d28:	f04f 0603 	mov.w	r6, #3
+20010d2c:	493c      	ldr	r1, [pc, #240]	@ (20010e20 <Reset_Handler+0xde0>)
+20010d2e:	4288      	cmp	r0, r1
+20010d30:	f041 8373 	bne.w	2001241a <fail>
+20010d34:	483c      	ldr	r0, [pc, #240]	@ (20010e28 <Reset_Handler+0xde8>)
+20010d36:	6800      	ldr	r0, [r0, #0]
+20010d38:	f04f 060a 	mov.w	r6, #10
+20010d3c:	f06f 0116 	mvn.w	r1, #22
+20010d40:	4288      	cmp	r0, r1
+20010d42:	f041 836a 	bne.w	2001241a <fail>
+20010d46:	4838      	ldr	r0, [pc, #224]	@ (20010e28 <Reset_Handler+0xde8>)
+20010d48:	68c0      	ldr	r0, [r0, #12]
+20010d4a:	f000 0001 	and.w	r0, r0, #1
+20010d4e:	f04f 060d 	mov.w	r6, #13
+20010d52:	f04f 0101 	mov.w	r1, #1
+20010d56:	4288      	cmp	r0, r1
+20010d58:	f041 835f 	bne.w	2001241a <fail>
+20010d5c:	480f      	ldr	r0, [pc, #60]	@ (20010d9c <Reset_Handler+0xd5c>)
+20010d5e:	6800      	ldr	r0, [r0, #0]
+20010d60:	f000 0001 	and.w	r0, r0, #1
+20010d64:	f04f 0613 	mov.w	r6, #19
+20010d68:	f04f 0100 	mov.w	r1, #0
+20010d6c:	4288      	cmp	r0, r1
+20010d6e:	f041 8354 	bne.w	2001241a <fail>
+20010d72:	f1a8 0968 	sub.w	r9, r8, #104	@ 0x68
+20010d76:	f8d9 0020 	ldr.w	r0, [r9, #32]
+20010d7a:	f04f 0614 	mov.w	r6, #20
+20010d7e:	f04f 315e 	mov.w	r1, #1583242846	@ 0x5e5e5e5e
+20010d82:	4288      	cmp	r0, r1
+20010d84:	f041 8349 	bne.w	2001241a <fail>
+20010d88:	f8d9 0060 	ldr.w	r0, [r9, #96]	@ 0x60
+20010d8c:	f04f 0615 	mov.w	r6, #21
+20010d90:	f04f 315e 	mov.w	r1, #1583242846	@ 0x5e5e5e5e
+20010d94:	4288      	cmp	r0, r1
+20010d96:	f041 8340 	bne.w	2001241a <fail>
+20010d9a:	e047      	b.n	20010e2c <Reset_Handler+0xdec>
+20010d9c:	e000ef34 	.word	0xe000ef34
+20010da0:	20000280 	.word	0x20000280
+20010da4:	43010001 	.word	0x43010001
+20010da8:	43020002 	.word	0x43020002
+20010dac:	43030003 	.word	0x43030003
+20010db0:	43040004 	.word	0x43040004
+20010db4:	43050005 	.word	0x43050005
+20010db8:	43060006 	.word	0x43060006
+20010dbc:	43070007 	.word	0x43070007
+20010dc0:	43080008 	.word	0x43080008
+20010dc4:	43090009 	.word	0x43090009
+20010dc8:	430a000a 	.word	0x430a000a
+20010dcc:	430b000b 	.word	0x430b000b
+20010dd0:	430c000c 	.word	0x430c000c
+20010dd4:	430d000d 	.word	0x430d000d
+20010dd8:	430e000e 	.word	0x430e000e
+20010ddc:	430f000f 	.word	0x430f000f
+20010de0:	43100010 	.word	0x43100010
+20010de4:	43110011 	.word	0x43110011
+20010de8:	43120012 	.word	0x43120012
+20010dec:	43130013 	.word	0x43130013
+20010df0:	43140014 	.word	0x43140014
+20010df4:	43150015 	.word	0x43150015
+20010df8:	43160016 	.word	0x43160016
+20010dfc:	43170017 	.word	0x43170017
+20010e00:	43180018 	.word	0x43180018
+20010e04:	43190019 	.word	0x43190019
+20010e08:	431a001a 	.word	0x431a001a
+20010e0c:	431b001b 	.word	0x431b001b
+20010e10:	431c001c 	.word	0x431c001c
+20010e14:	431d001d 	.word	0x431d001d
+20010e18:	431e001e 	.word	0x431e001e
+20010e1c:	431f001f 	.word	0x431f001f
+20010e20:	6340009f 	.word	0x6340009f
+20010e24:	e000ed04 	.word	0xe000ed04
+20010e28:	20000200 	.word	0x20000200
+20010e2c:	2704      	movs	r7, #4
+20010e2e:	486a      	ldr	r0, [pc, #424]	@ (20010fd8 <Reset_Handler+0xf98>)
+20010e30:	2101      	movs	r1, #1
+20010e32:	6001      	str	r1, [r0, #0]
+20010e34:	4869      	ldr	r0, [pc, #420]	@ (20010fdc <Reset_Handler+0xf9c>)
+20010e36:	ee08 0a10 	vmov	s16, r0
+20010e3a:	4869      	ldr	r0, [pc, #420]	@ (20010fe0 <Reset_Handler+0xfa0>)
+20010e3c:	ee08 0a90 	vmov	s17, r0
+20010e40:	4868      	ldr	r0, [pc, #416]	@ (20010fe4 <Reset_Handler+0xfa4>)
+20010e42:	ee09 0a10 	vmov	s18, r0
+20010e46:	4868      	ldr	r0, [pc, #416]	@ (20010fe8 <Reset_Handler+0xfa8>)
+20010e48:	ee09 0a90 	vmov	s19, r0
+20010e4c:	4867      	ldr	r0, [pc, #412]	@ (20010fec <Reset_Handler+0xfac>)
+20010e4e:	ee0a 0a10 	vmov	s20, r0
+20010e52:	4867      	ldr	r0, [pc, #412]	@ (20010ff0 <Reset_Handler+0xfb0>)
+20010e54:	ee0a 0a90 	vmov	s21, r0
+20010e58:	4866      	ldr	r0, [pc, #408]	@ (20010ff4 <Reset_Handler+0xfb4>)
+20010e5a:	ee0b 0a10 	vmov	s22, r0
+20010e5e:	4866      	ldr	r0, [pc, #408]	@ (20010ff8 <Reset_Handler+0xfb8>)
+20010e60:	ee0b 0a90 	vmov	s23, r0
+20010e64:	4865      	ldr	r0, [pc, #404]	@ (20010ffc <Reset_Handler+0xfbc>)
+20010e66:	ee0c 0a10 	vmov	s24, r0
+20010e6a:	4865      	ldr	r0, [pc, #404]	@ (20011000 <Reset_Handler+0xfc0>)
+20010e6c:	ee0c 0a90 	vmov	s25, r0
+20010e70:	4864      	ldr	r0, [pc, #400]	@ (20011004 <Reset_Handler+0xfc4>)
+20010e72:	ee0d 0a10 	vmov	s26, r0
+20010e76:	4864      	ldr	r0, [pc, #400]	@ (20011008 <Reset_Handler+0xfc8>)
+20010e78:	ee0d 0a90 	vmov	s27, r0
+20010e7c:	4863      	ldr	r0, [pc, #396]	@ (2001100c <Reset_Handler+0xfcc>)
+20010e7e:	ee0e 0a10 	vmov	s28, r0
+20010e82:	4863      	ldr	r0, [pc, #396]	@ (20011010 <Reset_Handler+0xfd0>)
+20010e84:	ee0e 0a90 	vmov	s29, r0
+20010e88:	4862      	ldr	r0, [pc, #392]	@ (20011014 <Reset_Handler+0xfd4>)
+20010e8a:	ee0f 0a10 	vmov	s30, r0
+20010e8e:	4862      	ldr	r0, [pc, #392]	@ (20011018 <Reset_Handler+0xfd8>)
+20010e90:	ee0f 0a90 	vmov	s31, r0
+20010e94:	f3ef 8014 	mrs	r0, CONTROL
+20010e98:	f020 0004 	bic.w	r0, r0, #4
+20010e9c:	f380 8814 	msr	CONTROL, r0
+20010ea0:	f3bf 8f6f 	isb	sy
+20010ea4:	46e8      	mov	r8, sp
+20010ea6:	485d      	ldr	r0, [pc, #372]	@ (2001101c <Reset_Handler+0xfdc>)
+20010ea8:	f04f 5180 	mov.w	r1, #268435456	@ 0x10000000
+20010eac:	6001      	str	r1, [r0, #0]
+20010eae:	f3bf 8f4f 	dsb	sy
+20010eb2:	f3bf 8f6f 	isb	sy
+20010eb6:	f3ef 8014 	mrs	r0, CONTROL
+20010eba:	f000 0004 	and.w	r0, r0, #4
+20010ebe:	f04f 0612 	mov.w	r6, #18
+20010ec2:	f04f 0100 	mov.w	r1, #0
+20010ec6:	4288      	cmp	r0, r1
+20010ec8:	f041 82a7 	bne.w	2001241a <fail>
+20010ecc:	f04f 0601 	mov.w	r6, #1
+20010ed0:	45c5      	cmp	sp, r8
+20010ed2:	f041 82a2 	bne.w	2001241a <fail>
+20010ed6:	f04f 0602 	mov.w	r6, #2
+20010eda:	ee18 0a10 	vmov	r0, s16
+20010ede:	493f      	ldr	r1, [pc, #252]	@ (20010fdc <Reset_Handler+0xf9c>)
+20010ee0:	4288      	cmp	r0, r1
+20010ee2:	f041 829a 	bne.w	2001241a <fail>
+20010ee6:	ee18 0a90 	vmov	r0, s17
+20010eea:	493d      	ldr	r1, [pc, #244]	@ (20010fe0 <Reset_Handler+0xfa0>)
+20010eec:	4288      	cmp	r0, r1
+20010eee:	f041 8294 	bne.w	2001241a <fail>
+20010ef2:	ee19 0a10 	vmov	r0, s18
+20010ef6:	493b      	ldr	r1, [pc, #236]	@ (20010fe4 <Reset_Handler+0xfa4>)
+20010ef8:	4288      	cmp	r0, r1
+20010efa:	f041 828e 	bne.w	2001241a <fail>
+20010efe:	ee19 0a90 	vmov	r0, s19
+20010f02:	4939      	ldr	r1, [pc, #228]	@ (20010fe8 <Reset_Handler+0xfa8>)
+20010f04:	4288      	cmp	r0, r1
+20010f06:	f041 8288 	bne.w	2001241a <fail>
+20010f0a:	ee1a 0a10 	vmov	r0, s20
+20010f0e:	4937      	ldr	r1, [pc, #220]	@ (20010fec <Reset_Handler+0xfac>)
+20010f10:	4288      	cmp	r0, r1
+20010f12:	f041 8282 	bne.w	2001241a <fail>
+20010f16:	ee1a 0a90 	vmov	r0, s21
+20010f1a:	4935      	ldr	r1, [pc, #212]	@ (20010ff0 <Reset_Handler+0xfb0>)
+20010f1c:	4288      	cmp	r0, r1
+20010f1e:	f041 827c 	bne.w	2001241a <fail>
+20010f22:	ee1b 0a10 	vmov	r0, s22
+20010f26:	4933      	ldr	r1, [pc, #204]	@ (20010ff4 <Reset_Handler+0xfb4>)
+20010f28:	4288      	cmp	r0, r1
+20010f2a:	f041 8276 	bne.w	2001241a <fail>
+20010f2e:	ee1b 0a90 	vmov	r0, s23
+20010f32:	4931      	ldr	r1, [pc, #196]	@ (20010ff8 <Reset_Handler+0xfb8>)
+20010f34:	4288      	cmp	r0, r1
+20010f36:	f041 8270 	bne.w	2001241a <fail>
+20010f3a:	ee1c 0a10 	vmov	r0, s24
+20010f3e:	492f      	ldr	r1, [pc, #188]	@ (20010ffc <Reset_Handler+0xfbc>)
+20010f40:	4288      	cmp	r0, r1
+20010f42:	f041 826a 	bne.w	2001241a <fail>
+20010f46:	ee1c 0a90 	vmov	r0, s25
+20010f4a:	492d      	ldr	r1, [pc, #180]	@ (20011000 <Reset_Handler+0xfc0>)
+20010f4c:	4288      	cmp	r0, r1
+20010f4e:	f041 8264 	bne.w	2001241a <fail>
+20010f52:	ee1d 0a10 	vmov	r0, s26
+20010f56:	492b      	ldr	r1, [pc, #172]	@ (20011004 <Reset_Handler+0xfc4>)
+20010f58:	4288      	cmp	r0, r1
+20010f5a:	f041 825e 	bne.w	2001241a <fail>
+20010f5e:	ee1d 0a90 	vmov	r0, s27
+20010f62:	4929      	ldr	r1, [pc, #164]	@ (20011008 <Reset_Handler+0xfc8>)
+20010f64:	4288      	cmp	r0, r1
+20010f66:	f041 8258 	bne.w	2001241a <fail>
+20010f6a:	ee1e 0a10 	vmov	r0, s28
+20010f6e:	4927      	ldr	r1, [pc, #156]	@ (2001100c <Reset_Handler+0xfcc>)
+20010f70:	4288      	cmp	r0, r1
+20010f72:	f041 8252 	bne.w	2001241a <fail>
+20010f76:	ee1e 0a90 	vmov	r0, s29
+20010f7a:	4925      	ldr	r1, [pc, #148]	@ (20011010 <Reset_Handler+0xfd0>)
+20010f7c:	4288      	cmp	r0, r1
+20010f7e:	f041 824c 	bne.w	2001241a <fail>
+20010f82:	ee1f 0a10 	vmov	r0, s30
+20010f86:	4923      	ldr	r1, [pc, #140]	@ (20011014 <Reset_Handler+0xfd4>)
+20010f88:	4288      	cmp	r0, r1
+20010f8a:	f041 8246 	bne.w	2001241a <fail>
+20010f8e:	ee1f 0a90 	vmov	r0, s31
+20010f92:	4921      	ldr	r1, [pc, #132]	@ (20011018 <Reset_Handler+0xfd8>)
+20010f94:	4288      	cmp	r0, r1
+20010f96:	f041 8240 	bne.w	2001241a <fail>
+20010f9a:	4821      	ldr	r0, [pc, #132]	@ (20011020 <Reset_Handler+0xfe0>)
+20010f9c:	6800      	ldr	r0, [r0, #0]
+20010f9e:	f04f 060a 	mov.w	r6, #10
+20010fa2:	f06f 0106 	mvn.w	r1, #6
+20010fa6:	4288      	cmp	r0, r1
+20010fa8:	f041 8237 	bne.w	2001241a <fail>
+20010fac:	481c      	ldr	r0, [pc, #112]	@ (20011020 <Reset_Handler+0xfe0>)
+20010fae:	6840      	ldr	r0, [r0, #4]
+20010fb0:	f1a8 0920 	sub.w	r9, r8, #32
+20010fb4:	f04f 060b 	mov.w	r6, #11
+20010fb8:	4548      	cmp	r0, r9
+20010fba:	f041 822e 	bne.w	2001241a <fail>
+20010fbe:	4818      	ldr	r0, [pc, #96]	@ (20011020 <Reset_Handler+0xfe0>)
+20010fc0:	68c0      	ldr	r0, [r0, #12]
+20010fc2:	f000 0001 	and.w	r0, r0, #1
+20010fc6:	f04f 060d 	mov.w	r6, #13
+20010fca:	f04f 0100 	mov.w	r1, #0
+20010fce:	4288      	cmp	r0, r1
+20010fd0:	f041 8223 	bne.w	2001241a <fail>
+20010fd4:	e026      	b.n	20011024 <Reset_Handler+0xfe4>
+20010fd6:	0000      	.short	0x0000
+20010fd8:	20000280 	.word	0x20000280
+20010fdc:	44100010 	.word	0x44100010
+20010fe0:	44110011 	.word	0x44110011
+20010fe4:	44120012 	.word	0x44120012
+20010fe8:	44130013 	.word	0x44130013
+20010fec:	44140014 	.word	0x44140014
+20010ff0:	44150015 	.word	0x44150015
+20010ff4:	44160016 	.word	0x44160016
+20010ff8:	44170017 	.word	0x44170017
+20010ffc:	44180018 	.word	0x44180018
+20011000:	44190019 	.word	0x44190019
+20011004:	441a001a 	.word	0x441a001a
+20011008:	441b001b 	.word	0x441b001b
+2001100c:	441c001c 	.word	0x441c001c
+20011010:	441d001d 	.word	0x441d001d
+20011014:	441e001e 	.word	0x441e001e
+20011018:	441f001f 	.word	0x441f001f
+2001101c:	e000ed04 	.word	0xe000ed04
+20011020:	20000200 	.word	0x20000200
+20011024:	2705      	movs	r7, #5
+20011026:	f8df 0430 	ldr.w	r0, [pc, #1072]	@ 20011458 <Reset_Handler+0x1418>
+2001102a:	2101      	movs	r1, #1
+2001102c:	6001      	str	r1, [r0, #0]
+2001102e:	f8df 042c 	ldr.w	r0, [pc, #1068]	@ 2001145c <Reset_Handler+0x141c>
+20011032:	f380 8809 	msr	PSP, r0
+20011036:	f3ef 8014 	mrs	r0, CONTROL
+2001103a:	f040 0002 	orr.w	r0, r0, #2
+2001103e:	f380 8814 	msr	CONTROL, r0
+20011042:	f3bf 8f6f 	isb	sy
+20011046:	46e8      	mov	r8, sp
+20011048:	f1a8 0068 	sub.w	r0, r8, #104	@ 0x68
+2001104c:	f04f 315e 	mov.w	r1, #1583242846	@ 0x5e5e5e5e
+20011050:	221a      	movs	r2, #26
+20011052:	f840 1b04 	str.w	r1, [r0], #4
+20011056:	3a01      	subs	r2, #1
+20011058:	d1fb      	bne.n	20011052 <Reset_Handler+0x1012>
+2001105a:	f04f 408a 	mov.w	r0, #1157627904	@ 0x45000000
+2001105e:	ee00 0a10 	vmov	s0, r0
+20011062:	48ff      	ldr	r0, [pc, #1020]	@ (20011460 <Reset_Handler+0x1420>)
+20011064:	ee00 0a90 	vmov	s1, r0
+20011068:	48fe      	ldr	r0, [pc, #1016]	@ (20011464 <Reset_Handler+0x1424>)
+2001106a:	ee01 0a10 	vmov	s2, r0
+2001106e:	48fe      	ldr	r0, [pc, #1016]	@ (20011468 <Reset_Handler+0x1428>)
+20011070:	ee01 0a90 	vmov	s3, r0
+20011074:	48fd      	ldr	r0, [pc, #1012]	@ (2001146c <Reset_Handler+0x142c>)
+20011076:	ee02 0a10 	vmov	s4, r0
+2001107a:	48fd      	ldr	r0, [pc, #1012]	@ (20011470 <Reset_Handler+0x1430>)
+2001107c:	ee02 0a90 	vmov	s5, r0
+20011080:	48fc      	ldr	r0, [pc, #1008]	@ (20011474 <Reset_Handler+0x1434>)
+20011082:	ee03 0a10 	vmov	s6, r0
+20011086:	48fc      	ldr	r0, [pc, #1008]	@ (20011478 <Reset_Handler+0x1438>)
+20011088:	ee03 0a90 	vmov	s7, r0
+2001108c:	48fb      	ldr	r0, [pc, #1004]	@ (2001147c <Reset_Handler+0x143c>)
+2001108e:	ee04 0a10 	vmov	s8, r0
+20011092:	48fb      	ldr	r0, [pc, #1004]	@ (20011480 <Reset_Handler+0x1440>)
+20011094:	ee04 0a90 	vmov	s9, r0
+20011098:	48fa      	ldr	r0, [pc, #1000]	@ (20011484 <Reset_Handler+0x1444>)
+2001109a:	ee05 0a10 	vmov	s10, r0
+2001109e:	48fa      	ldr	r0, [pc, #1000]	@ (20011488 <Reset_Handler+0x1448>)
+200110a0:	ee05 0a90 	vmov	s11, r0
+200110a4:	48f9      	ldr	r0, [pc, #996]	@ (2001148c <Reset_Handler+0x144c>)
+200110a6:	ee06 0a10 	vmov	s12, r0
+200110aa:	48f9      	ldr	r0, [pc, #996]	@ (20011490 <Reset_Handler+0x1450>)
+200110ac:	ee06 0a90 	vmov	s13, r0
+200110b0:	48f8      	ldr	r0, [pc, #992]	@ (20011494 <Reset_Handler+0x1454>)
+200110b2:	ee07 0a10 	vmov	s14, r0
+200110b6:	48f8      	ldr	r0, [pc, #992]	@ (20011498 <Reset_Handler+0x1458>)
+200110b8:	ee07 0a90 	vmov	s15, r0
+200110bc:	48f7      	ldr	r0, [pc, #988]	@ (2001149c <Reset_Handler+0x145c>)
+200110be:	ee08 0a10 	vmov	s16, r0
+200110c2:	48f7      	ldr	r0, [pc, #988]	@ (200114a0 <Reset_Handler+0x1460>)
+200110c4:	ee08 0a90 	vmov	s17, r0
+200110c8:	48f6      	ldr	r0, [pc, #984]	@ (200114a4 <Reset_Handler+0x1464>)
+200110ca:	ee09 0a10 	vmov	s18, r0
+200110ce:	48f6      	ldr	r0, [pc, #984]	@ (200114a8 <Reset_Handler+0x1468>)
+200110d0:	ee09 0a90 	vmov	s19, r0
+200110d4:	48f5      	ldr	r0, [pc, #980]	@ (200114ac <Reset_Handler+0x146c>)
+200110d6:	ee0a 0a10 	vmov	s20, r0
+200110da:	48f5      	ldr	r0, [pc, #980]	@ (200114b0 <Reset_Handler+0x1470>)
+200110dc:	ee0a 0a90 	vmov	s21, r0
+200110e0:	48f4      	ldr	r0, [pc, #976]	@ (200114b4 <Reset_Handler+0x1474>)
+200110e2:	ee0b 0a10 	vmov	s22, r0
+200110e6:	48f4      	ldr	r0, [pc, #976]	@ (200114b8 <Reset_Handler+0x1478>)
+200110e8:	ee0b 0a90 	vmov	s23, r0
+200110ec:	48f3      	ldr	r0, [pc, #972]	@ (200114bc <Reset_Handler+0x147c>)
+200110ee:	ee0c 0a10 	vmov	s24, r0
+200110f2:	48f3      	ldr	r0, [pc, #972]	@ (200114c0 <Reset_Handler+0x1480>)
+200110f4:	ee0c 0a90 	vmov	s25, r0
+200110f8:	48f2      	ldr	r0, [pc, #968]	@ (200114c4 <Reset_Handler+0x1484>)
+200110fa:	ee0d 0a10 	vmov	s26, r0
+200110fe:	48f2      	ldr	r0, [pc, #968]	@ (200114c8 <Reset_Handler+0x1488>)
+20011100:	ee0d 0a90 	vmov	s27, r0
+20011104:	48f1      	ldr	r0, [pc, #964]	@ (200114cc <Reset_Handler+0x148c>)
+20011106:	ee0e 0a10 	vmov	s28, r0
+2001110a:	48f1      	ldr	r0, [pc, #964]	@ (200114d0 <Reset_Handler+0x1490>)
+2001110c:	ee0e 0a90 	vmov	s29, r0
+20011110:	48f0      	ldr	r0, [pc, #960]	@ (200114d4 <Reset_Handler+0x1494>)
+20011112:	ee0f 0a10 	vmov	s30, r0
+20011116:	48f0      	ldr	r0, [pc, #960]	@ (200114d8 <Reset_Handler+0x1498>)
+20011118:	ee0f 0a90 	vmov	s31, r0
+2001111c:	48ef      	ldr	r0, [pc, #956]	@ (200114dc <Reset_Handler+0x149c>)
+2001111e:	eee1 0a10 	vmsr	fpscr, r0
+20011122:	48ef      	ldr	r0, [pc, #956]	@ (200114e0 <Reset_Handler+0x14a0>)
+20011124:	f04f 5180 	mov.w	r1, #268435456	@ 0x10000000
+20011128:	6001      	str	r1, [r0, #0]
+2001112a:	f3bf 8f4f 	dsb	sy
+2001112e:	f3bf 8f6f 	isb	sy
+20011132:	f04f 0601 	mov.w	r6, #1
+20011136:	45c5      	cmp	sp, r8
+20011138:	f041 816f 	bne.w	2001241a <fail>
+2001113c:	f04f 0602 	mov.w	r6, #2
+20011140:	ee10 0a10 	vmov	r0, s0
+20011144:	f04f 418a 	mov.w	r1, #1157627904	@ 0x45000000
+20011148:	4288      	cmp	r0, r1
+2001114a:	f041 8166 	bne.w	2001241a <fail>
+2001114e:	ee10 0a90 	vmov	r0, s1
+20011152:	49c3      	ldr	r1, [pc, #780]	@ (20011460 <Reset_Handler+0x1420>)
+20011154:	4288      	cmp	r0, r1
+20011156:	f041 8160 	bne.w	2001241a <fail>
+2001115a:	ee11 0a10 	vmov	r0, s2
+2001115e:	49c1      	ldr	r1, [pc, #772]	@ (20011464 <Reset_Handler+0x1424>)
+20011160:	4288      	cmp	r0, r1
+20011162:	f041 815a 	bne.w	2001241a <fail>
+20011166:	ee11 0a90 	vmov	r0, s3
+2001116a:	49bf      	ldr	r1, [pc, #764]	@ (20011468 <Reset_Handler+0x1428>)
+2001116c:	4288      	cmp	r0, r1
+2001116e:	f041 8154 	bne.w	2001241a <fail>
+20011172:	ee12 0a10 	vmov	r0, s4
+20011176:	49bd      	ldr	r1, [pc, #756]	@ (2001146c <Reset_Handler+0x142c>)
+20011178:	4288      	cmp	r0, r1
+2001117a:	f041 814e 	bne.w	2001241a <fail>
+2001117e:	ee12 0a90 	vmov	r0, s5
+20011182:	49bb      	ldr	r1, [pc, #748]	@ (20011470 <Reset_Handler+0x1430>)
+20011184:	4288      	cmp	r0, r1
+20011186:	f041 8148 	bne.w	2001241a <fail>
+2001118a:	ee13 0a10 	vmov	r0, s6
+2001118e:	49b9      	ldr	r1, [pc, #740]	@ (20011474 <Reset_Handler+0x1434>)
+20011190:	4288      	cmp	r0, r1
+20011192:	f041 8142 	bne.w	2001241a <fail>
+20011196:	ee13 0a90 	vmov	r0, s7
+2001119a:	49b7      	ldr	r1, [pc, #732]	@ (20011478 <Reset_Handler+0x1438>)
+2001119c:	4288      	cmp	r0, r1
+2001119e:	f041 813c 	bne.w	2001241a <fail>
+200111a2:	ee14 0a10 	vmov	r0, s8
+200111a6:	49b5      	ldr	r1, [pc, #724]	@ (2001147c <Reset_Handler+0x143c>)
+200111a8:	4288      	cmp	r0, r1
+200111aa:	f041 8136 	bne.w	2001241a <fail>
+200111ae:	ee14 0a90 	vmov	r0, s9
+200111b2:	49b3      	ldr	r1, [pc, #716]	@ (20011480 <Reset_Handler+0x1440>)
+200111b4:	4288      	cmp	r0, r1
+200111b6:	f041 8130 	bne.w	2001241a <fail>
+200111ba:	ee15 0a10 	vmov	r0, s10
+200111be:	49b1      	ldr	r1, [pc, #708]	@ (20011484 <Reset_Handler+0x1444>)
+200111c0:	4288      	cmp	r0, r1
+200111c2:	f041 812a 	bne.w	2001241a <fail>
+200111c6:	ee15 0a90 	vmov	r0, s11
+200111ca:	49af      	ldr	r1, [pc, #700]	@ (20011488 <Reset_Handler+0x1448>)
+200111cc:	4288      	cmp	r0, r1
+200111ce:	f041 8124 	bne.w	2001241a <fail>
+200111d2:	ee16 0a10 	vmov	r0, s12
+200111d6:	49ad      	ldr	r1, [pc, #692]	@ (2001148c <Reset_Handler+0x144c>)
+200111d8:	4288      	cmp	r0, r1
+200111da:	f041 811e 	bne.w	2001241a <fail>
+200111de:	ee16 0a90 	vmov	r0, s13
+200111e2:	49ab      	ldr	r1, [pc, #684]	@ (20011490 <Reset_Handler+0x1450>)
+200111e4:	4288      	cmp	r0, r1
+200111e6:	f041 8118 	bne.w	2001241a <fail>
+200111ea:	ee17 0a10 	vmov	r0, s14
+200111ee:	49a9      	ldr	r1, [pc, #676]	@ (20011494 <Reset_Handler+0x1454>)
+200111f0:	4288      	cmp	r0, r1
+200111f2:	f041 8112 	bne.w	2001241a <fail>
+200111f6:	ee17 0a90 	vmov	r0, s15
+200111fa:	49a7      	ldr	r1, [pc, #668]	@ (20011498 <Reset_Handler+0x1458>)
+200111fc:	4288      	cmp	r0, r1
+200111fe:	f041 810c 	bne.w	2001241a <fail>
+20011202:	ee18 0a10 	vmov	r0, s16
+20011206:	49a5      	ldr	r1, [pc, #660]	@ (2001149c <Reset_Handler+0x145c>)
+20011208:	4288      	cmp	r0, r1
+2001120a:	f041 8106 	bne.w	2001241a <fail>
+2001120e:	ee18 0a90 	vmov	r0, s17
+20011212:	49a3      	ldr	r1, [pc, #652]	@ (200114a0 <Reset_Handler+0x1460>)
+20011214:	4288      	cmp	r0, r1
+20011216:	f041 8100 	bne.w	2001241a <fail>
+2001121a:	ee19 0a10 	vmov	r0, s18
+2001121e:	49a1      	ldr	r1, [pc, #644]	@ (200114a4 <Reset_Handler+0x1464>)
+20011220:	4288      	cmp	r0, r1
+20011222:	f041 80fa 	bne.w	2001241a <fail>
+20011226:	ee19 0a90 	vmov	r0, s19
+2001122a:	499f      	ldr	r1, [pc, #636]	@ (200114a8 <Reset_Handler+0x1468>)
+2001122c:	4288      	cmp	r0, r1
+2001122e:	f041 80f4 	bne.w	2001241a <fail>
+20011232:	ee1a 0a10 	vmov	r0, s20
+20011236:	499d      	ldr	r1, [pc, #628]	@ (200114ac <Reset_Handler+0x146c>)
+20011238:	4288      	cmp	r0, r1
+2001123a:	f041 80ee 	bne.w	2001241a <fail>
+2001123e:	ee1a 0a90 	vmov	r0, s21
+20011242:	499b      	ldr	r1, [pc, #620]	@ (200114b0 <Reset_Handler+0x1470>)
+20011244:	4288      	cmp	r0, r1
+20011246:	f041 80e8 	bne.w	2001241a <fail>
+2001124a:	ee1b 0a10 	vmov	r0, s22
+2001124e:	4999      	ldr	r1, [pc, #612]	@ (200114b4 <Reset_Handler+0x1474>)
+20011250:	4288      	cmp	r0, r1
+20011252:	f041 80e2 	bne.w	2001241a <fail>
+20011256:	ee1b 0a90 	vmov	r0, s23
+2001125a:	4997      	ldr	r1, [pc, #604]	@ (200114b8 <Reset_Handler+0x1478>)
+2001125c:	4288      	cmp	r0, r1
+2001125e:	f041 80dc 	bne.w	2001241a <fail>
+20011262:	ee1c 0a10 	vmov	r0, s24
+20011266:	4995      	ldr	r1, [pc, #596]	@ (200114bc <Reset_Handler+0x147c>)
+20011268:	4288      	cmp	r0, r1
+2001126a:	f041 80d6 	bne.w	2001241a <fail>
+2001126e:	ee1c 0a90 	vmov	r0, s25
+20011272:	4993      	ldr	r1, [pc, #588]	@ (200114c0 <Reset_Handler+0x1480>)
+20011274:	4288      	cmp	r0, r1
+20011276:	f041 80d0 	bne.w	2001241a <fail>
+2001127a:	ee1d 0a10 	vmov	r0, s26
+2001127e:	4991      	ldr	r1, [pc, #580]	@ (200114c4 <Reset_Handler+0x1484>)
+20011280:	4288      	cmp	r0, r1
+20011282:	f041 80ca 	bne.w	2001241a <fail>
+20011286:	ee1d 0a90 	vmov	r0, s27
+2001128a:	498f      	ldr	r1, [pc, #572]	@ (200114c8 <Reset_Handler+0x1488>)
+2001128c:	4288      	cmp	r0, r1
+2001128e:	f041 80c4 	bne.w	2001241a <fail>
+20011292:	ee1e 0a10 	vmov	r0, s28
+20011296:	498d      	ldr	r1, [pc, #564]	@ (200114cc <Reset_Handler+0x148c>)
+20011298:	4288      	cmp	r0, r1
+2001129a:	f041 80be 	bne.w	2001241a <fail>
+2001129e:	ee1e 0a90 	vmov	r0, s29
+200112a2:	498b      	ldr	r1, [pc, #556]	@ (200114d0 <Reset_Handler+0x1490>)
+200112a4:	4288      	cmp	r0, r1
+200112a6:	f041 80b8 	bne.w	2001241a <fail>
+200112aa:	ee1f 0a10 	vmov	r0, s30
+200112ae:	4989      	ldr	r1, [pc, #548]	@ (200114d4 <Reset_Handler+0x1494>)
+200112b0:	4288      	cmp	r0, r1
+200112b2:	f041 80b2 	bne.w	2001241a <fail>
+200112b6:	ee1f 0a90 	vmov	r0, s31
+200112ba:	4987      	ldr	r1, [pc, #540]	@ (200114d8 <Reset_Handler+0x1498>)
+200112bc:	4288      	cmp	r0, r1
+200112be:	f041 80ac 	bne.w	2001241a <fail>
+200112c2:	eef1 0a10 	vmrs	r0, fpscr
+200112c6:	f04f 0603 	mov.w	r6, #3
+200112ca:	4984      	ldr	r1, [pc, #528]	@ (200114dc <Reset_Handler+0x149c>)
+200112cc:	4288      	cmp	r0, r1
+200112ce:	f041 80a4 	bne.w	2001241a <fail>
+200112d2:	4884      	ldr	r0, [pc, #528]	@ (200114e4 <Reset_Handler+0x14a4>)
+200112d4:	6800      	ldr	r0, [r0, #0]
+200112d6:	f04f 060a 	mov.w	r6, #10
+200112da:	f06f 0112 	mvn.w	r1, #18
+200112de:	4288      	cmp	r0, r1
+200112e0:	f041 809b 	bne.w	2001241a <fail>
+200112e4:	487f      	ldr	r0, [pc, #508]	@ (200114e4 <Reset_Handler+0x14a4>)
+200112e6:	6b00      	ldr	r0, [r0, #48]	@ 0x30
+200112e8:	f1a8 0968 	sub.w	r9, r8, #104	@ 0x68
+200112ec:	f04f 060b 	mov.w	r6, #11
+200112f0:	4548      	cmp	r0, r9
+200112f2:	f041 8092 	bne.w	2001241a <fail>
+200112f6:	487b      	ldr	r0, [pc, #492]	@ (200114e4 <Reset_Handler+0x14a4>)
+200112f8:	6900      	ldr	r0, [r0, #16]
+200112fa:	f109 0120 	add.w	r1, r9, #32
+200112fe:	f04f 060e 	mov.w	r6, #14
+20011302:	4288      	cmp	r0, r1
+20011304:	f041 8089 	bne.w	2001241a <fail>
+20011308:	4876      	ldr	r0, [pc, #472]	@ (200114e4 <Reset_Handler+0x14a4>)
+2001130a:	68c0      	ldr	r0, [r0, #12]
+2001130c:	f000 0009 	and.w	r0, r0, #9
+20011310:	f04f 060d 	mov.w	r6, #13
+20011314:	f04f 0109 	mov.w	r1, #9
+20011318:	4288      	cmp	r0, r1
+2001131a:	f041 807e 	bne.w	2001241a <fail>
+2001131e:	f8d9 0020 	ldr.w	r0, [r9, #32]
+20011322:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20011326:	f04f 418a 	mov.w	r1, #1157627904	@ 0x45000000
+2001132a:	4288      	cmp	r0, r1
+2001132c:	f041 8075 	bne.w	2001241a <fail>
+20011330:	f8d9 0024 	ldr.w	r0, [r9, #36]	@ 0x24
+20011334:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20011338:	4949      	ldr	r1, [pc, #292]	@ (20011460 <Reset_Handler+0x1420>)
+2001133a:	4288      	cmp	r0, r1
+2001133c:	f041 806d 	bne.w	2001241a <fail>
+20011340:	f8d9 0028 	ldr.w	r0, [r9, #40]	@ 0x28
+20011344:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20011348:	4946      	ldr	r1, [pc, #280]	@ (20011464 <Reset_Handler+0x1424>)
+2001134a:	4288      	cmp	r0, r1
+2001134c:	f041 8065 	bne.w	2001241a <fail>
+20011350:	f8d9 002c 	ldr.w	r0, [r9, #44]	@ 0x2c
+20011354:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20011358:	4943      	ldr	r1, [pc, #268]	@ (20011468 <Reset_Handler+0x1428>)
+2001135a:	4288      	cmp	r0, r1
+2001135c:	f041 805d 	bne.w	2001241a <fail>
+20011360:	f8d9 0030 	ldr.w	r0, [r9, #48]	@ 0x30
+20011364:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20011368:	4940      	ldr	r1, [pc, #256]	@ (2001146c <Reset_Handler+0x142c>)
+2001136a:	4288      	cmp	r0, r1
+2001136c:	f041 8055 	bne.w	2001241a <fail>
+20011370:	f8d9 0034 	ldr.w	r0, [r9, #52]	@ 0x34
+20011374:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20011378:	493d      	ldr	r1, [pc, #244]	@ (20011470 <Reset_Handler+0x1430>)
+2001137a:	4288      	cmp	r0, r1
+2001137c:	f041 804d 	bne.w	2001241a <fail>
+20011380:	f8d9 0038 	ldr.w	r0, [r9, #56]	@ 0x38
+20011384:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20011388:	493a      	ldr	r1, [pc, #232]	@ (20011474 <Reset_Handler+0x1434>)
+2001138a:	4288      	cmp	r0, r1
+2001138c:	f041 8045 	bne.w	2001241a <fail>
+20011390:	f8d9 003c 	ldr.w	r0, [r9, #60]	@ 0x3c
+20011394:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20011398:	4937      	ldr	r1, [pc, #220]	@ (20011478 <Reset_Handler+0x1438>)
+2001139a:	4288      	cmp	r0, r1
+2001139c:	f041 803d 	bne.w	2001241a <fail>
+200113a0:	f8d9 0040 	ldr.w	r0, [r9, #64]	@ 0x40
+200113a4:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200113a8:	4934      	ldr	r1, [pc, #208]	@ (2001147c <Reset_Handler+0x143c>)
+200113aa:	4288      	cmp	r0, r1
+200113ac:	f041 8035 	bne.w	2001241a <fail>
+200113b0:	f8d9 0044 	ldr.w	r0, [r9, #68]	@ 0x44
+200113b4:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200113b8:	4931      	ldr	r1, [pc, #196]	@ (20011480 <Reset_Handler+0x1440>)
+200113ba:	4288      	cmp	r0, r1
+200113bc:	f041 802d 	bne.w	2001241a <fail>
+200113c0:	f8d9 0048 	ldr.w	r0, [r9, #72]	@ 0x48
+200113c4:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200113c8:	492e      	ldr	r1, [pc, #184]	@ (20011484 <Reset_Handler+0x1444>)
+200113ca:	4288      	cmp	r0, r1
+200113cc:	f041 8025 	bne.w	2001241a <fail>
+200113d0:	f8d9 004c 	ldr.w	r0, [r9, #76]	@ 0x4c
+200113d4:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200113d8:	492b      	ldr	r1, [pc, #172]	@ (20011488 <Reset_Handler+0x1448>)
+200113da:	4288      	cmp	r0, r1
+200113dc:	f041 801d 	bne.w	2001241a <fail>
+200113e0:	f8d9 0050 	ldr.w	r0, [r9, #80]	@ 0x50
+200113e4:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200113e8:	4928      	ldr	r1, [pc, #160]	@ (2001148c <Reset_Handler+0x144c>)
+200113ea:	4288      	cmp	r0, r1
+200113ec:	f041 8015 	bne.w	2001241a <fail>
+200113f0:	f8d9 0054 	ldr.w	r0, [r9, #84]	@ 0x54
+200113f4:	f04f 0628 	mov.w	r6, #40	@ 0x28
+200113f8:	4925      	ldr	r1, [pc, #148]	@ (20011490 <Reset_Handler+0x1450>)
+200113fa:	4288      	cmp	r0, r1
+200113fc:	f041 800d 	bne.w	2001241a <fail>
+20011400:	f8d9 0058 	ldr.w	r0, [r9, #88]	@ 0x58
+20011404:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20011408:	4922      	ldr	r1, [pc, #136]	@ (20011494 <Reset_Handler+0x1454>)
+2001140a:	4288      	cmp	r0, r1
+2001140c:	f041 8005 	bne.w	2001241a <fail>
+20011410:	f8d9 005c 	ldr.w	r0, [r9, #92]	@ 0x5c
+20011414:	f04f 0628 	mov.w	r6, #40	@ 0x28
+20011418:	491f      	ldr	r1, [pc, #124]	@ (20011498 <Reset_Handler+0x1458>)
+2001141a:	4288      	cmp	r0, r1
+2001141c:	f040 87fd 	bne.w	2001241a <fail>
+20011420:	f8d9 0060 	ldr.w	r0, [r9, #96]	@ 0x60
+20011424:	f04f 0629 	mov.w	r6, #41	@ 0x29
+20011428:	492c      	ldr	r1, [pc, #176]	@ (200114dc <Reset_Handler+0x149c>)
+2001142a:	4288      	cmp	r0, r1
+2001142c:	f040 87f5 	bne.w	2001241a <fail>
+20011430:	f3ef 8014 	mrs	r0, CONTROL
+20011434:	f000 0006 	and.w	r0, r0, #6
+20011438:	f04f 0612 	mov.w	r6, #18
+2001143c:	f04f 0106 	mov.w	r1, #6
+20011440:	4288      	cmp	r0, r1
+20011442:	f040 87ea 	bne.w	2001241a <fail>
+20011446:	f3ef 8014 	mrs	r0, CONTROL
+2001144a:	f020 0002 	bic.w	r0, r0, #2
+2001144e:	f380 8814 	msr	CONTROL, r0
+20011452:	f3bf 8f6f 	isb	sy
+20011456:	e047      	b.n	200114e8 <Reset_Handler+0x14a8>
+20011458:	20000280 	.word	0x20000280
+2001145c:	20008000 	.word	0x20008000
+20011460:	45010001 	.word	0x45010001
+20011464:	45020002 	.word	0x45020002
+20011468:	45030003 	.word	0x45030003
+2001146c:	45040004 	.word	0x45040004
+20011470:	45050005 	.word	0x45050005
+20011474:	45060006 	.word	0x45060006
+20011478:	45070007 	.word	0x45070007
+2001147c:	45080008 	.word	0x45080008
+20011480:	45090009 	.word	0x45090009
+20011484:	450a000a 	.word	0x450a000a
+20011488:	450b000b 	.word	0x450b000b
+2001148c:	450c000c 	.word	0x450c000c
+20011490:	450d000d 	.word	0x450d000d
+20011494:	450e000e 	.word	0x450e000e
+20011498:	450f000f 	.word	0x450f000f
+2001149c:	45100010 	.word	0x45100010
+200114a0:	45110011 	.word	0x45110011
+200114a4:	45120012 	.word	0x45120012
+200114a8:	45130013 	.word	0x45130013
+200114ac:	45140014 	.word	0x45140014
+200114b0:	45150015 	.word	0x45150015
+200114b4:	45160016 	.word	0x45160016
+200114b8:	45170017 	.word	0x45170017
+200114bc:	45180018 	.word	0x45180018
+200114c0:	45190019 	.word	0x45190019
+200114c4:	451a001a 	.word	0x451a001a
+200114c8:	451b001b 	.word	0x451b001b
+200114cc:	451c001c 	.word	0x451c001c
+200114d0:	451d001d 	.word	0x451d001d
+200114d4:	451e001e 	.word	0x451e001e
+200114d8:	451f001f 	.word	0x451f001f
+200114dc:	6340009f 	.word	0x6340009f
+200114e0:	e000ed04 	.word	0xe000ed04
+200114e4:	20000200 	.word	0x20000200
+200114e8:	2706      	movs	r7, #6
+200114ea:	48b7      	ldr	r0, [pc, #732]	@ (200117c8 <Reset_Handler+0x1788>)
+200114ec:	f04f 4140 	mov.w	r1, #3221225472	@ 0xc0000000
+200114f0:	6001      	str	r1, [r0, #0]
+200114f2:	f3bf 8f4f 	dsb	sy
+200114f6:	f3bf 8f6f 	isb	sy
+200114fa:	48b4      	ldr	r0, [pc, #720]	@ (200117cc <Reset_Handler+0x178c>)
+200114fc:	2103      	movs	r1, #3
+200114fe:	6001      	str	r1, [r0, #0]
+20011500:	46e8      	mov	r8, sp
+20011502:	f04f 408c 	mov.w	r0, #1174405120	@ 0x46000000
+20011506:	ee00 0a10 	vmov	s0, r0
+2001150a:	48b1      	ldr	r0, [pc, #708]	@ (200117d0 <Reset_Handler+0x1790>)
+2001150c:	ee00 0a90 	vmov	s1, r0
+20011510:	48b0      	ldr	r0, [pc, #704]	@ (200117d4 <Reset_Handler+0x1794>)
+20011512:	ee01 0a10 	vmov	s2, r0
+20011516:	48b0      	ldr	r0, [pc, #704]	@ (200117d8 <Reset_Handler+0x1798>)
+20011518:	ee01 0a90 	vmov	s3, r0
+2001151c:	48af      	ldr	r0, [pc, #700]	@ (200117dc <Reset_Handler+0x179c>)
+2001151e:	ee02 0a10 	vmov	s4, r0
+20011522:	48af      	ldr	r0, [pc, #700]	@ (200117e0 <Reset_Handler+0x17a0>)
+20011524:	ee02 0a90 	vmov	s5, r0
+20011528:	48ae      	ldr	r0, [pc, #696]	@ (200117e4 <Reset_Handler+0x17a4>)
+2001152a:	ee03 0a10 	vmov	s6, r0
+2001152e:	48ae      	ldr	r0, [pc, #696]	@ (200117e8 <Reset_Handler+0x17a8>)
+20011530:	ee03 0a90 	vmov	s7, r0
+20011534:	48ad      	ldr	r0, [pc, #692]	@ (200117ec <Reset_Handler+0x17ac>)
+20011536:	ee04 0a10 	vmov	s8, r0
+2001153a:	48ad      	ldr	r0, [pc, #692]	@ (200117f0 <Reset_Handler+0x17b0>)
+2001153c:	ee04 0a90 	vmov	s9, r0
+20011540:	48ac      	ldr	r0, [pc, #688]	@ (200117f4 <Reset_Handler+0x17b4>)
+20011542:	ee05 0a10 	vmov	s10, r0
+20011546:	48ac      	ldr	r0, [pc, #688]	@ (200117f8 <Reset_Handler+0x17b8>)
+20011548:	ee05 0a90 	vmov	s11, r0
+2001154c:	48ab      	ldr	r0, [pc, #684]	@ (200117fc <Reset_Handler+0x17bc>)
+2001154e:	ee06 0a10 	vmov	s12, r0
+20011552:	48ab      	ldr	r0, [pc, #684]	@ (20011800 <Reset_Handler+0x17c0>)
+20011554:	ee06 0a90 	vmov	s13, r0
+20011558:	48aa      	ldr	r0, [pc, #680]	@ (20011804 <Reset_Handler+0x17c4>)
+2001155a:	ee07 0a10 	vmov	s14, r0
+2001155e:	48aa      	ldr	r0, [pc, #680]	@ (20011808 <Reset_Handler+0x17c8>)
+20011560:	ee07 0a90 	vmov	s15, r0
+20011564:	48a9      	ldr	r0, [pc, #676]	@ (2001180c <Reset_Handler+0x17cc>)
+20011566:	ee08 0a10 	vmov	s16, r0
+2001156a:	48a9      	ldr	r0, [pc, #676]	@ (20011810 <Reset_Handler+0x17d0>)
+2001156c:	ee08 0a90 	vmov	s17, r0
+20011570:	48a8      	ldr	r0, [pc, #672]	@ (20011814 <Reset_Handler+0x17d4>)
+20011572:	ee09 0a10 	vmov	s18, r0
+20011576:	48a8      	ldr	r0, [pc, #672]	@ (20011818 <Reset_Handler+0x17d8>)
+20011578:	ee09 0a90 	vmov	s19, r0
+2001157c:	48a7      	ldr	r0, [pc, #668]	@ (2001181c <Reset_Handler+0x17dc>)
+2001157e:	ee0a 0a10 	vmov	s20, r0
+20011582:	48a7      	ldr	r0, [pc, #668]	@ (20011820 <Reset_Handler+0x17e0>)
+20011584:	ee0a 0a90 	vmov	s21, r0
+20011588:	48a6      	ldr	r0, [pc, #664]	@ (20011824 <Reset_Handler+0x17e4>)
+2001158a:	ee0b 0a10 	vmov	s22, r0
+2001158e:	48a6      	ldr	r0, [pc, #664]	@ (20011828 <Reset_Handler+0x17e8>)
+20011590:	ee0b 0a90 	vmov	s23, r0
+20011594:	48a5      	ldr	r0, [pc, #660]	@ (2001182c <Reset_Handler+0x17ec>)
+20011596:	ee0c 0a10 	vmov	s24, r0
+2001159a:	48a5      	ldr	r0, [pc, #660]	@ (20011830 <Reset_Handler+0x17f0>)
+2001159c:	ee0c 0a90 	vmov	s25, r0
+200115a0:	48a4      	ldr	r0, [pc, #656]	@ (20011834 <Reset_Handler+0x17f4>)
+200115a2:	ee0d 0a10 	vmov	s26, r0
+200115a6:	48a4      	ldr	r0, [pc, #656]	@ (20011838 <Reset_Handler+0x17f8>)
+200115a8:	ee0d 0a90 	vmov	s27, r0
+200115ac:	48a3      	ldr	r0, [pc, #652]	@ (2001183c <Reset_Handler+0x17fc>)
+200115ae:	ee0e 0a10 	vmov	s28, r0
+200115b2:	48a3      	ldr	r0, [pc, #652]	@ (20011840 <Reset_Handler+0x1800>)
+200115b4:	ee0e 0a90 	vmov	s29, r0
+200115b8:	48a2      	ldr	r0, [pc, #648]	@ (20011844 <Reset_Handler+0x1804>)
+200115ba:	ee0f 0a10 	vmov	s30, r0
+200115be:	48a2      	ldr	r0, [pc, #648]	@ (20011848 <Reset_Handler+0x1808>)
+200115c0:	ee0f 0a90 	vmov	s31, r0
+200115c4:	48a1      	ldr	r0, [pc, #644]	@ (2001184c <Reset_Handler+0x180c>)
+200115c6:	eee1 0a10 	vmsr	fpscr, r0
+200115ca:	48a1      	ldr	r0, [pc, #644]	@ (20011850 <Reset_Handler+0x1810>)
+200115cc:	f04f 5180 	mov.w	r1, #268435456	@ 0x10000000
+200115d0:	6001      	str	r1, [r0, #0]
+200115d2:	f3bf 8f4f 	dsb	sy
+200115d6:	f3bf 8f6f 	isb	sy
+200115da:	f04f 0601 	mov.w	r6, #1
+200115de:	45c5      	cmp	sp, r8
+200115e0:	f040 871b 	bne.w	2001241a <fail>
+200115e4:	f04f 0602 	mov.w	r6, #2
+200115e8:	ee10 0a10 	vmov	r0, s0
+200115ec:	f04f 418c 	mov.w	r1, #1174405120	@ 0x46000000
+200115f0:	4288      	cmp	r0, r1
+200115f2:	f040 8712 	bne.w	2001241a <fail>
+200115f6:	ee10 0a90 	vmov	r0, s1
+200115fa:	4975      	ldr	r1, [pc, #468]	@ (200117d0 <Reset_Handler+0x1790>)
+200115fc:	4288      	cmp	r0, r1
+200115fe:	f040 870c 	bne.w	2001241a <fail>
+20011602:	ee11 0a10 	vmov	r0, s2
+20011606:	4973      	ldr	r1, [pc, #460]	@ (200117d4 <Reset_Handler+0x1794>)
+20011608:	4288      	cmp	r0, r1
+2001160a:	f040 8706 	bne.w	2001241a <fail>
+2001160e:	ee11 0a90 	vmov	r0, s3
+20011612:	4971      	ldr	r1, [pc, #452]	@ (200117d8 <Reset_Handler+0x1798>)
+20011614:	4288      	cmp	r0, r1
+20011616:	f040 8700 	bne.w	2001241a <fail>
+2001161a:	ee12 0a10 	vmov	r0, s4
+2001161e:	496f      	ldr	r1, [pc, #444]	@ (200117dc <Reset_Handler+0x179c>)
+20011620:	4288      	cmp	r0, r1
+20011622:	f040 86fa 	bne.w	2001241a <fail>
+20011626:	ee12 0a90 	vmov	r0, s5
+2001162a:	496d      	ldr	r1, [pc, #436]	@ (200117e0 <Reset_Handler+0x17a0>)
+2001162c:	4288      	cmp	r0, r1
+2001162e:	f040 86f4 	bne.w	2001241a <fail>
+20011632:	ee13 0a10 	vmov	r0, s6
+20011636:	496b      	ldr	r1, [pc, #428]	@ (200117e4 <Reset_Handler+0x17a4>)
+20011638:	4288      	cmp	r0, r1
+2001163a:	f040 86ee 	bne.w	2001241a <fail>
+2001163e:	ee13 0a90 	vmov	r0, s7
+20011642:	4969      	ldr	r1, [pc, #420]	@ (200117e8 <Reset_Handler+0x17a8>)
+20011644:	4288      	cmp	r0, r1
+20011646:	f040 86e8 	bne.w	2001241a <fail>
+2001164a:	ee14 0a10 	vmov	r0, s8
+2001164e:	4967      	ldr	r1, [pc, #412]	@ (200117ec <Reset_Handler+0x17ac>)
+20011650:	4288      	cmp	r0, r1
+20011652:	f040 86e2 	bne.w	2001241a <fail>
+20011656:	ee14 0a90 	vmov	r0, s9
+2001165a:	4965      	ldr	r1, [pc, #404]	@ (200117f0 <Reset_Handler+0x17b0>)
+2001165c:	4288      	cmp	r0, r1
+2001165e:	f040 86dc 	bne.w	2001241a <fail>
+20011662:	ee15 0a10 	vmov	r0, s10
+20011666:	4963      	ldr	r1, [pc, #396]	@ (200117f4 <Reset_Handler+0x17b4>)
+20011668:	4288      	cmp	r0, r1
+2001166a:	f040 86d6 	bne.w	2001241a <fail>
+2001166e:	ee15 0a90 	vmov	r0, s11
+20011672:	4961      	ldr	r1, [pc, #388]	@ (200117f8 <Reset_Handler+0x17b8>)
+20011674:	4288      	cmp	r0, r1
+20011676:	f040 86d0 	bne.w	2001241a <fail>
+2001167a:	ee16 0a10 	vmov	r0, s12
+2001167e:	495f      	ldr	r1, [pc, #380]	@ (200117fc <Reset_Handler+0x17bc>)
+20011680:	4288      	cmp	r0, r1
+20011682:	f040 86ca 	bne.w	2001241a <fail>
+20011686:	ee16 0a90 	vmov	r0, s13
+2001168a:	495d      	ldr	r1, [pc, #372]	@ (20011800 <Reset_Handler+0x17c0>)
+2001168c:	4288      	cmp	r0, r1
+2001168e:	f040 86c4 	bne.w	2001241a <fail>
+20011692:	ee17 0a10 	vmov	r0, s14
+20011696:	495b      	ldr	r1, [pc, #364]	@ (20011804 <Reset_Handler+0x17c4>)
+20011698:	4288      	cmp	r0, r1
+2001169a:	f040 86be 	bne.w	2001241a <fail>
+2001169e:	ee17 0a90 	vmov	r0, s15
+200116a2:	4959      	ldr	r1, [pc, #356]	@ (20011808 <Reset_Handler+0x17c8>)
+200116a4:	4288      	cmp	r0, r1
+200116a6:	f040 86b8 	bne.w	2001241a <fail>
+200116aa:	ee18 0a10 	vmov	r0, s16
+200116ae:	4957      	ldr	r1, [pc, #348]	@ (2001180c <Reset_Handler+0x17cc>)
+200116b0:	4288      	cmp	r0, r1
+200116b2:	f040 86b2 	bne.w	2001241a <fail>
+200116b6:	ee18 0a90 	vmov	r0, s17
+200116ba:	4955      	ldr	r1, [pc, #340]	@ (20011810 <Reset_Handler+0x17d0>)
+200116bc:	4288      	cmp	r0, r1
+200116be:	f040 86ac 	bne.w	2001241a <fail>
+200116c2:	ee19 0a10 	vmov	r0, s18
+200116c6:	4953      	ldr	r1, [pc, #332]	@ (20011814 <Reset_Handler+0x17d4>)
+200116c8:	4288      	cmp	r0, r1
+200116ca:	f040 86a6 	bne.w	2001241a <fail>
+200116ce:	ee19 0a90 	vmov	r0, s19
+200116d2:	4951      	ldr	r1, [pc, #324]	@ (20011818 <Reset_Handler+0x17d8>)
+200116d4:	4288      	cmp	r0, r1
+200116d6:	f040 86a0 	bne.w	2001241a <fail>
+200116da:	ee1a 0a10 	vmov	r0, s20
+200116de:	494f      	ldr	r1, [pc, #316]	@ (2001181c <Reset_Handler+0x17dc>)
+200116e0:	4288      	cmp	r0, r1
+200116e2:	f040 869a 	bne.w	2001241a <fail>
+200116e6:	ee1a 0a90 	vmov	r0, s21
+200116ea:	494d      	ldr	r1, [pc, #308]	@ (20011820 <Reset_Handler+0x17e0>)
+200116ec:	4288      	cmp	r0, r1
+200116ee:	f040 8694 	bne.w	2001241a <fail>
+200116f2:	ee1b 0a10 	vmov	r0, s22
+200116f6:	494b      	ldr	r1, [pc, #300]	@ (20011824 <Reset_Handler+0x17e4>)
+200116f8:	4288      	cmp	r0, r1
+200116fa:	f040 868e 	bne.w	2001241a <fail>
+200116fe:	ee1b 0a90 	vmov	r0, s23
+20011702:	4949      	ldr	r1, [pc, #292]	@ (20011828 <Reset_Handler+0x17e8>)
+20011704:	4288      	cmp	r0, r1
+20011706:	f040 8688 	bne.w	2001241a <fail>
+2001170a:	ee1c 0a10 	vmov	r0, s24
+2001170e:	4947      	ldr	r1, [pc, #284]	@ (2001182c <Reset_Handler+0x17ec>)
+20011710:	4288      	cmp	r0, r1
+20011712:	f040 8682 	bne.w	2001241a <fail>
+20011716:	ee1c 0a90 	vmov	r0, s25
+2001171a:	4945      	ldr	r1, [pc, #276]	@ (20011830 <Reset_Handler+0x17f0>)
+2001171c:	4288      	cmp	r0, r1
+2001171e:	f040 867c 	bne.w	2001241a <fail>
+20011722:	ee1d 0a10 	vmov	r0, s26
+20011726:	4943      	ldr	r1, [pc, #268]	@ (20011834 <Reset_Handler+0x17f4>)
+20011728:	4288      	cmp	r0, r1
+2001172a:	f040 8676 	bne.w	2001241a <fail>
+2001172e:	ee1d 0a90 	vmov	r0, s27
+20011732:	4941      	ldr	r1, [pc, #260]	@ (20011838 <Reset_Handler+0x17f8>)
+20011734:	4288      	cmp	r0, r1
+20011736:	f040 8670 	bne.w	2001241a <fail>
+2001173a:	ee1e 0a10 	vmov	r0, s28
+2001173e:	493f      	ldr	r1, [pc, #252]	@ (2001183c <Reset_Handler+0x17fc>)
+20011740:	4288      	cmp	r0, r1
+20011742:	f040 866a 	bne.w	2001241a <fail>
+20011746:	ee1e 0a90 	vmov	r0, s29
+2001174a:	493d      	ldr	r1, [pc, #244]	@ (20011840 <Reset_Handler+0x1800>)
+2001174c:	4288      	cmp	r0, r1
+2001174e:	f040 8664 	bne.w	2001241a <fail>
+20011752:	ee1f 0a10 	vmov	r0, s30
+20011756:	493b      	ldr	r1, [pc, #236]	@ (20011844 <Reset_Handler+0x1804>)
+20011758:	4288      	cmp	r0, r1
+2001175a:	f040 865e 	bne.w	2001241a <fail>
+2001175e:	ee1f 0a90 	vmov	r0, s31
+20011762:	4939      	ldr	r1, [pc, #228]	@ (20011848 <Reset_Handler+0x1808>)
+20011764:	4288      	cmp	r0, r1
+20011766:	f040 8658 	bne.w	2001241a <fail>
+2001176a:	eef1 0a10 	vmrs	r0, fpscr
+2001176e:	f04f 0603 	mov.w	r6, #3
+20011772:	4936      	ldr	r1, [pc, #216]	@ (2001184c <Reset_Handler+0x180c>)
+20011774:	4288      	cmp	r0, r1
+20011776:	f040 8650 	bne.w	2001241a <fail>
+2001177a:	4836      	ldr	r0, [pc, #216]	@ (20011854 <Reset_Handler+0x1814>)
+2001177c:	6800      	ldr	r0, [r0, #0]
+2001177e:	f04f 060a 	mov.w	r6, #10
+20011782:	f06f 0116 	mvn.w	r1, #22
+20011786:	4288      	cmp	r0, r1
+20011788:	f040 8647 	bne.w	2001241a <fail>
+2001178c:	4831      	ldr	r0, [pc, #196]	@ (20011854 <Reset_Handler+0x1814>)
+2001178e:	6a40      	ldr	r0, [r0, #36]	@ 0x24
+20011790:	f04f 061e 	mov.w	r6, #30
+20011794:	f06f 011e 	mvn.w	r1, #30
+20011798:	4288      	cmp	r0, r1
+2001179a:	f040 863e 	bne.w	2001241a <fail>
+2001179e:	482d      	ldr	r0, [pc, #180]	@ (20011854 <Reset_Handler+0x1814>)
+200117a0:	6840      	ldr	r0, [r0, #4]
+200117a2:	f1a0 09a8 	sub.w	r9, r0, #168	@ 0xa8
+200117a6:	482b      	ldr	r0, [pc, #172]	@ (20011854 <Reset_Handler+0x1814>)
+200117a8:	6a80      	ldr	r0, [r0, #40]	@ 0x28
+200117aa:	f04f 061f 	mov.w	r6, #31
+200117ae:	4548      	cmp	r0, r9
+200117b0:	f040 8633 	bne.w	2001241a <fail>
+200117b4:	4827      	ldr	r0, [pc, #156]	@ (20011854 <Reset_Handler+0x1814>)
+200117b6:	6ac0      	ldr	r0, [r0, #44]	@ 0x2c
+200117b8:	f04f 0620 	mov.w	r6, #32
+200117bc:	f04f 0101 	mov.w	r1, #1
+200117c0:	4288      	cmp	r0, r1
+200117c2:	f040 862a 	bne.w	2001241a <fail>
+200117c6:	e047      	b.n	20011858 <Reset_Handler+0x1818>
+200117c8:	e000ef34 	.word	0xe000ef34
+200117cc:	20000280 	.word	0x20000280
+200117d0:	46010001 	.word	0x46010001
+200117d4:	46020002 	.word	0x46020002
+200117d8:	46030003 	.word	0x46030003
+200117dc:	46040004 	.word	0x46040004
+200117e0:	46050005 	.word	0x46050005
+200117e4:	46060006 	.word	0x46060006
+200117e8:	46070007 	.word	0x46070007
+200117ec:	46080008 	.word	0x46080008
+200117f0:	46090009 	.word	0x46090009
+200117f4:	460a000a 	.word	0x460a000a
+200117f8:	460b000b 	.word	0x460b000b
+200117fc:	460c000c 	.word	0x460c000c
+20011800:	460d000d 	.word	0x460d000d
+20011804:	460e000e 	.word	0x460e000e
+20011808:	460f000f 	.word	0x460f000f
+2001180c:	46100010 	.word	0x46100010
+20011810:	46110011 	.word	0x46110011
+20011814:	46120012 	.word	0x46120012
+20011818:	46130013 	.word	0x46130013
+2001181c:	46140014 	.word	0x46140014
+20011820:	46150015 	.word	0x46150015
+20011824:	46160016 	.word	0x46160016
+20011828:	46170017 	.word	0x46170017
+2001182c:	46180018 	.word	0x46180018
+20011830:	46190019 	.word	0x46190019
+20011834:	461a001a 	.word	0x461a001a
+20011838:	461b001b 	.word	0x461b001b
+2001183c:	461c001c 	.word	0x461c001c
+20011840:	461d001d 	.word	0x461d001d
+20011844:	461e001e 	.word	0x461e001e
+20011848:	461f001f 	.word	0x461f001f
+2001184c:	6340009f 	.word	0x6340009f
+20011850:	e000ed04 	.word	0xe000ed04
+20011854:	20000200 	.word	0x20000200
+20011858:	2707      	movs	r7, #7
+2001185a:	48ad      	ldr	r0, [pc, #692]	@ (20011b10 <Reset_Handler+0x1ad0>)
+2001185c:	f04f 4100 	mov.w	r1, #2147483648	@ 0x80000000
+20011860:	6001      	str	r1, [r0, #0]
+20011862:	f3bf 8f4f 	dsb	sy
+20011866:	f3bf 8f6f 	isb	sy
+2001186a:	48aa      	ldr	r0, [pc, #680]	@ (20011b14 <Reset_Handler+0x1ad4>)
+2001186c:	2103      	movs	r1, #3
+2001186e:	6001      	str	r1, [r0, #0]
+20011870:	46e8      	mov	r8, sp
+20011872:	f04f 408e 	mov.w	r0, #1191182336	@ 0x47000000
+20011876:	ee00 0a10 	vmov	s0, r0
+2001187a:	48a7      	ldr	r0, [pc, #668]	@ (20011b18 <Reset_Handler+0x1ad8>)
+2001187c:	ee00 0a90 	vmov	s1, r0
+20011880:	48a6      	ldr	r0, [pc, #664]	@ (20011b1c <Reset_Handler+0x1adc>)
+20011882:	ee01 0a10 	vmov	s2, r0
+20011886:	48a6      	ldr	r0, [pc, #664]	@ (20011b20 <Reset_Handler+0x1ae0>)
+20011888:	ee01 0a90 	vmov	s3, r0
+2001188c:	48a5      	ldr	r0, [pc, #660]	@ (20011b24 <Reset_Handler+0x1ae4>)
+2001188e:	ee02 0a10 	vmov	s4, r0
+20011892:	48a5      	ldr	r0, [pc, #660]	@ (20011b28 <Reset_Handler+0x1ae8>)
+20011894:	ee02 0a90 	vmov	s5, r0
+20011898:	48a4      	ldr	r0, [pc, #656]	@ (20011b2c <Reset_Handler+0x1aec>)
+2001189a:	ee03 0a10 	vmov	s6, r0
+2001189e:	48a4      	ldr	r0, [pc, #656]	@ (20011b30 <Reset_Handler+0x1af0>)
+200118a0:	ee03 0a90 	vmov	s7, r0
+200118a4:	48a3      	ldr	r0, [pc, #652]	@ (20011b34 <Reset_Handler+0x1af4>)
+200118a6:	ee04 0a10 	vmov	s8, r0
+200118aa:	48a3      	ldr	r0, [pc, #652]	@ (20011b38 <Reset_Handler+0x1af8>)
+200118ac:	ee04 0a90 	vmov	s9, r0
+200118b0:	48a2      	ldr	r0, [pc, #648]	@ (20011b3c <Reset_Handler+0x1afc>)
+200118b2:	ee05 0a10 	vmov	s10, r0
+200118b6:	48a2      	ldr	r0, [pc, #648]	@ (20011b40 <Reset_Handler+0x1b00>)
+200118b8:	ee05 0a90 	vmov	s11, r0
+200118bc:	48a1      	ldr	r0, [pc, #644]	@ (20011b44 <Reset_Handler+0x1b04>)
+200118be:	ee06 0a10 	vmov	s12, r0
+200118c2:	48a1      	ldr	r0, [pc, #644]	@ (20011b48 <Reset_Handler+0x1b08>)
+200118c4:	ee06 0a90 	vmov	s13, r0
+200118c8:	48a0      	ldr	r0, [pc, #640]	@ (20011b4c <Reset_Handler+0x1b0c>)
+200118ca:	ee07 0a10 	vmov	s14, r0
+200118ce:	48a0      	ldr	r0, [pc, #640]	@ (20011b50 <Reset_Handler+0x1b10>)
+200118d0:	ee07 0a90 	vmov	s15, r0
+200118d4:	489f      	ldr	r0, [pc, #636]	@ (20011b54 <Reset_Handler+0x1b14>)
+200118d6:	ee08 0a10 	vmov	s16, r0
+200118da:	489f      	ldr	r0, [pc, #636]	@ (20011b58 <Reset_Handler+0x1b18>)
+200118dc:	ee08 0a90 	vmov	s17, r0
+200118e0:	489e      	ldr	r0, [pc, #632]	@ (20011b5c <Reset_Handler+0x1b1c>)
+200118e2:	ee09 0a10 	vmov	s18, r0
+200118e6:	489e      	ldr	r0, [pc, #632]	@ (20011b60 <Reset_Handler+0x1b20>)
+200118e8:	ee09 0a90 	vmov	s19, r0
+200118ec:	489d      	ldr	r0, [pc, #628]	@ (20011b64 <Reset_Handler+0x1b24>)
+200118ee:	ee0a 0a10 	vmov	s20, r0
+200118f2:	489d      	ldr	r0, [pc, #628]	@ (20011b68 <Reset_Handler+0x1b28>)
+200118f4:	ee0a 0a90 	vmov	s21, r0
+200118f8:	489c      	ldr	r0, [pc, #624]	@ (20011b6c <Reset_Handler+0x1b2c>)
+200118fa:	ee0b 0a10 	vmov	s22, r0
+200118fe:	489c      	ldr	r0, [pc, #624]	@ (20011b70 <Reset_Handler+0x1b30>)
+20011900:	ee0b 0a90 	vmov	s23, r0
+20011904:	489b      	ldr	r0, [pc, #620]	@ (20011b74 <Reset_Handler+0x1b34>)
+20011906:	ee0c 0a10 	vmov	s24, r0
+2001190a:	489b      	ldr	r0, [pc, #620]	@ (20011b78 <Reset_Handler+0x1b38>)
+2001190c:	ee0c 0a90 	vmov	s25, r0
+20011910:	489a      	ldr	r0, [pc, #616]	@ (20011b7c <Reset_Handler+0x1b3c>)
+20011912:	ee0d 0a10 	vmov	s26, r0
+20011916:	489a      	ldr	r0, [pc, #616]	@ (20011b80 <Reset_Handler+0x1b40>)
+20011918:	ee0d 0a90 	vmov	s27, r0
+2001191c:	4899      	ldr	r0, [pc, #612]	@ (20011b84 <Reset_Handler+0x1b44>)
+2001191e:	ee0e 0a10 	vmov	s28, r0
+20011922:	4899      	ldr	r0, [pc, #612]	@ (20011b88 <Reset_Handler+0x1b48>)
+20011924:	ee0e 0a90 	vmov	s29, r0
+20011928:	4898      	ldr	r0, [pc, #608]	@ (20011b8c <Reset_Handler+0x1b4c>)
+2001192a:	ee0f 0a10 	vmov	s30, r0
+2001192e:	4898      	ldr	r0, [pc, #608]	@ (20011b90 <Reset_Handler+0x1b50>)
+20011930:	ee0f 0a90 	vmov	s31, r0
+20011934:	4897      	ldr	r0, [pc, #604]	@ (20011b94 <Reset_Handler+0x1b54>)
+20011936:	eee1 0a10 	vmsr	fpscr, r0
+2001193a:	4897      	ldr	r0, [pc, #604]	@ (20011b98 <Reset_Handler+0x1b58>)
+2001193c:	f04f 5180 	mov.w	r1, #268435456	@ 0x10000000
+20011940:	6001      	str	r1, [r0, #0]
+20011942:	f3bf 8f4f 	dsb	sy
+20011946:	f3bf 8f6f 	isb	sy
+2001194a:	f04f 0601 	mov.w	r6, #1
+2001194e:	45c5      	cmp	sp, r8
+20011950:	f040 8563 	bne.w	2001241a <fail>
+20011954:	f04f 0602 	mov.w	r6, #2
+20011958:	ee10 0a10 	vmov	r0, s0
+2001195c:	f04f 418e 	mov.w	r1, #1191182336	@ 0x47000000
+20011960:	4288      	cmp	r0, r1
+20011962:	f040 855a 	bne.w	2001241a <fail>
+20011966:	ee10 0a90 	vmov	r0, s1
+2001196a:	496b      	ldr	r1, [pc, #428]	@ (20011b18 <Reset_Handler+0x1ad8>)
+2001196c:	4288      	cmp	r0, r1
+2001196e:	f040 8554 	bne.w	2001241a <fail>
+20011972:	ee11 0a10 	vmov	r0, s2
+20011976:	4969      	ldr	r1, [pc, #420]	@ (20011b1c <Reset_Handler+0x1adc>)
+20011978:	4288      	cmp	r0, r1
+2001197a:	f040 854e 	bne.w	2001241a <fail>
+2001197e:	ee11 0a90 	vmov	r0, s3
+20011982:	4967      	ldr	r1, [pc, #412]	@ (20011b20 <Reset_Handler+0x1ae0>)
+20011984:	4288      	cmp	r0, r1
+20011986:	f040 8548 	bne.w	2001241a <fail>
+2001198a:	ee12 0a10 	vmov	r0, s4
+2001198e:	4965      	ldr	r1, [pc, #404]	@ (20011b24 <Reset_Handler+0x1ae4>)
+20011990:	4288      	cmp	r0, r1
+20011992:	f040 8542 	bne.w	2001241a <fail>
+20011996:	ee12 0a90 	vmov	r0, s5
+2001199a:	4963      	ldr	r1, [pc, #396]	@ (20011b28 <Reset_Handler+0x1ae8>)
+2001199c:	4288      	cmp	r0, r1
+2001199e:	f040 853c 	bne.w	2001241a <fail>
+200119a2:	ee13 0a10 	vmov	r0, s6
+200119a6:	4961      	ldr	r1, [pc, #388]	@ (20011b2c <Reset_Handler+0x1aec>)
+200119a8:	4288      	cmp	r0, r1
+200119aa:	f040 8536 	bne.w	2001241a <fail>
+200119ae:	ee13 0a90 	vmov	r0, s7
+200119b2:	495f      	ldr	r1, [pc, #380]	@ (20011b30 <Reset_Handler+0x1af0>)
+200119b4:	4288      	cmp	r0, r1
+200119b6:	f040 8530 	bne.w	2001241a <fail>
+200119ba:	ee14 0a10 	vmov	r0, s8
+200119be:	495d      	ldr	r1, [pc, #372]	@ (20011b34 <Reset_Handler+0x1af4>)
+200119c0:	4288      	cmp	r0, r1
+200119c2:	f040 852a 	bne.w	2001241a <fail>
+200119c6:	ee14 0a90 	vmov	r0, s9
+200119ca:	495b      	ldr	r1, [pc, #364]	@ (20011b38 <Reset_Handler+0x1af8>)
+200119cc:	4288      	cmp	r0, r1
+200119ce:	f040 8524 	bne.w	2001241a <fail>
+200119d2:	ee15 0a10 	vmov	r0, s10
+200119d6:	4959      	ldr	r1, [pc, #356]	@ (20011b3c <Reset_Handler+0x1afc>)
+200119d8:	4288      	cmp	r0, r1
+200119da:	f040 851e 	bne.w	2001241a <fail>
+200119de:	ee15 0a90 	vmov	r0, s11
+200119e2:	4957      	ldr	r1, [pc, #348]	@ (20011b40 <Reset_Handler+0x1b00>)
+200119e4:	4288      	cmp	r0, r1
+200119e6:	f040 8518 	bne.w	2001241a <fail>
+200119ea:	ee16 0a10 	vmov	r0, s12
+200119ee:	4955      	ldr	r1, [pc, #340]	@ (20011b44 <Reset_Handler+0x1b04>)
+200119f0:	4288      	cmp	r0, r1
+200119f2:	f040 8512 	bne.w	2001241a <fail>
+200119f6:	ee16 0a90 	vmov	r0, s13
+200119fa:	4953      	ldr	r1, [pc, #332]	@ (20011b48 <Reset_Handler+0x1b08>)
+200119fc:	4288      	cmp	r0, r1
+200119fe:	f040 850c 	bne.w	2001241a <fail>
+20011a02:	ee17 0a10 	vmov	r0, s14
+20011a06:	4951      	ldr	r1, [pc, #324]	@ (20011b4c <Reset_Handler+0x1b0c>)
+20011a08:	4288      	cmp	r0, r1
+20011a0a:	f040 8506 	bne.w	2001241a <fail>
+20011a0e:	ee17 0a90 	vmov	r0, s15
+20011a12:	494f      	ldr	r1, [pc, #316]	@ (20011b50 <Reset_Handler+0x1b10>)
+20011a14:	4288      	cmp	r0, r1
+20011a16:	f040 8500 	bne.w	2001241a <fail>
+20011a1a:	ee18 0a10 	vmov	r0, s16
+20011a1e:	494d      	ldr	r1, [pc, #308]	@ (20011b54 <Reset_Handler+0x1b14>)
+20011a20:	4288      	cmp	r0, r1
+20011a22:	f040 84fa 	bne.w	2001241a <fail>
+20011a26:	ee18 0a90 	vmov	r0, s17
+20011a2a:	494b      	ldr	r1, [pc, #300]	@ (20011b58 <Reset_Handler+0x1b18>)
+20011a2c:	4288      	cmp	r0, r1
+20011a2e:	f040 84f4 	bne.w	2001241a <fail>
+20011a32:	ee19 0a10 	vmov	r0, s18
+20011a36:	4949      	ldr	r1, [pc, #292]	@ (20011b5c <Reset_Handler+0x1b1c>)
+20011a38:	4288      	cmp	r0, r1
+20011a3a:	f040 84ee 	bne.w	2001241a <fail>
+20011a3e:	ee19 0a90 	vmov	r0, s19
+20011a42:	4947      	ldr	r1, [pc, #284]	@ (20011b60 <Reset_Handler+0x1b20>)
+20011a44:	4288      	cmp	r0, r1
+20011a46:	f040 84e8 	bne.w	2001241a <fail>
+20011a4a:	ee1a 0a10 	vmov	r0, s20
+20011a4e:	4945      	ldr	r1, [pc, #276]	@ (20011b64 <Reset_Handler+0x1b24>)
+20011a50:	4288      	cmp	r0, r1
+20011a52:	f040 84e2 	bne.w	2001241a <fail>
+20011a56:	ee1a 0a90 	vmov	r0, s21
+20011a5a:	4943      	ldr	r1, [pc, #268]	@ (20011b68 <Reset_Handler+0x1b28>)
+20011a5c:	4288      	cmp	r0, r1
+20011a5e:	f040 84dc 	bne.w	2001241a <fail>
+20011a62:	ee1b 0a10 	vmov	r0, s22
+20011a66:	4941      	ldr	r1, [pc, #260]	@ (20011b6c <Reset_Handler+0x1b2c>)
+20011a68:	4288      	cmp	r0, r1
+20011a6a:	f040 84d6 	bne.w	2001241a <fail>
+20011a6e:	ee1b 0a90 	vmov	r0, s23
+20011a72:	493f      	ldr	r1, [pc, #252]	@ (20011b70 <Reset_Handler+0x1b30>)
+20011a74:	4288      	cmp	r0, r1
+20011a76:	f040 84d0 	bne.w	2001241a <fail>
+20011a7a:	ee1c 0a10 	vmov	r0, s24
+20011a7e:	493d      	ldr	r1, [pc, #244]	@ (20011b74 <Reset_Handler+0x1b34>)
+20011a80:	4288      	cmp	r0, r1
+20011a82:	f040 84ca 	bne.w	2001241a <fail>
+20011a86:	ee1c 0a90 	vmov	r0, s25
+20011a8a:	493b      	ldr	r1, [pc, #236]	@ (20011b78 <Reset_Handler+0x1b38>)
+20011a8c:	4288      	cmp	r0, r1
+20011a8e:	f040 84c4 	bne.w	2001241a <fail>
+20011a92:	ee1d 0a10 	vmov	r0, s26
+20011a96:	4939      	ldr	r1, [pc, #228]	@ (20011b7c <Reset_Handler+0x1b3c>)
+20011a98:	4288      	cmp	r0, r1
+20011a9a:	f040 84be 	bne.w	2001241a <fail>
+20011a9e:	ee1d 0a90 	vmov	r0, s27
+20011aa2:	4937      	ldr	r1, [pc, #220]	@ (20011b80 <Reset_Handler+0x1b40>)
+20011aa4:	4288      	cmp	r0, r1
+20011aa6:	f040 84b8 	bne.w	2001241a <fail>
+20011aaa:	ee1e 0a10 	vmov	r0, s28
+20011aae:	4935      	ldr	r1, [pc, #212]	@ (20011b84 <Reset_Handler+0x1b44>)
+20011ab0:	4288      	cmp	r0, r1
+20011ab2:	f040 84b2 	bne.w	2001241a <fail>
+20011ab6:	ee1e 0a90 	vmov	r0, s29
+20011aba:	4933      	ldr	r1, [pc, #204]	@ (20011b88 <Reset_Handler+0x1b48>)
+20011abc:	4288      	cmp	r0, r1
+20011abe:	f040 84ac 	bne.w	2001241a <fail>
+20011ac2:	ee1f 0a10 	vmov	r0, s30
+20011ac6:	4931      	ldr	r1, [pc, #196]	@ (20011b8c <Reset_Handler+0x1b4c>)
+20011ac8:	4288      	cmp	r0, r1
+20011aca:	f040 84a6 	bne.w	2001241a <fail>
+20011ace:	ee1f 0a90 	vmov	r0, s31
+20011ad2:	492f      	ldr	r1, [pc, #188]	@ (20011b90 <Reset_Handler+0x1b50>)
+20011ad4:	4288      	cmp	r0, r1
+20011ad6:	f040 84a0 	bne.w	2001241a <fail>
+20011ada:	eef1 0a10 	vmrs	r0, fpscr
+20011ade:	f04f 0603 	mov.w	r6, #3
+20011ae2:	492c      	ldr	r1, [pc, #176]	@ (20011b94 <Reset_Handler+0x1b54>)
+20011ae4:	4288      	cmp	r0, r1
+20011ae6:	f040 8498 	bne.w	2001241a <fail>
+20011aea:	482c      	ldr	r0, [pc, #176]	@ (20011b9c <Reset_Handler+0x1b5c>)
+20011aec:	6a40      	ldr	r0, [r0, #36]	@ 0x24
+20011aee:	f04f 061e 	mov.w	r6, #30
+20011af2:	f06f 011e 	mvn.w	r1, #30
+20011af6:	4288      	cmp	r0, r1
+20011af8:	f040 848f 	bne.w	2001241a <fail>
+20011afc:	4827      	ldr	r0, [pc, #156]	@ (20011b9c <Reset_Handler+0x1b5c>)
+20011afe:	6ac0      	ldr	r0, [r0, #44]	@ 0x2c
+20011b00:	f04f 0620 	mov.w	r6, #32
+20011b04:	f04f 0101 	mov.w	r1, #1
+20011b08:	4288      	cmp	r0, r1
+20011b0a:	f040 8486 	bne.w	2001241a <fail>
+20011b0e:	e047      	b.n	20011ba0 <Reset_Handler+0x1b60>
+20011b10:	e000ef34 	.word	0xe000ef34
+20011b14:	20000280 	.word	0x20000280
+20011b18:	47010001 	.word	0x47010001
+20011b1c:	47020002 	.word	0x47020002
+20011b20:	47030003 	.word	0x47030003
+20011b24:	47040004 	.word	0x47040004
+20011b28:	47050005 	.word	0x47050005
+20011b2c:	47060006 	.word	0x47060006
+20011b30:	47070007 	.word	0x47070007
+20011b34:	47080008 	.word	0x47080008
+20011b38:	47090009 	.word	0x47090009
+20011b3c:	470a000a 	.word	0x470a000a
+20011b40:	470b000b 	.word	0x470b000b
+20011b44:	470c000c 	.word	0x470c000c
+20011b48:	470d000d 	.word	0x470d000d
+20011b4c:	470e000e 	.word	0x470e000e
+20011b50:	470f000f 	.word	0x470f000f
+20011b54:	47100010 	.word	0x47100010
+20011b58:	47110011 	.word	0x47110011
+20011b5c:	47120012 	.word	0x47120012
+20011b60:	47130013 	.word	0x47130013
+20011b64:	47140014 	.word	0x47140014
+20011b68:	47150015 	.word	0x47150015
+20011b6c:	47160016 	.word	0x47160016
+20011b70:	47170017 	.word	0x47170017
+20011b74:	47180018 	.word	0x47180018
+20011b78:	47190019 	.word	0x47190019
+20011b7c:	471a001a 	.word	0x471a001a
+20011b80:	471b001b 	.word	0x471b001b
+20011b84:	471c001c 	.word	0x471c001c
+20011b88:	471d001d 	.word	0x471d001d
+20011b8c:	471e001e 	.word	0x471e001e
+20011b90:	471f001f 	.word	0x471f001f
+20011b94:	6340009f 	.word	0x6340009f
+20011b98:	e000ed04 	.word	0xe000ed04
+20011b9c:	20000200 	.word	0x20000200
+20011ba0:	2708      	movs	r7, #8
+20011ba2:	48b4      	ldr	r0, [pc, #720]	@ (20011e74 <Reset_Handler+0x1e34>)
+20011ba4:	f04f 4140 	mov.w	r1, #3221225472	@ 0xc0000000
+20011ba8:	6001      	str	r1, [r0, #0]
+20011baa:	f3bf 8f4f 	dsb	sy
+20011bae:	f3bf 8f6f 	isb	sy
+20011bb2:	48b1      	ldr	r0, [pc, #708]	@ (20011e78 <Reset_Handler+0x1e38>)
+20011bb4:	2101      	movs	r1, #1
+20011bb6:	6001      	str	r1, [r0, #0]
+20011bb8:	48b0      	ldr	r0, [pc, #704]	@ (20011e7c <Reset_Handler+0x1e3c>)
+20011bba:	6801      	ldr	r1, [r0, #0]
+20011bbc:	f421 7100 	bic.w	r1, r1, #512	@ 0x200
+20011bc0:	6001      	str	r1, [r0, #0]
+20011bc2:	b081      	sub	sp, #4
+20011bc4:	46e8      	mov	r8, sp
+20011bc6:	f04f 4090 	mov.w	r0, #1207959552	@ 0x48000000
+20011bca:	ee00 0a10 	vmov	s0, r0
+20011bce:	48ac      	ldr	r0, [pc, #688]	@ (20011e80 <Reset_Handler+0x1e40>)
+20011bd0:	ee00 0a90 	vmov	s1, r0
+20011bd4:	48ab      	ldr	r0, [pc, #684]	@ (20011e84 <Reset_Handler+0x1e44>)
+20011bd6:	ee01 0a10 	vmov	s2, r0
+20011bda:	48ab      	ldr	r0, [pc, #684]	@ (20011e88 <Reset_Handler+0x1e48>)
+20011bdc:	ee01 0a90 	vmov	s3, r0
+20011be0:	48aa      	ldr	r0, [pc, #680]	@ (20011e8c <Reset_Handler+0x1e4c>)
+20011be2:	ee02 0a10 	vmov	s4, r0
+20011be6:	48aa      	ldr	r0, [pc, #680]	@ (20011e90 <Reset_Handler+0x1e50>)
+20011be8:	ee02 0a90 	vmov	s5, r0
+20011bec:	48a9      	ldr	r0, [pc, #676]	@ (20011e94 <Reset_Handler+0x1e54>)
+20011bee:	ee03 0a10 	vmov	s6, r0
+20011bf2:	48a9      	ldr	r0, [pc, #676]	@ (20011e98 <Reset_Handler+0x1e58>)
+20011bf4:	ee03 0a90 	vmov	s7, r0
+20011bf8:	48a8      	ldr	r0, [pc, #672]	@ (20011e9c <Reset_Handler+0x1e5c>)
+20011bfa:	ee04 0a10 	vmov	s8, r0
+20011bfe:	48a8      	ldr	r0, [pc, #672]	@ (20011ea0 <Reset_Handler+0x1e60>)
+20011c00:	ee04 0a90 	vmov	s9, r0
+20011c04:	48a7      	ldr	r0, [pc, #668]	@ (20011ea4 <Reset_Handler+0x1e64>)
+20011c06:	ee05 0a10 	vmov	s10, r0
+20011c0a:	48a7      	ldr	r0, [pc, #668]	@ (20011ea8 <Reset_Handler+0x1e68>)
+20011c0c:	ee05 0a90 	vmov	s11, r0
+20011c10:	48a6      	ldr	r0, [pc, #664]	@ (20011eac <Reset_Handler+0x1e6c>)
+20011c12:	ee06 0a10 	vmov	s12, r0
+20011c16:	48a6      	ldr	r0, [pc, #664]	@ (20011eb0 <Reset_Handler+0x1e70>)
+20011c18:	ee06 0a90 	vmov	s13, r0
+20011c1c:	48a5      	ldr	r0, [pc, #660]	@ (20011eb4 <Reset_Handler+0x1e74>)
+20011c1e:	ee07 0a10 	vmov	s14, r0
+20011c22:	48a5      	ldr	r0, [pc, #660]	@ (20011eb8 <Reset_Handler+0x1e78>)
+20011c24:	ee07 0a90 	vmov	s15, r0
+20011c28:	48a4      	ldr	r0, [pc, #656]	@ (20011ebc <Reset_Handler+0x1e7c>)
+20011c2a:	ee08 0a10 	vmov	s16, r0
+20011c2e:	48a4      	ldr	r0, [pc, #656]	@ (20011ec0 <Reset_Handler+0x1e80>)
+20011c30:	ee08 0a90 	vmov	s17, r0
+20011c34:	48a3      	ldr	r0, [pc, #652]	@ (20011ec4 <Reset_Handler+0x1e84>)
+20011c36:	ee09 0a10 	vmov	s18, r0
+20011c3a:	48a3      	ldr	r0, [pc, #652]	@ (20011ec8 <Reset_Handler+0x1e88>)
+20011c3c:	ee09 0a90 	vmov	s19, r0
+20011c40:	48a2      	ldr	r0, [pc, #648]	@ (20011ecc <Reset_Handler+0x1e8c>)
+20011c42:	ee0a 0a10 	vmov	s20, r0
+20011c46:	48a2      	ldr	r0, [pc, #648]	@ (20011ed0 <Reset_Handler+0x1e90>)
+20011c48:	ee0a 0a90 	vmov	s21, r0
+20011c4c:	48a1      	ldr	r0, [pc, #644]	@ (20011ed4 <Reset_Handler+0x1e94>)
+20011c4e:	ee0b 0a10 	vmov	s22, r0
+20011c52:	48a1      	ldr	r0, [pc, #644]	@ (20011ed8 <Reset_Handler+0x1e98>)
+20011c54:	ee0b 0a90 	vmov	s23, r0
+20011c58:	48a0      	ldr	r0, [pc, #640]	@ (20011edc <Reset_Handler+0x1e9c>)
+20011c5a:	ee0c 0a10 	vmov	s24, r0
+20011c5e:	48a0      	ldr	r0, [pc, #640]	@ (20011ee0 <Reset_Handler+0x1ea0>)
+20011c60:	ee0c 0a90 	vmov	s25, r0
+20011c64:	489f      	ldr	r0, [pc, #636]	@ (20011ee4 <Reset_Handler+0x1ea4>)
+20011c66:	ee0d 0a10 	vmov	s26, r0
+20011c6a:	489f      	ldr	r0, [pc, #636]	@ (20011ee8 <Reset_Handler+0x1ea8>)
+20011c6c:	ee0d 0a90 	vmov	s27, r0
+20011c70:	489e      	ldr	r0, [pc, #632]	@ (20011eec <Reset_Handler+0x1eac>)
+20011c72:	ee0e 0a10 	vmov	s28, r0
+20011c76:	489e      	ldr	r0, [pc, #632]	@ (20011ef0 <Reset_Handler+0x1eb0>)
+20011c78:	ee0e 0a90 	vmov	s29, r0
+20011c7c:	489d      	ldr	r0, [pc, #628]	@ (20011ef4 <Reset_Handler+0x1eb4>)
+20011c7e:	ee0f 0a10 	vmov	s30, r0
+20011c82:	489d      	ldr	r0, [pc, #628]	@ (20011ef8 <Reset_Handler+0x1eb8>)
+20011c84:	ee0f 0a90 	vmov	s31, r0
+20011c88:	489c      	ldr	r0, [pc, #624]	@ (20011efc <Reset_Handler+0x1ebc>)
+20011c8a:	eee1 0a10 	vmsr	fpscr, r0
+20011c8e:	489c      	ldr	r0, [pc, #624]	@ (20011f00 <Reset_Handler+0x1ec0>)
+20011c90:	f04f 5180 	mov.w	r1, #268435456	@ 0x10000000
+20011c94:	6001      	str	r1, [r0, #0]
+20011c96:	f3bf 8f4f 	dsb	sy
+20011c9a:	f3bf 8f6f 	isb	sy
+20011c9e:	f04f 0601 	mov.w	r6, #1
+20011ca2:	45c5      	cmp	sp, r8
+20011ca4:	f040 83b9 	bne.w	2001241a <fail>
+20011ca8:	f04f 0602 	mov.w	r6, #2
+20011cac:	ee10 0a10 	vmov	r0, s0
+20011cb0:	f04f 4190 	mov.w	r1, #1207959552	@ 0x48000000
+20011cb4:	4288      	cmp	r0, r1
+20011cb6:	f040 83b0 	bne.w	2001241a <fail>
+20011cba:	ee10 0a90 	vmov	r0, s1
+20011cbe:	4970      	ldr	r1, [pc, #448]	@ (20011e80 <Reset_Handler+0x1e40>)
+20011cc0:	4288      	cmp	r0, r1
+20011cc2:	f040 83aa 	bne.w	2001241a <fail>
+20011cc6:	ee11 0a10 	vmov	r0, s2
+20011cca:	496e      	ldr	r1, [pc, #440]	@ (20011e84 <Reset_Handler+0x1e44>)
+20011ccc:	4288      	cmp	r0, r1
+20011cce:	f040 83a4 	bne.w	2001241a <fail>
+20011cd2:	ee11 0a90 	vmov	r0, s3
+20011cd6:	496c      	ldr	r1, [pc, #432]	@ (20011e88 <Reset_Handler+0x1e48>)
+20011cd8:	4288      	cmp	r0, r1
+20011cda:	f040 839e 	bne.w	2001241a <fail>
+20011cde:	ee12 0a10 	vmov	r0, s4
+20011ce2:	496a      	ldr	r1, [pc, #424]	@ (20011e8c <Reset_Handler+0x1e4c>)
+20011ce4:	4288      	cmp	r0, r1
+20011ce6:	f040 8398 	bne.w	2001241a <fail>
+20011cea:	ee12 0a90 	vmov	r0, s5
+20011cee:	4968      	ldr	r1, [pc, #416]	@ (20011e90 <Reset_Handler+0x1e50>)
+20011cf0:	4288      	cmp	r0, r1
+20011cf2:	f040 8392 	bne.w	2001241a <fail>
+20011cf6:	ee13 0a10 	vmov	r0, s6
+20011cfa:	4966      	ldr	r1, [pc, #408]	@ (20011e94 <Reset_Handler+0x1e54>)
+20011cfc:	4288      	cmp	r0, r1
+20011cfe:	f040 838c 	bne.w	2001241a <fail>
+20011d02:	ee13 0a90 	vmov	r0, s7
+20011d06:	4964      	ldr	r1, [pc, #400]	@ (20011e98 <Reset_Handler+0x1e58>)
+20011d08:	4288      	cmp	r0, r1
+20011d0a:	f040 8386 	bne.w	2001241a <fail>
+20011d0e:	ee14 0a10 	vmov	r0, s8
+20011d12:	4962      	ldr	r1, [pc, #392]	@ (20011e9c <Reset_Handler+0x1e5c>)
+20011d14:	4288      	cmp	r0, r1
+20011d16:	f040 8380 	bne.w	2001241a <fail>
+20011d1a:	ee14 0a90 	vmov	r0, s9
+20011d1e:	4960      	ldr	r1, [pc, #384]	@ (20011ea0 <Reset_Handler+0x1e60>)
+20011d20:	4288      	cmp	r0, r1
+20011d22:	f040 837a 	bne.w	2001241a <fail>
+20011d26:	ee15 0a10 	vmov	r0, s10
+20011d2a:	495e      	ldr	r1, [pc, #376]	@ (20011ea4 <Reset_Handler+0x1e64>)
+20011d2c:	4288      	cmp	r0, r1
+20011d2e:	f040 8374 	bne.w	2001241a <fail>
+20011d32:	ee15 0a90 	vmov	r0, s11
+20011d36:	495c      	ldr	r1, [pc, #368]	@ (20011ea8 <Reset_Handler+0x1e68>)
+20011d38:	4288      	cmp	r0, r1
+20011d3a:	f040 836e 	bne.w	2001241a <fail>
+20011d3e:	ee16 0a10 	vmov	r0, s12
+20011d42:	495a      	ldr	r1, [pc, #360]	@ (20011eac <Reset_Handler+0x1e6c>)
+20011d44:	4288      	cmp	r0, r1
+20011d46:	f040 8368 	bne.w	2001241a <fail>
+20011d4a:	ee16 0a90 	vmov	r0, s13
+20011d4e:	4958      	ldr	r1, [pc, #352]	@ (20011eb0 <Reset_Handler+0x1e70>)
+20011d50:	4288      	cmp	r0, r1
+20011d52:	f040 8362 	bne.w	2001241a <fail>
+20011d56:	ee17 0a10 	vmov	r0, s14
+20011d5a:	4956      	ldr	r1, [pc, #344]	@ (20011eb4 <Reset_Handler+0x1e74>)
+20011d5c:	4288      	cmp	r0, r1
+20011d5e:	f040 835c 	bne.w	2001241a <fail>
+20011d62:	ee17 0a90 	vmov	r0, s15
+20011d66:	4954      	ldr	r1, [pc, #336]	@ (20011eb8 <Reset_Handler+0x1e78>)
+20011d68:	4288      	cmp	r0, r1
+20011d6a:	f040 8356 	bne.w	2001241a <fail>
+20011d6e:	ee18 0a10 	vmov	r0, s16
+20011d72:	4952      	ldr	r1, [pc, #328]	@ (20011ebc <Reset_Handler+0x1e7c>)
+20011d74:	4288      	cmp	r0, r1
+20011d76:	f040 8350 	bne.w	2001241a <fail>
+20011d7a:	ee18 0a90 	vmov	r0, s17
+20011d7e:	4950      	ldr	r1, [pc, #320]	@ (20011ec0 <Reset_Handler+0x1e80>)
+20011d80:	4288      	cmp	r0, r1
+20011d82:	f040 834a 	bne.w	2001241a <fail>
+20011d86:	ee19 0a10 	vmov	r0, s18
+20011d8a:	494e      	ldr	r1, [pc, #312]	@ (20011ec4 <Reset_Handler+0x1e84>)
+20011d8c:	4288      	cmp	r0, r1
+20011d8e:	f040 8344 	bne.w	2001241a <fail>
+20011d92:	ee19 0a90 	vmov	r0, s19
+20011d96:	494c      	ldr	r1, [pc, #304]	@ (20011ec8 <Reset_Handler+0x1e88>)
+20011d98:	4288      	cmp	r0, r1
+20011d9a:	f040 833e 	bne.w	2001241a <fail>
+20011d9e:	ee1a 0a10 	vmov	r0, s20
+20011da2:	494a      	ldr	r1, [pc, #296]	@ (20011ecc <Reset_Handler+0x1e8c>)
+20011da4:	4288      	cmp	r0, r1
+20011da6:	f040 8338 	bne.w	2001241a <fail>
+20011daa:	ee1a 0a90 	vmov	r0, s21
+20011dae:	4948      	ldr	r1, [pc, #288]	@ (20011ed0 <Reset_Handler+0x1e90>)
+20011db0:	4288      	cmp	r0, r1
+20011db2:	f040 8332 	bne.w	2001241a <fail>
+20011db6:	ee1b 0a10 	vmov	r0, s22
+20011dba:	4946      	ldr	r1, [pc, #280]	@ (20011ed4 <Reset_Handler+0x1e94>)
+20011dbc:	4288      	cmp	r0, r1
+20011dbe:	f040 832c 	bne.w	2001241a <fail>
+20011dc2:	ee1b 0a90 	vmov	r0, s23
+20011dc6:	4944      	ldr	r1, [pc, #272]	@ (20011ed8 <Reset_Handler+0x1e98>)
+20011dc8:	4288      	cmp	r0, r1
+20011dca:	f040 8326 	bne.w	2001241a <fail>
+20011dce:	ee1c 0a10 	vmov	r0, s24
+20011dd2:	4942      	ldr	r1, [pc, #264]	@ (20011edc <Reset_Handler+0x1e9c>)
+20011dd4:	4288      	cmp	r0, r1
+20011dd6:	f040 8320 	bne.w	2001241a <fail>
+20011dda:	ee1c 0a90 	vmov	r0, s25
+20011dde:	4940      	ldr	r1, [pc, #256]	@ (20011ee0 <Reset_Handler+0x1ea0>)
+20011de0:	4288      	cmp	r0, r1
+20011de2:	f040 831a 	bne.w	2001241a <fail>
+20011de6:	ee1d 0a10 	vmov	r0, s26
+20011dea:	493e      	ldr	r1, [pc, #248]	@ (20011ee4 <Reset_Handler+0x1ea4>)
+20011dec:	4288      	cmp	r0, r1
+20011dee:	f040 8314 	bne.w	2001241a <fail>
+20011df2:	ee1d 0a90 	vmov	r0, s27
+20011df6:	493c      	ldr	r1, [pc, #240]	@ (20011ee8 <Reset_Handler+0x1ea8>)
+20011df8:	4288      	cmp	r0, r1
+20011dfa:	f040 830e 	bne.w	2001241a <fail>
+20011dfe:	ee1e 0a10 	vmov	r0, s28
+20011e02:	493a      	ldr	r1, [pc, #232]	@ (20011eec <Reset_Handler+0x1eac>)
+20011e04:	4288      	cmp	r0, r1
+20011e06:	f040 8308 	bne.w	2001241a <fail>
+20011e0a:	ee1e 0a90 	vmov	r0, s29
+20011e0e:	4938      	ldr	r1, [pc, #224]	@ (20011ef0 <Reset_Handler+0x1eb0>)
+20011e10:	4288      	cmp	r0, r1
+20011e12:	f040 8302 	bne.w	2001241a <fail>
+20011e16:	ee1f 0a10 	vmov	r0, s30
+20011e1a:	4936      	ldr	r1, [pc, #216]	@ (20011ef4 <Reset_Handler+0x1eb4>)
+20011e1c:	4288      	cmp	r0, r1
+20011e1e:	f040 82fc 	bne.w	2001241a <fail>
+20011e22:	ee1f 0a90 	vmov	r0, s31
+20011e26:	4934      	ldr	r1, [pc, #208]	@ (20011ef8 <Reset_Handler+0x1eb8>)
+20011e28:	4288      	cmp	r0, r1
+20011e2a:	f040 82f6 	bne.w	2001241a <fail>
+20011e2e:	eef1 0a10 	vmrs	r0, fpscr
+20011e32:	f04f 0603 	mov.w	r6, #3
+20011e36:	4931      	ldr	r1, [pc, #196]	@ (20011efc <Reset_Handler+0x1ebc>)
+20011e38:	4288      	cmp	r0, r1
+20011e3a:	f040 82ee 	bne.w	2001241a <fail>
+20011e3e:	4831      	ldr	r0, [pc, #196]	@ (20011f04 <Reset_Handler+0x1ec4>)
+20011e40:	6840      	ldr	r0, [r0, #4]
+20011e42:	f1a8 096c 	sub.w	r9, r8, #108	@ 0x6c
+20011e46:	f04f 060b 	mov.w	r6, #11
+20011e4a:	4548      	cmp	r0, r9
+20011e4c:	f040 82e5 	bne.w	2001241a <fail>
+20011e50:	482c      	ldr	r0, [pc, #176]	@ (20011f04 <Reset_Handler+0x1ec4>)
+20011e52:	6a00      	ldr	r0, [r0, #32]
+20011e54:	f400 7000 	and.w	r0, r0, #512	@ 0x200
+20011e58:	f04f 0616 	mov.w	r6, #22
+20011e5c:	f44f 7100 	mov.w	r1, #512	@ 0x200
+20011e60:	4288      	cmp	r0, r1
+20011e62:	f040 82da 	bne.w	2001241a <fail>
+20011e66:	b001      	add	sp, #4
+20011e68:	4804      	ldr	r0, [pc, #16]	@ (20011e7c <Reset_Handler+0x1e3c>)
+20011e6a:	6801      	ldr	r1, [r0, #0]
+20011e6c:	f441 7100 	orr.w	r1, r1, #512	@ 0x200
+20011e70:	6001      	str	r1, [r0, #0]
+20011e72:	e049      	b.n	20011f08 <Reset_Handler+0x1ec8>
+20011e74:	e000ef34 	.word	0xe000ef34
+20011e78:	20000280 	.word	0x20000280
+20011e7c:	e000ed14 	.word	0xe000ed14
+20011e80:	48010001 	.word	0x48010001
+20011e84:	48020002 	.word	0x48020002
+20011e88:	48030003 	.word	0x48030003
+20011e8c:	48040004 	.word	0x48040004
+20011e90:	48050005 	.word	0x48050005
+20011e94:	48060006 	.word	0x48060006
+20011e98:	48070007 	.word	0x48070007
+20011e9c:	48080008 	.word	0x48080008
+20011ea0:	48090009 	.word	0x48090009
+20011ea4:	480a000a 	.word	0x480a000a
+20011ea8:	480b000b 	.word	0x480b000b
+20011eac:	480c000c 	.word	0x480c000c
+20011eb0:	480d000d 	.word	0x480d000d
+20011eb4:	480e000e 	.word	0x480e000e
+20011eb8:	480f000f 	.word	0x480f000f
+20011ebc:	48100010 	.word	0x48100010
+20011ec0:	48110011 	.word	0x48110011
+20011ec4:	48120012 	.word	0x48120012
+20011ec8:	48130013 	.word	0x48130013
+20011ecc:	48140014 	.word	0x48140014
+20011ed0:	48150015 	.word	0x48150015
+20011ed4:	48160016 	.word	0x48160016
+20011ed8:	48170017 	.word	0x48170017
+20011edc:	48180018 	.word	0x48180018
+20011ee0:	48190019 	.word	0x48190019
+20011ee4:	481a001a 	.word	0x481a001a
+20011ee8:	481b001b 	.word	0x481b001b
+20011eec:	481c001c 	.word	0x481c001c
+20011ef0:	481d001d 	.word	0x481d001d
+20011ef4:	481e001e 	.word	0x481e001e
+20011ef8:	481f001f 	.word	0x481f001f
+20011efc:	6340009f 	.word	0x6340009f
+20011f00:	e000ed04 	.word	0xe000ed04
+20011f04:	20000200 	.word	0x20000200
+20011f08:	2709      	movs	r7, #9
+20011f0a:	486a      	ldr	r0, [pc, #424]	@ (200120b4 <Reset_Handler+0x2074>)
+20011f0c:	f04f 0100 	mov.w	r1, #0
+20011f10:	6001      	str	r1, [r0, #0]
+20011f12:	f3bf 8f4f 	dsb	sy
+20011f16:	f3bf 8f6f 	isb	sy
+20011f1a:	4867      	ldr	r0, [pc, #412]	@ (200120b8 <Reset_Handler+0x2078>)
+20011f1c:	2101      	movs	r1, #1
+20011f1e:	6001      	str	r1, [r0, #0]
+20011f20:	f3ef 8014 	mrs	r0, CONTROL
+20011f24:	f020 0004 	bic.w	r0, r0, #4
+20011f28:	f380 8814 	msr	CONTROL, r0
+20011f2c:	f3bf 8f6f 	isb	sy
+20011f30:	4862      	ldr	r0, [pc, #392]	@ (200120bc <Reset_Handler+0x207c>)
+20011f32:	ee08 0a10 	vmov	s16, r0
+20011f36:	4862      	ldr	r0, [pc, #392]	@ (200120c0 <Reset_Handler+0x2080>)
+20011f38:	ee08 0a90 	vmov	s17, r0
+20011f3c:	4861      	ldr	r0, [pc, #388]	@ (200120c4 <Reset_Handler+0x2084>)
+20011f3e:	ee09 0a10 	vmov	s18, r0
+20011f42:	4861      	ldr	r0, [pc, #388]	@ (200120c8 <Reset_Handler+0x2088>)
+20011f44:	ee09 0a90 	vmov	s19, r0
+20011f48:	4860      	ldr	r0, [pc, #384]	@ (200120cc <Reset_Handler+0x208c>)
+20011f4a:	ee0a 0a10 	vmov	s20, r0
+20011f4e:	4860      	ldr	r0, [pc, #384]	@ (200120d0 <Reset_Handler+0x2090>)
+20011f50:	ee0a 0a90 	vmov	s21, r0
+20011f54:	485f      	ldr	r0, [pc, #380]	@ (200120d4 <Reset_Handler+0x2094>)
+20011f56:	ee0b 0a10 	vmov	s22, r0
+20011f5a:	485f      	ldr	r0, [pc, #380]	@ (200120d8 <Reset_Handler+0x2098>)
+20011f5c:	ee0b 0a90 	vmov	s23, r0
+20011f60:	485e      	ldr	r0, [pc, #376]	@ (200120dc <Reset_Handler+0x209c>)
+20011f62:	ee0c 0a10 	vmov	s24, r0
+20011f66:	485e      	ldr	r0, [pc, #376]	@ (200120e0 <Reset_Handler+0x20a0>)
+20011f68:	ee0c 0a90 	vmov	s25, r0
+20011f6c:	485d      	ldr	r0, [pc, #372]	@ (200120e4 <Reset_Handler+0x20a4>)
+20011f6e:	ee0d 0a10 	vmov	s26, r0
+20011f72:	485d      	ldr	r0, [pc, #372]	@ (200120e8 <Reset_Handler+0x20a8>)
+20011f74:	ee0d 0a90 	vmov	s27, r0
+20011f78:	485c      	ldr	r0, [pc, #368]	@ (200120ec <Reset_Handler+0x20ac>)
+20011f7a:	ee0e 0a10 	vmov	s28, r0
+20011f7e:	485c      	ldr	r0, [pc, #368]	@ (200120f0 <Reset_Handler+0x20b0>)
+20011f80:	ee0e 0a90 	vmov	s29, r0
+20011f84:	485b      	ldr	r0, [pc, #364]	@ (200120f4 <Reset_Handler+0x20b4>)
+20011f86:	ee0f 0a10 	vmov	s30, r0
+20011f8a:	485b      	ldr	r0, [pc, #364]	@ (200120f8 <Reset_Handler+0x20b8>)
+20011f8c:	ee0f 0a90 	vmov	s31, r0
+20011f90:	f3ef 8014 	mrs	r0, CONTROL
+20011f94:	f000 0004 	and.w	r0, r0, #4
+20011f98:	f04f 0617 	mov.w	r6, #23
+20011f9c:	f04f 0100 	mov.w	r1, #0
+20011fa0:	4288      	cmp	r0, r1
+20011fa2:	f040 823a 	bne.w	2001241a <fail>
+20011fa6:	46e8      	mov	r8, sp
+20011fa8:	4854      	ldr	r0, [pc, #336]	@ (200120fc <Reset_Handler+0x20bc>)
+20011faa:	f04f 5180 	mov.w	r1, #268435456	@ 0x10000000
+20011fae:	6001      	str	r1, [r0, #0]
+20011fb0:	f3bf 8f4f 	dsb	sy
+20011fb4:	f3bf 8f6f 	isb	sy
+20011fb8:	4851      	ldr	r0, [pc, #324]	@ (20012100 <Reset_Handler+0x20c0>)
+20011fba:	6800      	ldr	r0, [r0, #0]
+20011fbc:	f04f 060a 	mov.w	r6, #10
+20011fc0:	f06f 0106 	mvn.w	r1, #6
+20011fc4:	4288      	cmp	r0, r1
+20011fc6:	f040 8228 	bne.w	2001241a <fail>
+20011fca:	484d      	ldr	r0, [pc, #308]	@ (20012100 <Reset_Handler+0x20c0>)
+20011fcc:	6840      	ldr	r0, [r0, #4]
+20011fce:	f1a8 0920 	sub.w	r9, r8, #32
+20011fd2:	f04f 060b 	mov.w	r6, #11
+20011fd6:	4548      	cmp	r0, r9
+20011fd8:	f040 821f 	bne.w	2001241a <fail>
+20011fdc:	f04f 0602 	mov.w	r6, #2
+20011fe0:	ee18 0a10 	vmov	r0, s16
+20011fe4:	4935      	ldr	r1, [pc, #212]	@ (200120bc <Reset_Handler+0x207c>)
+20011fe6:	4288      	cmp	r0, r1
+20011fe8:	f040 8217 	bne.w	2001241a <fail>
+20011fec:	ee18 0a90 	vmov	r0, s17
+20011ff0:	4933      	ldr	r1, [pc, #204]	@ (200120c0 <Reset_Handler+0x2080>)
+20011ff2:	4288      	cmp	r0, r1
+20011ff4:	f040 8211 	bne.w	2001241a <fail>
+20011ff8:	ee19 0a10 	vmov	r0, s18
+20011ffc:	4931      	ldr	r1, [pc, #196]	@ (200120c4 <Reset_Handler+0x2084>)
+20011ffe:	4288      	cmp	r0, r1
+20012000:	f040 820b 	bne.w	2001241a <fail>
+20012004:	ee19 0a90 	vmov	r0, s19
+20012008:	492f      	ldr	r1, [pc, #188]	@ (200120c8 <Reset_Handler+0x2088>)
+2001200a:	4288      	cmp	r0, r1
+2001200c:	f040 8205 	bne.w	2001241a <fail>
+20012010:	ee1a 0a10 	vmov	r0, s20
+20012014:	492d      	ldr	r1, [pc, #180]	@ (200120cc <Reset_Handler+0x208c>)
+20012016:	4288      	cmp	r0, r1
+20012018:	f040 81ff 	bne.w	2001241a <fail>
+2001201c:	ee1a 0a90 	vmov	r0, s21
+20012020:	492b      	ldr	r1, [pc, #172]	@ (200120d0 <Reset_Handler+0x2090>)
+20012022:	4288      	cmp	r0, r1
+20012024:	f040 81f9 	bne.w	2001241a <fail>
+20012028:	ee1b 0a10 	vmov	r0, s22
+2001202c:	4929      	ldr	r1, [pc, #164]	@ (200120d4 <Reset_Handler+0x2094>)
+2001202e:	4288      	cmp	r0, r1
+20012030:	f040 81f3 	bne.w	2001241a <fail>
+20012034:	ee1b 0a90 	vmov	r0, s23
+20012038:	4927      	ldr	r1, [pc, #156]	@ (200120d8 <Reset_Handler+0x2098>)
+2001203a:	4288      	cmp	r0, r1
+2001203c:	f040 81ed 	bne.w	2001241a <fail>
+20012040:	ee1c 0a10 	vmov	r0, s24
+20012044:	4925      	ldr	r1, [pc, #148]	@ (200120dc <Reset_Handler+0x209c>)
+20012046:	4288      	cmp	r0, r1
+20012048:	f040 81e7 	bne.w	2001241a <fail>
+2001204c:	ee1c 0a90 	vmov	r0, s25
+20012050:	4923      	ldr	r1, [pc, #140]	@ (200120e0 <Reset_Handler+0x20a0>)
+20012052:	4288      	cmp	r0, r1
+20012054:	f040 81e1 	bne.w	2001241a <fail>
+20012058:	ee1d 0a10 	vmov	r0, s26
+2001205c:	4921      	ldr	r1, [pc, #132]	@ (200120e4 <Reset_Handler+0x20a4>)
+2001205e:	4288      	cmp	r0, r1
+20012060:	f040 81db 	bne.w	2001241a <fail>
+20012064:	ee1d 0a90 	vmov	r0, s27
+20012068:	491f      	ldr	r1, [pc, #124]	@ (200120e8 <Reset_Handler+0x20a8>)
+2001206a:	4288      	cmp	r0, r1
+2001206c:	f040 81d5 	bne.w	2001241a <fail>
+20012070:	ee1e 0a10 	vmov	r0, s28
+20012074:	491d      	ldr	r1, [pc, #116]	@ (200120ec <Reset_Handler+0x20ac>)
+20012076:	4288      	cmp	r0, r1
+20012078:	f040 81cf 	bne.w	2001241a <fail>
+2001207c:	ee1e 0a90 	vmov	r0, s29
+20012080:	491b      	ldr	r1, [pc, #108]	@ (200120f0 <Reset_Handler+0x20b0>)
+20012082:	4288      	cmp	r0, r1
+20012084:	f040 81c9 	bne.w	2001241a <fail>
+20012088:	ee1f 0a10 	vmov	r0, s30
+2001208c:	4919      	ldr	r1, [pc, #100]	@ (200120f4 <Reset_Handler+0x20b4>)
+2001208e:	4288      	cmp	r0, r1
+20012090:	f040 81c3 	bne.w	2001241a <fail>
+20012094:	ee1f 0a90 	vmov	r0, s31
+20012098:	4917      	ldr	r1, [pc, #92]	@ (200120f8 <Reset_Handler+0x20b8>)
+2001209a:	4288      	cmp	r0, r1
+2001209c:	f040 81bd 	bne.w	2001241a <fail>
+200120a0:	4804      	ldr	r0, [pc, #16]	@ (200120b4 <Reset_Handler+0x2074>)
+200120a2:	f04f 4140 	mov.w	r1, #3221225472	@ 0xc0000000
+200120a6:	6001      	str	r1, [r0, #0]
+200120a8:	f3bf 8f4f 	dsb	sy
+200120ac:	f3bf 8f6f 	isb	sy
+200120b0:	e028      	b.n	20012104 <Reset_Handler+0x20c4>
+200120b2:	0000      	.short	0x0000
+200120b4:	e000ef34 	.word	0xe000ef34
+200120b8:	20000280 	.word	0x20000280
+200120bc:	49100010 	.word	0x49100010
+200120c0:	49110011 	.word	0x49110011
+200120c4:	49120012 	.word	0x49120012
+200120c8:	49130013 	.word	0x49130013
+200120cc:	49140014 	.word	0x49140014
+200120d0:	49150015 	.word	0x49150015
+200120d4:	49160016 	.word	0x49160016
+200120d8:	49170017 	.word	0x49170017
+200120dc:	49180018 	.word	0x49180018
+200120e0:	49190019 	.word	0x49190019
+200120e4:	491a001a 	.word	0x491a001a
+200120e8:	491b001b 	.word	0x491b001b
+200120ec:	491c001c 	.word	0x491c001c
+200120f0:	491d001d 	.word	0x491d001d
+200120f4:	491e001e 	.word	0x491e001e
+200120f8:	491f001f 	.word	0x491f001f
+200120fc:	e000ed04 	.word	0xe000ed04
+20012100:	20000200 	.word	0x20000200
+20012104:	270a      	movs	r7, #10
+20012106:	489f      	ldr	r0, [pc, #636]	@ (20012384 <Reset_Handler+0x2344>)
+20012108:	f04f 4140 	mov.w	r1, #3221225472	@ 0xc0000000
+2001210c:	6001      	str	r1, [r0, #0]
+2001210e:	f3bf 8f4f 	dsb	sy
+20012112:	f3bf 8f6f 	isb	sy
+20012116:	489c      	ldr	r0, [pc, #624]	@ (20012388 <Reset_Handler+0x2348>)
+20012118:	2104      	movs	r1, #4
+2001211a:	6001      	str	r1, [r0, #0]
+2001211c:	46e8      	mov	r8, sp
+2001211e:	f04f 4094 	mov.w	r0, #1241513984	@ 0x4a000000
+20012122:	ee00 0a10 	vmov	s0, r0
+20012126:	4899      	ldr	r0, [pc, #612]	@ (2001238c <Reset_Handler+0x234c>)
+20012128:	ee00 0a90 	vmov	s1, r0
+2001212c:	4898      	ldr	r0, [pc, #608]	@ (20012390 <Reset_Handler+0x2350>)
+2001212e:	ee01 0a10 	vmov	s2, r0
+20012132:	4898      	ldr	r0, [pc, #608]	@ (20012394 <Reset_Handler+0x2354>)
+20012134:	ee01 0a90 	vmov	s3, r0
+20012138:	4897      	ldr	r0, [pc, #604]	@ (20012398 <Reset_Handler+0x2358>)
+2001213a:	ee02 0a10 	vmov	s4, r0
+2001213e:	4897      	ldr	r0, [pc, #604]	@ (2001239c <Reset_Handler+0x235c>)
+20012140:	ee02 0a90 	vmov	s5, r0
+20012144:	4896      	ldr	r0, [pc, #600]	@ (200123a0 <Reset_Handler+0x2360>)
+20012146:	ee03 0a10 	vmov	s6, r0
+2001214a:	4896      	ldr	r0, [pc, #600]	@ (200123a4 <Reset_Handler+0x2364>)
+2001214c:	ee03 0a90 	vmov	s7, r0
+20012150:	4895      	ldr	r0, [pc, #596]	@ (200123a8 <Reset_Handler+0x2368>)
+20012152:	ee04 0a10 	vmov	s8, r0
+20012156:	4895      	ldr	r0, [pc, #596]	@ (200123ac <Reset_Handler+0x236c>)
+20012158:	ee04 0a90 	vmov	s9, r0
+2001215c:	4894      	ldr	r0, [pc, #592]	@ (200123b0 <Reset_Handler+0x2370>)
+2001215e:	ee05 0a10 	vmov	s10, r0
+20012162:	4894      	ldr	r0, [pc, #592]	@ (200123b4 <Reset_Handler+0x2374>)
+20012164:	ee05 0a90 	vmov	s11, r0
+20012168:	4893      	ldr	r0, [pc, #588]	@ (200123b8 <Reset_Handler+0x2378>)
+2001216a:	ee06 0a10 	vmov	s12, r0
+2001216e:	4893      	ldr	r0, [pc, #588]	@ (200123bc <Reset_Handler+0x237c>)
+20012170:	ee06 0a90 	vmov	s13, r0
+20012174:	4892      	ldr	r0, [pc, #584]	@ (200123c0 <Reset_Handler+0x2380>)
+20012176:	ee07 0a10 	vmov	s14, r0
+2001217a:	4892      	ldr	r0, [pc, #584]	@ (200123c4 <Reset_Handler+0x2384>)
+2001217c:	ee07 0a90 	vmov	s15, r0
+20012180:	4891      	ldr	r0, [pc, #580]	@ (200123c8 <Reset_Handler+0x2388>)
+20012182:	ee08 0a10 	vmov	s16, r0
+20012186:	4891      	ldr	r0, [pc, #580]	@ (200123cc <Reset_Handler+0x238c>)
+20012188:	ee08 0a90 	vmov	s17, r0
+2001218c:	4890      	ldr	r0, [pc, #576]	@ (200123d0 <Reset_Handler+0x2390>)
+2001218e:	ee09 0a10 	vmov	s18, r0
+20012192:	4890      	ldr	r0, [pc, #576]	@ (200123d4 <Reset_Handler+0x2394>)
+20012194:	ee09 0a90 	vmov	s19, r0
+20012198:	488f      	ldr	r0, [pc, #572]	@ (200123d8 <Reset_Handler+0x2398>)
+2001219a:	ee0a 0a10 	vmov	s20, r0
+2001219e:	488f      	ldr	r0, [pc, #572]	@ (200123dc <Reset_Handler+0x239c>)
+200121a0:	ee0a 0a90 	vmov	s21, r0
+200121a4:	488e      	ldr	r0, [pc, #568]	@ (200123e0 <Reset_Handler+0x23a0>)
+200121a6:	ee0b 0a10 	vmov	s22, r0
+200121aa:	488e      	ldr	r0, [pc, #568]	@ (200123e4 <Reset_Handler+0x23a4>)
+200121ac:	ee0b 0a90 	vmov	s23, r0
+200121b0:	488d      	ldr	r0, [pc, #564]	@ (200123e8 <Reset_Handler+0x23a8>)
+200121b2:	ee0c 0a10 	vmov	s24, r0
+200121b6:	488d      	ldr	r0, [pc, #564]	@ (200123ec <Reset_Handler+0x23ac>)
+200121b8:	ee0c 0a90 	vmov	s25, r0
+200121bc:	488c      	ldr	r0, [pc, #560]	@ (200123f0 <Reset_Handler+0x23b0>)
+200121be:	ee0d 0a10 	vmov	s26, r0
+200121c2:	488c      	ldr	r0, [pc, #560]	@ (200123f4 <Reset_Handler+0x23b4>)
+200121c4:	ee0d 0a90 	vmov	s27, r0
+200121c8:	488b      	ldr	r0, [pc, #556]	@ (200123f8 <Reset_Handler+0x23b8>)
+200121ca:	ee0e 0a10 	vmov	s28, r0
+200121ce:	488b      	ldr	r0, [pc, #556]	@ (200123fc <Reset_Handler+0x23bc>)
+200121d0:	ee0e 0a90 	vmov	s29, r0
+200121d4:	488a      	ldr	r0, [pc, #552]	@ (20012400 <Reset_Handler+0x23c0>)
+200121d6:	ee0f 0a10 	vmov	s30, r0
+200121da:	488a      	ldr	r0, [pc, #552]	@ (20012404 <Reset_Handler+0x23c4>)
+200121dc:	ee0f 0a90 	vmov	s31, r0
+200121e0:	4889      	ldr	r0, [pc, #548]	@ (20012408 <Reset_Handler+0x23c8>)
+200121e2:	eee1 0a10 	vmsr	fpscr, r0
+200121e6:	4889      	ldr	r0, [pc, #548]	@ (2001240c <Reset_Handler+0x23cc>)
+200121e8:	f04f 5180 	mov.w	r1, #268435456	@ 0x10000000
+200121ec:	6001      	str	r1, [r0, #0]
+200121ee:	f3bf 8f4f 	dsb	sy
+200121f2:	f3bf 8f6f 	isb	sy
+200121f6:	f04f 0601 	mov.w	r6, #1
+200121fa:	45c5      	cmp	sp, r8
+200121fc:	f040 810d 	bne.w	2001241a <fail>
+20012200:	f04f 0602 	mov.w	r6, #2
+20012204:	ee10 0a10 	vmov	r0, s0
+20012208:	f04f 4194 	mov.w	r1, #1241513984	@ 0x4a000000
+2001220c:	4288      	cmp	r0, r1
+2001220e:	f040 8104 	bne.w	2001241a <fail>
+20012212:	ee10 0a90 	vmov	r0, s1
+20012216:	495d      	ldr	r1, [pc, #372]	@ (2001238c <Reset_Handler+0x234c>)
+20012218:	4288      	cmp	r0, r1
+2001221a:	f040 80fe 	bne.w	2001241a <fail>
+2001221e:	ee11 0a10 	vmov	r0, s2
+20012222:	495b      	ldr	r1, [pc, #364]	@ (20012390 <Reset_Handler+0x2350>)
+20012224:	4288      	cmp	r0, r1
+20012226:	f040 80f8 	bne.w	2001241a <fail>
+2001222a:	ee11 0a90 	vmov	r0, s3
+2001222e:	4959      	ldr	r1, [pc, #356]	@ (20012394 <Reset_Handler+0x2354>)
+20012230:	4288      	cmp	r0, r1
+20012232:	f040 80f2 	bne.w	2001241a <fail>
+20012236:	ee12 0a10 	vmov	r0, s4
+2001223a:	4957      	ldr	r1, [pc, #348]	@ (20012398 <Reset_Handler+0x2358>)
+2001223c:	4288      	cmp	r0, r1
+2001223e:	f040 80ec 	bne.w	2001241a <fail>
+20012242:	ee12 0a90 	vmov	r0, s5
+20012246:	4955      	ldr	r1, [pc, #340]	@ (2001239c <Reset_Handler+0x235c>)
+20012248:	4288      	cmp	r0, r1
+2001224a:	f040 80e6 	bne.w	2001241a <fail>
+2001224e:	ee13 0a10 	vmov	r0, s6
+20012252:	4953      	ldr	r1, [pc, #332]	@ (200123a0 <Reset_Handler+0x2360>)
+20012254:	4288      	cmp	r0, r1
+20012256:	f040 80e0 	bne.w	2001241a <fail>
+2001225a:	ee13 0a90 	vmov	r0, s7
+2001225e:	4951      	ldr	r1, [pc, #324]	@ (200123a4 <Reset_Handler+0x2364>)
+20012260:	4288      	cmp	r0, r1
+20012262:	f040 80da 	bne.w	2001241a <fail>
+20012266:	ee14 0a10 	vmov	r0, s8
+2001226a:	494f      	ldr	r1, [pc, #316]	@ (200123a8 <Reset_Handler+0x2368>)
+2001226c:	4288      	cmp	r0, r1
+2001226e:	f040 80d4 	bne.w	2001241a <fail>
+20012272:	ee14 0a90 	vmov	r0, s9
+20012276:	494d      	ldr	r1, [pc, #308]	@ (200123ac <Reset_Handler+0x236c>)
+20012278:	4288      	cmp	r0, r1
+2001227a:	f040 80ce 	bne.w	2001241a <fail>
+2001227e:	ee15 0a10 	vmov	r0, s10
+20012282:	494b      	ldr	r1, [pc, #300]	@ (200123b0 <Reset_Handler+0x2370>)
+20012284:	4288      	cmp	r0, r1
+20012286:	f040 80c8 	bne.w	2001241a <fail>
+2001228a:	ee15 0a90 	vmov	r0, s11
+2001228e:	4949      	ldr	r1, [pc, #292]	@ (200123b4 <Reset_Handler+0x2374>)
+20012290:	4288      	cmp	r0, r1
+20012292:	f040 80c2 	bne.w	2001241a <fail>
+20012296:	ee16 0a10 	vmov	r0, s12
+2001229a:	4947      	ldr	r1, [pc, #284]	@ (200123b8 <Reset_Handler+0x2378>)
+2001229c:	4288      	cmp	r0, r1
+2001229e:	f040 80bc 	bne.w	2001241a <fail>
+200122a2:	ee16 0a90 	vmov	r0, s13
+200122a6:	4945      	ldr	r1, [pc, #276]	@ (200123bc <Reset_Handler+0x237c>)
+200122a8:	4288      	cmp	r0, r1
+200122aa:	f040 80b6 	bne.w	2001241a <fail>
+200122ae:	ee17 0a10 	vmov	r0, s14
+200122b2:	4943      	ldr	r1, [pc, #268]	@ (200123c0 <Reset_Handler+0x2380>)
+200122b4:	4288      	cmp	r0, r1
+200122b6:	f040 80b0 	bne.w	2001241a <fail>
+200122ba:	ee17 0a90 	vmov	r0, s15
+200122be:	4941      	ldr	r1, [pc, #260]	@ (200123c4 <Reset_Handler+0x2384>)
+200122c0:	4288      	cmp	r0, r1
+200122c2:	f040 80aa 	bne.w	2001241a <fail>
+200122c6:	ee18 0a10 	vmov	r0, s16
+200122ca:	493f      	ldr	r1, [pc, #252]	@ (200123c8 <Reset_Handler+0x2388>)
+200122cc:	4288      	cmp	r0, r1
+200122ce:	f040 80a4 	bne.w	2001241a <fail>
+200122d2:	ee18 0a90 	vmov	r0, s17
+200122d6:	493d      	ldr	r1, [pc, #244]	@ (200123cc <Reset_Handler+0x238c>)
+200122d8:	4288      	cmp	r0, r1
+200122da:	f040 809e 	bne.w	2001241a <fail>
+200122de:	ee19 0a10 	vmov	r0, s18
+200122e2:	493b      	ldr	r1, [pc, #236]	@ (200123d0 <Reset_Handler+0x2390>)
+200122e4:	4288      	cmp	r0, r1
+200122e6:	f040 8098 	bne.w	2001241a <fail>
+200122ea:	ee19 0a90 	vmov	r0, s19
+200122ee:	4939      	ldr	r1, [pc, #228]	@ (200123d4 <Reset_Handler+0x2394>)
+200122f0:	4288      	cmp	r0, r1
+200122f2:	f040 8092 	bne.w	2001241a <fail>
+200122f6:	ee1a 0a10 	vmov	r0, s20
+200122fa:	4937      	ldr	r1, [pc, #220]	@ (200123d8 <Reset_Handler+0x2398>)
+200122fc:	4288      	cmp	r0, r1
+200122fe:	f040 808c 	bne.w	2001241a <fail>
+20012302:	ee1a 0a90 	vmov	r0, s21
+20012306:	4935      	ldr	r1, [pc, #212]	@ (200123dc <Reset_Handler+0x239c>)
+20012308:	4288      	cmp	r0, r1
+2001230a:	f040 8086 	bne.w	2001241a <fail>
+2001230e:	ee1b 0a10 	vmov	r0, s22
+20012312:	4933      	ldr	r1, [pc, #204]	@ (200123e0 <Reset_Handler+0x23a0>)
+20012314:	4288      	cmp	r0, r1
+20012316:	f040 8080 	bne.w	2001241a <fail>
+2001231a:	ee1b 0a90 	vmov	r0, s23
+2001231e:	4931      	ldr	r1, [pc, #196]	@ (200123e4 <Reset_Handler+0x23a4>)
+20012320:	4288      	cmp	r0, r1
+20012322:	d17a      	bne.n	2001241a <fail>
+20012324:	ee1c 0a10 	vmov	r0, s24
+20012328:	492f      	ldr	r1, [pc, #188]	@ (200123e8 <Reset_Handler+0x23a8>)
+2001232a:	4288      	cmp	r0, r1
+2001232c:	d175      	bne.n	2001241a <fail>
+2001232e:	ee1c 0a90 	vmov	r0, s25
+20012332:	492e      	ldr	r1, [pc, #184]	@ (200123ec <Reset_Handler+0x23ac>)
+20012334:	4288      	cmp	r0, r1
+20012336:	d170      	bne.n	2001241a <fail>
+20012338:	ee1d 0a10 	vmov	r0, s26
+2001233c:	492c      	ldr	r1, [pc, #176]	@ (200123f0 <Reset_Handler+0x23b0>)
+2001233e:	4288      	cmp	r0, r1
+20012340:	d16b      	bne.n	2001241a <fail>
+20012342:	ee1d 0a90 	vmov	r0, s27
+20012346:	492b      	ldr	r1, [pc, #172]	@ (200123f4 <Reset_Handler+0x23b4>)
+20012348:	4288      	cmp	r0, r1
+2001234a:	d166      	bne.n	2001241a <fail>
+2001234c:	ee1e 0a10 	vmov	r0, s28
+20012350:	4929      	ldr	r1, [pc, #164]	@ (200123f8 <Reset_Handler+0x23b8>)
+20012352:	4288      	cmp	r0, r1
+20012354:	d161      	bne.n	2001241a <fail>
+20012356:	ee1e 0a90 	vmov	r0, s29
+2001235a:	4928      	ldr	r1, [pc, #160]	@ (200123fc <Reset_Handler+0x23bc>)
+2001235c:	4288      	cmp	r0, r1
+2001235e:	d15c      	bne.n	2001241a <fail>
+20012360:	ee1f 0a10 	vmov	r0, s30
+20012364:	4926      	ldr	r1, [pc, #152]	@ (20012400 <Reset_Handler+0x23c0>)
+20012366:	4288      	cmp	r0, r1
+20012368:	d157      	bne.n	2001241a <fail>
+2001236a:	ee1f 0a90 	vmov	r0, s31
+2001236e:	4925      	ldr	r1, [pc, #148]	@ (20012404 <Reset_Handler+0x23c4>)
+20012370:	4288      	cmp	r0, r1
+20012372:	d152      	bne.n	2001241a <fail>
+20012374:	eef1 0a10 	vmrs	r0, fpscr
+20012378:	f04f 0603 	mov.w	r6, #3
+2001237c:	4922      	ldr	r1, [pc, #136]	@ (20012408 <Reset_Handler+0x23c8>)
+2001237e:	4288      	cmp	r0, r1
+20012380:	d14b      	bne.n	2001241a <fail>
+20012382:	e045      	b.n	20012410 <Reset_Handler+0x23d0>
+20012384:	e000ef34 	.word	0xe000ef34
+20012388:	20000280 	.word	0x20000280
+2001238c:	4a010001 	.word	0x4a010001
+20012390:	4a020002 	.word	0x4a020002
+20012394:	4a030003 	.word	0x4a030003
+20012398:	4a040004 	.word	0x4a040004
+2001239c:	4a050005 	.word	0x4a050005
+200123a0:	4a060006 	.word	0x4a060006
+200123a4:	4a070007 	.word	0x4a070007
+200123a8:	4a080008 	.word	0x4a080008
+200123ac:	4a090009 	.word	0x4a090009
+200123b0:	4a0a000a 	.word	0x4a0a000a
+200123b4:	4a0b000b 	.word	0x4a0b000b
+200123b8:	4a0c000c 	.word	0x4a0c000c
+200123bc:	4a0d000d 	.word	0x4a0d000d
+200123c0:	4a0e000e 	.word	0x4a0e000e
+200123c4:	4a0f000f 	.word	0x4a0f000f
+200123c8:	4a100010 	.word	0x4a100010
+200123cc:	4a110011 	.word	0x4a110011
+200123d0:	4a120012 	.word	0x4a120012
+200123d4:	4a130013 	.word	0x4a130013
+200123d8:	4a140014 	.word	0x4a140014
+200123dc:	4a150015 	.word	0x4a150015
+200123e0:	4a160016 	.word	0x4a160016
+200123e4:	4a170017 	.word	0x4a170017
+200123e8:	4a180018 	.word	0x4a180018
+200123ec:	4a190019 	.word	0x4a190019
+200123f0:	4a1a001a 	.word	0x4a1a001a
+200123f4:	4a1b001b 	.word	0x4a1b001b
+200123f8:	4a1c001c 	.word	0x4a1c001c
+200123fc:	4a1d001d 	.word	0x4a1d001d
+20012400:	4a1e001e 	.word	0x4a1e001e
+20012404:	4a1f001f 	.word	0x4a1f001f
+20012408:	6340009f 	.word	0x6340009f
+2001240c:	e000ed04 	.word	0xe000ed04
+20012410:	480d      	ldr	r0, [pc, #52]	@ (20012448 <done+0x12>)
+20012412:	490e      	ldr	r1, [pc, #56]	@ (2001244c <done+0x16>)
+20012414:	6008      	str	r0, [r1, #0]
+20012416:	490e      	ldr	r1, [pc, #56]	@ (20012450 <done+0x1a>)
+20012418:	e00d      	b.n	20012436 <done>
+
+2001241a <fail>:
+2001241a:	480e      	ldr	r0, [pc, #56]	@ (20012454 <done+0x1e>)
+2001241c:	490b      	ldr	r1, [pc, #44]	@ (2001244c <done+0x16>)
+2001241e:	6008      	str	r0, [r1, #0]
+20012420:	490d      	ldr	r1, [pc, #52]	@ (20012458 <done+0x22>)
+20012422:	600f      	str	r7, [r1, #0]
+20012424:	490d      	ldr	r1, [pc, #52]	@ (2001245c <done+0x26>)
+20012426:	600e      	str	r6, [r1, #0]
+20012428:	4638      	mov	r0, r7
+2001242a:	f000 f9cf 	bl	200127cc <print_hex>
+2001242e:	4630      	mov	r0, r6
+20012430:	f000 f9cc 	bl	200127cc <print_hex>
+20012434:	490a      	ldr	r1, [pc, #40]	@ (20012460 <done+0x2a>)
+
+20012436 <done>:
+20012436:	2004      	movs	r0, #4
+20012438:	beab      	bkpt	0x00ab
+2001243a:	f04f 0018 	mov.w	r0, #24
+2001243e:	4909      	ldr	r1, [pc, #36]	@ (20012464 <done+0x2e>)
+20012440:	beab      	bkpt	0x00ab
+20012442:	e7fe      	b.n	20012442 <done+0xc>
+20012444:	e010      	b.n	20012468 <PendSV_Handler>
+20012446:	0000      	.short	0x0000
+20012448:	cafecafe 	.word	0xcafecafe
+2001244c:	20000100 	.word	0x20000100
+20012450:	200127aa 	.word	0x200127aa
+20012454:	deaddead 	.word	0xdeaddead
+20012458:	20000104 	.word	0x20000104
+2001245c:	20000108 	.word	0x20000108
+20012460:	200127ba 	.word	0x200127ba
+20012464:	00020026 	.word	0x00020026
+
+20012468 <PendSV_Handler>:
+20012468:	4b7c      	ldr	r3, [pc, #496]	@ (2001265c <pendsv_done+0x6>)
+2001246a:	681b      	ldr	r3, [r3, #0]
+2001246c:	f013 0f04 	tst.w	r3, #4
+20012470:	d002      	beq.n	20012478 <PendSV_Handler+0x10>
+20012472:	ee00 3a10 	vmov	s0, r3
+20012476:	4770      	bx	lr
+20012478:	4a79      	ldr	r2, [pc, #484]	@ (20012660 <pendsv_done+0xa>)
+2001247a:	f8c2 e000 	str.w	lr, [r2]
+2001247e:	4668      	mov	r0, sp
+20012480:	6050      	str	r0, [r2, #4]
+20012482:	f3ef 8014 	mrs	r0, CONTROL
+20012486:	6090      	str	r0, [r2, #8]
+20012488:	4976      	ldr	r1, [pc, #472]	@ (20012664 <pendsv_done+0xe>)
+2001248a:	6808      	ldr	r0, [r1, #0]
+2001248c:	60d0      	str	r0, [r2, #12]
+2001248e:	6848      	ldr	r0, [r1, #4]
+20012490:	6110      	str	r0, [r2, #16]
+20012492:	f01e 0f04 	tst.w	lr, #4
+20012496:	bf0c      	ite	eq
+20012498:	f3ef 8308 	mrseq	r3, MSP
+2001249c:	f3ef 8309 	mrsne	r3, PSP
+200124a0:	69d8      	ldr	r0, [r3, #28]
+200124a2:	6210      	str	r0, [r2, #32]
+200124a4:	f3ef 8009 	mrs	r0, PSP
+200124a8:	6310      	str	r0, [r2, #48]	@ 0x30
+200124aa:	2000      	movs	r0, #0
+200124ac:	62d0      	str	r0, [r2, #44]	@ 0x2c
+200124ae:	4b6b      	ldr	r3, [pc, #428]	@ (2001265c <pendsv_done+0x6>)
+200124b0:	681b      	ldr	r3, [r3, #0]
+200124b2:	f013 0f01 	tst.w	r3, #1
+200124b6:	f000 80ce 	beq.w	20012656 <pendsv_done>
+200124ba:	eef1 0a10 	vmrs	r0, fpscr
+200124be:	6150      	str	r0, [r2, #20]
+200124c0:	4968      	ldr	r1, [pc, #416]	@ (20012664 <pendsv_done+0xe>)
+200124c2:	6808      	ldr	r0, [r1, #0]
+200124c4:	6190      	str	r0, [r2, #24]
+200124c6:	f3ef 8014 	mrs	r0, CONTROL
+200124ca:	61d0      	str	r0, [r2, #28]
+200124cc:	ed2d 8a10 	vpush	{s16-s31}
+200124d0:	f04f 40e0 	mov.w	r0, #1879048192	@ 0x70000000
+200124d4:	ee00 0a10 	vmov	s0, r0
+200124d8:	4863      	ldr	r0, [pc, #396]	@ (20012668 <pendsv_done+0x12>)
+200124da:	ee00 0a90 	vmov	s1, r0
+200124de:	4863      	ldr	r0, [pc, #396]	@ (2001266c <pendsv_done+0x16>)
+200124e0:	ee01 0a10 	vmov	s2, r0
+200124e4:	4862      	ldr	r0, [pc, #392]	@ (20012670 <pendsv_done+0x1a>)
+200124e6:	ee01 0a90 	vmov	s3, r0
+200124ea:	4862      	ldr	r0, [pc, #392]	@ (20012674 <pendsv_done+0x1e>)
+200124ec:	ee02 0a10 	vmov	s4, r0
+200124f0:	4861      	ldr	r0, [pc, #388]	@ (20012678 <pendsv_done+0x22>)
+200124f2:	ee02 0a90 	vmov	s5, r0
+200124f6:	4861      	ldr	r0, [pc, #388]	@ (2001267c <pendsv_done+0x26>)
+200124f8:	ee03 0a10 	vmov	s6, r0
+200124fc:	4860      	ldr	r0, [pc, #384]	@ (20012680 <pendsv_done+0x2a>)
+200124fe:	ee03 0a90 	vmov	s7, r0
+20012502:	4860      	ldr	r0, [pc, #384]	@ (20012684 <pendsv_done+0x2e>)
+20012504:	ee04 0a10 	vmov	s8, r0
+20012508:	485f      	ldr	r0, [pc, #380]	@ (20012688 <pendsv_done+0x32>)
+2001250a:	ee04 0a90 	vmov	s9, r0
+2001250e:	485f      	ldr	r0, [pc, #380]	@ (2001268c <pendsv_done+0x36>)
+20012510:	ee05 0a10 	vmov	s10, r0
+20012514:	485e      	ldr	r0, [pc, #376]	@ (20012690 <pendsv_done+0x3a>)
+20012516:	ee05 0a90 	vmov	s11, r0
+2001251a:	485e      	ldr	r0, [pc, #376]	@ (20012694 <pendsv_done+0x3e>)
+2001251c:	ee06 0a10 	vmov	s12, r0
+20012520:	485d      	ldr	r0, [pc, #372]	@ (20012698 <pendsv_done+0x42>)
+20012522:	ee06 0a90 	vmov	s13, r0
+20012526:	485d      	ldr	r0, [pc, #372]	@ (2001269c <pendsv_done+0x46>)
+20012528:	ee07 0a10 	vmov	s14, r0
+2001252c:	485c      	ldr	r0, [pc, #368]	@ (200126a0 <pendsv_done+0x4a>)
+2001252e:	ee07 0a90 	vmov	s15, r0
+20012532:	485c      	ldr	r0, [pc, #368]	@ (200126a4 <pendsv_done+0x4e>)
+20012534:	ee08 0a10 	vmov	s16, r0
+20012538:	485b      	ldr	r0, [pc, #364]	@ (200126a8 <pendsv_done+0x52>)
+2001253a:	ee08 0a90 	vmov	s17, r0
+2001253e:	485b      	ldr	r0, [pc, #364]	@ (200126ac <pendsv_done+0x56>)
+20012540:	ee09 0a10 	vmov	s18, r0
+20012544:	485a      	ldr	r0, [pc, #360]	@ (200126b0 <pendsv_done+0x5a>)
+20012546:	ee09 0a90 	vmov	s19, r0
+2001254a:	485a      	ldr	r0, [pc, #360]	@ (200126b4 <pendsv_done+0x5e>)
+2001254c:	ee0a 0a10 	vmov	s20, r0
+20012550:	4859      	ldr	r0, [pc, #356]	@ (200126b8 <pendsv_done+0x62>)
+20012552:	ee0a 0a90 	vmov	s21, r0
+20012556:	4859      	ldr	r0, [pc, #356]	@ (200126bc <pendsv_done+0x66>)
+20012558:	ee0b 0a10 	vmov	s22, r0
+2001255c:	4858      	ldr	r0, [pc, #352]	@ (200126c0 <pendsv_done+0x6a>)
+2001255e:	ee0b 0a90 	vmov	s23, r0
+20012562:	4858      	ldr	r0, [pc, #352]	@ (200126c4 <pendsv_done+0x6e>)
+20012564:	ee0c 0a10 	vmov	s24, r0
+20012568:	4857      	ldr	r0, [pc, #348]	@ (200126c8 <pendsv_done+0x72>)
+2001256a:	ee0c 0a90 	vmov	s25, r0
+2001256e:	4857      	ldr	r0, [pc, #348]	@ (200126cc <pendsv_done+0x76>)
+20012570:	ee0d 0a10 	vmov	s26, r0
+20012574:	4856      	ldr	r0, [pc, #344]	@ (200126d0 <pendsv_done+0x7a>)
+20012576:	ee0d 0a90 	vmov	s27, r0
+2001257a:	4856      	ldr	r0, [pc, #344]	@ (200126d4 <pendsv_done+0x7e>)
+2001257c:	ee0e 0a10 	vmov	s28, r0
+20012580:	4855      	ldr	r0, [pc, #340]	@ (200126d8 <pendsv_done+0x82>)
+20012582:	ee0e 0a90 	vmov	s29, r0
+20012586:	4855      	ldr	r0, [pc, #340]	@ (200126dc <pendsv_done+0x86>)
+20012588:	ee0f 0a10 	vmov	s30, r0
+2001258c:	4854      	ldr	r0, [pc, #336]	@ (200126e0 <pendsv_done+0x8a>)
+2001258e:	ee0f 0a90 	vmov	s31, r0
+20012592:	4854      	ldr	r0, [pc, #336]	@ (200126e4 <pendsv_done+0x8e>)
+20012594:	eee1 0a10 	vmsr	fpscr, r0
+20012598:	f013 0f02 	tst.w	r3, #2
+2001259c:	d059      	beq.n	20012652 <pendsv_pop>
+2001259e:	df00      	svc	0
+200125a0:	4a2f      	ldr	r2, [pc, #188]	@ (20012660 <pendsv_done+0xa>)
+200125a2:	ee10 0a10 	vmov	r0, s0
+200125a6:	f04f 41e0 	mov.w	r1, #1879048192	@ 0x70000000
+200125aa:	4288      	cmp	r0, r1
+200125ac:	d151      	bne.n	20012652 <pendsv_pop>
+200125ae:	ee10 0a90 	vmov	r0, s1
+200125b2:	492d      	ldr	r1, [pc, #180]	@ (20012668 <pendsv_done+0x12>)
+200125b4:	4288      	cmp	r0, r1
+200125b6:	d14c      	bne.n	20012652 <pendsv_pop>
+200125b8:	ee11 0a10 	vmov	r0, s2
+200125bc:	492b      	ldr	r1, [pc, #172]	@ (2001266c <pendsv_done+0x16>)
+200125be:	4288      	cmp	r0, r1
+200125c0:	d147      	bne.n	20012652 <pendsv_pop>
+200125c2:	ee11 0a90 	vmov	r0, s3
+200125c6:	492a      	ldr	r1, [pc, #168]	@ (20012670 <pendsv_done+0x1a>)
+200125c8:	4288      	cmp	r0, r1
+200125ca:	d142      	bne.n	20012652 <pendsv_pop>
+200125cc:	ee12 0a10 	vmov	r0, s4
+200125d0:	4928      	ldr	r1, [pc, #160]	@ (20012674 <pendsv_done+0x1e>)
+200125d2:	4288      	cmp	r0, r1
+200125d4:	d13d      	bne.n	20012652 <pendsv_pop>
+200125d6:	ee12 0a90 	vmov	r0, s5
+200125da:	4927      	ldr	r1, [pc, #156]	@ (20012678 <pendsv_done+0x22>)
+200125dc:	4288      	cmp	r0, r1
+200125de:	d138      	bne.n	20012652 <pendsv_pop>
+200125e0:	ee13 0a10 	vmov	r0, s6
+200125e4:	4925      	ldr	r1, [pc, #148]	@ (2001267c <pendsv_done+0x26>)
+200125e6:	4288      	cmp	r0, r1
+200125e8:	d133      	bne.n	20012652 <pendsv_pop>
+200125ea:	ee13 0a90 	vmov	r0, s7
+200125ee:	4924      	ldr	r1, [pc, #144]	@ (20012680 <pendsv_done+0x2a>)
+200125f0:	4288      	cmp	r0, r1
+200125f2:	d12e      	bne.n	20012652 <pendsv_pop>
+200125f4:	ee14 0a10 	vmov	r0, s8
+200125f8:	4922      	ldr	r1, [pc, #136]	@ (20012684 <pendsv_done+0x2e>)
+200125fa:	4288      	cmp	r0, r1
+200125fc:	d129      	bne.n	20012652 <pendsv_pop>
+200125fe:	ee14 0a90 	vmov	r0, s9
+20012602:	4921      	ldr	r1, [pc, #132]	@ (20012688 <pendsv_done+0x32>)
+20012604:	4288      	cmp	r0, r1
+20012606:	d124      	bne.n	20012652 <pendsv_pop>
+20012608:	ee15 0a10 	vmov	r0, s10
+2001260c:	491f      	ldr	r1, [pc, #124]	@ (2001268c <pendsv_done+0x36>)
+2001260e:	4288      	cmp	r0, r1
+20012610:	d11f      	bne.n	20012652 <pendsv_pop>
+20012612:	ee15 0a90 	vmov	r0, s11
+20012616:	491e      	ldr	r1, [pc, #120]	@ (20012690 <pendsv_done+0x3a>)
+20012618:	4288      	cmp	r0, r1
+2001261a:	d11a      	bne.n	20012652 <pendsv_pop>
+2001261c:	ee16 0a10 	vmov	r0, s12
+20012620:	491c      	ldr	r1, [pc, #112]	@ (20012694 <pendsv_done+0x3e>)
+20012622:	4288      	cmp	r0, r1
+20012624:	d115      	bne.n	20012652 <pendsv_pop>
+20012626:	ee16 0a90 	vmov	r0, s13
+2001262a:	491b      	ldr	r1, [pc, #108]	@ (20012698 <pendsv_done+0x42>)
+2001262c:	4288      	cmp	r0, r1
+2001262e:	d110      	bne.n	20012652 <pendsv_pop>
+20012630:	ee17 0a10 	vmov	r0, s14
+20012634:	4919      	ldr	r1, [pc, #100]	@ (2001269c <pendsv_done+0x46>)
+20012636:	4288      	cmp	r0, r1
+20012638:	d10b      	bne.n	20012652 <pendsv_pop>
+2001263a:	ee17 0a90 	vmov	r0, s15
+2001263e:	4918      	ldr	r1, [pc, #96]	@ (200126a0 <pendsv_done+0x4a>)
+20012640:	4288      	cmp	r0, r1
+20012642:	d106      	bne.n	20012652 <pendsv_pop>
+20012644:	eef1 0a10 	vmrs	r0, fpscr
+20012648:	4926      	ldr	r1, [pc, #152]	@ (200126e4 <pendsv_done+0x8e>)
+2001264a:	4288      	cmp	r0, r1
+2001264c:	d101      	bne.n	20012652 <pendsv_pop>
+2001264e:	2001      	movs	r0, #1
+20012650:	62d0      	str	r0, [r2, #44]	@ 0x2c
+
+20012652 <pendsv_pop>:
+20012652:	ecbd 8a10 	vpop	{s16-s31}
+
+20012656 <pendsv_done>:
+20012656:	4770      	bx	lr
+20012658:	e046      	b.n	200126e8 <SVC_Handler>
+2001265a:	0000      	.short	0x0000
+2001265c:	20000280 	.word	0x20000280
+20012660:	20000200 	.word	0x20000200
+20012664:	e000ef34 	.word	0xe000ef34
+20012668:	70010001 	.word	0x70010001
+2001266c:	70020002 	.word	0x70020002
+20012670:	70030003 	.word	0x70030003
+20012674:	70040004 	.word	0x70040004
+20012678:	70050005 	.word	0x70050005
+2001267c:	70060006 	.word	0x70060006
+20012680:	70070007 	.word	0x70070007
+20012684:	70080008 	.word	0x70080008
+20012688:	70090009 	.word	0x70090009
+2001268c:	700a000a 	.word	0x700a000a
+20012690:	700b000b 	.word	0x700b000b
+20012694:	700c000c 	.word	0x700c000c
+20012698:	700d000d 	.word	0x700d000d
+2001269c:	700e000e 	.word	0x700e000e
+200126a0:	700f000f 	.word	0x700f000f
+200126a4:	70100010 	.word	0x70100010
+200126a8:	70110011 	.word	0x70110011
+200126ac:	70120012 	.word	0x70120012
+200126b0:	70130013 	.word	0x70130013
+200126b4:	70140014 	.word	0x70140014
+200126b8:	70150015 	.word	0x70150015
+200126bc:	70160016 	.word	0x70160016
+200126c0:	70170017 	.word	0x70170017
+200126c4:	70180018 	.word	0x70180018
+200126c8:	70190019 	.word	0x70190019
+200126cc:	701a001a 	.word	0x701a001a
+200126d0:	701b001b 	.word	0x701b001b
+200126d4:	701c001c 	.word	0x701c001c
+200126d8:	701d001d 	.word	0x701d001d
+200126dc:	701e001e 	.word	0x701e001e
+200126e0:	701f001f 	.word	0x701f001f
+200126e4:	9080001b 	.word	0x9080001b
+
+200126e8 <SVC_Handler>:
+200126e8:	4a1d      	ldr	r2, [pc, #116]	@ (20012760 <SVC_Handler+0x78>)
+200126ea:	f8c2 e024 	str.w	lr, [r2, #36]	@ 0x24
+200126ee:	4668      	mov	r0, sp
+200126f0:	6290      	str	r0, [r2, #40]	@ 0x28
+200126f2:	f04f 40f0 	mov.w	r0, #2013265920	@ 0x78000000
+200126f6:	ee00 0a10 	vmov	s0, r0
+200126fa:	481a      	ldr	r0, [pc, #104]	@ (20012764 <SVC_Handler+0x7c>)
+200126fc:	ee00 0a90 	vmov	s1, r0
+20012700:	4819      	ldr	r0, [pc, #100]	@ (20012768 <SVC_Handler+0x80>)
+20012702:	ee01 0a10 	vmov	s2, r0
+20012706:	4819      	ldr	r0, [pc, #100]	@ (2001276c <SVC_Handler+0x84>)
+20012708:	ee01 0a90 	vmov	s3, r0
+2001270c:	4818      	ldr	r0, [pc, #96]	@ (20012770 <SVC_Handler+0x88>)
+2001270e:	ee02 0a10 	vmov	s4, r0
+20012712:	4818      	ldr	r0, [pc, #96]	@ (20012774 <SVC_Handler+0x8c>)
+20012714:	ee02 0a90 	vmov	s5, r0
+20012718:	4817      	ldr	r0, [pc, #92]	@ (20012778 <SVC_Handler+0x90>)
+2001271a:	ee03 0a10 	vmov	s6, r0
+2001271e:	4817      	ldr	r0, [pc, #92]	@ (2001277c <SVC_Handler+0x94>)
+20012720:	ee03 0a90 	vmov	s7, r0
+20012724:	4816      	ldr	r0, [pc, #88]	@ (20012780 <SVC_Handler+0x98>)
+20012726:	ee04 0a10 	vmov	s8, r0
+2001272a:	4816      	ldr	r0, [pc, #88]	@ (20012784 <SVC_Handler+0x9c>)
+2001272c:	ee04 0a90 	vmov	s9, r0
+20012730:	4815      	ldr	r0, [pc, #84]	@ (20012788 <SVC_Handler+0xa0>)
+20012732:	ee05 0a10 	vmov	s10, r0
+20012736:	4815      	ldr	r0, [pc, #84]	@ (2001278c <SVC_Handler+0xa4>)
+20012738:	ee05 0a90 	vmov	s11, r0
+2001273c:	4814      	ldr	r0, [pc, #80]	@ (20012790 <SVC_Handler+0xa8>)
+2001273e:	ee06 0a10 	vmov	s12, r0
+20012742:	4814      	ldr	r0, [pc, #80]	@ (20012794 <SVC_Handler+0xac>)
+20012744:	ee06 0a90 	vmov	s13, r0
+20012748:	4813      	ldr	r0, [pc, #76]	@ (20012798 <SVC_Handler+0xb0>)
+2001274a:	ee07 0a10 	vmov	s14, r0
+2001274e:	4813      	ldr	r0, [pc, #76]	@ (2001279c <SVC_Handler+0xb4>)
+20012750:	ee07 0a90 	vmov	s15, r0
+20012754:	4812      	ldr	r0, [pc, #72]	@ (200127a0 <SVC_Handler+0xb8>)
+20012756:	eee1 0a10 	vmsr	fpscr, r0
+2001275a:	4770      	bx	lr
+2001275c:	e022      	b.n	200127a4 <fault_handler>
+2001275e:	0000      	.short	0x0000
+20012760:	20000200 	.word	0x20000200
+20012764:	78010001 	.word	0x78010001
+20012768:	78020002 	.word	0x78020002
+2001276c:	78030003 	.word	0x78030003
+20012770:	78040004 	.word	0x78040004
+20012774:	78050005 	.word	0x78050005
+20012778:	78060006 	.word	0x78060006
+2001277c:	78070007 	.word	0x78070007
+20012780:	78080008 	.word	0x78080008
+20012784:	78090009 	.word	0x78090009
+20012788:	780a000a 	.word	0x780a000a
+2001278c:	780b000b 	.word	0x780b000b
+20012790:	780c000c 	.word	0x780c000c
+20012794:	780d000d 	.word	0x780d000d
+20012798:	780e000e 	.word	0x780e000e
+2001279c:	780f000f 	.word	0x780f000f
+200127a0:	50000004 	.word	0x50000004
+
+200127a4 <fault_handler>:
+200127a4:	f04f 0663 	mov.w	r6, #99	@ 0x63
+200127a8:	e637      	b.n	2001241a <fail>
+
+200127aa <ok_message>:
+200127aa:	5046      	.short	0x5046
+200127ac:	4154535f 	.word	0x4154535f
+200127b0:	4e494b43 	.word	0x4e494b43
+200127b4:	4b4f5f47 	.word	0x4b4f5f47
+200127b8:	000a      	.short	0x000a
+
+200127ba <fail_message>:
+200127ba:	5046      	.short	0x5046
+200127bc:	4154535f 	.word	0x4154535f
+200127c0:	4e494b43 	.word	0x4e494b43
+200127c4:	41465f47 	.word	0x41465f47
+200127c8:	000a4c49 	.word	0x000a4c49
+
+200127cc <print_hex>:
+200127cc:	490b      	ldr	r1, [pc, #44]	@ (200127fc <print_hex+0x30>)
+200127ce:	221c      	movs	r2, #28
+200127d0:	fa20 f302 	lsr.w	r3, r0, r2
+200127d4:	f003 030f 	and.w	r3, r3, #15
+200127d8:	2b0a      	cmp	r3, #10
+200127da:	bf34      	ite	cc
+200127dc:	3330      	addcc	r3, #48	@ 0x30
+200127de:	3357      	addcs	r3, #87	@ 0x57
+200127e0:	f801 3b01 	strb.w	r3, [r1], #1
+200127e4:	3a04      	subs	r2, #4
+200127e6:	d5f3      	bpl.n	200127d0 <print_hex+0x4>
+200127e8:	2320      	movs	r3, #32
+200127ea:	f801 3b01 	strb.w	r3, [r1], #1
+200127ee:	2300      	movs	r3, #0
+200127f0:	700b      	strb	r3, [r1, #0]
+200127f2:	2004      	movs	r0, #4
+200127f4:	4901      	ldr	r1, [pc, #4]	@ (200127fc <print_hex+0x30>)
+200127f6:	beab      	bkpt	0x00ab
+200127f8:	4770      	bx	lr
+200127fa:	0000      	.short	0x0000
+200127fc:	20000300 	.word	0x20000300
