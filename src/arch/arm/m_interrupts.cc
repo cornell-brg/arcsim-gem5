@@ -246,6 +246,12 @@ MProfileInterrupts::getInterrupt()
             auto *mmu = dynamic_cast<MMMU *>(tc->getMMUPtr());
             assert(mmu);
             mmu->abandonUnstacking();
+            // The return already restored the background state (the
+            // unstacking's functional reads); only its timing is cut
+            // short.  The returning exception is deactivated now, as
+            // the reads' completion would have (the return deactivates
+            // it before popping, DDI0403E B1.5.8).
+            removeStackReadPending();
         }
     }
 
