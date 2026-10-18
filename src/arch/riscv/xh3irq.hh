@@ -44,6 +44,7 @@ class Xh3irq : public SimObject
     void trapExit();
 
     // An interrupt line's level.
+    // One of the irq's lines went high or low; the irq is high while any is.
     void setLevel(uint32_t irq, bool high);
 
     uint32_t numIrqs() const { return _numIrqs; }
@@ -78,7 +79,8 @@ class Xh3irq : public SimObject
 
     std::vector<bool> enable;    // h3.meiea
     std::vector<bool> force;     // h3.meifa
-    std::vector<bool> level;     // the lines
+    std::vector<bool> level;     // the lines, ORed
+    std::vector<uint32_t> highLines;  // lines high, per irq
     std::vector<uint8_t> priority;  // h3.meipra
 
     // h3.meicontext
@@ -125,6 +127,8 @@ class Xh3irqLine : public ClockedObject
     // Levels on their way through the registers, oldest first, with the
     // tick each reaches the controller.
     std::deque<std::pair<Tick, bool>> inFlight;
+    bool delivered = false;      // the level last given to the controller
+    void apply(bool high);
     EventFunctionWrapper deliverEvent;
 };
 
