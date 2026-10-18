@@ -315,7 +315,7 @@ MMMU::storeToStack(Addr frameptr, const std::vector<uint32_t> &values,
         auto *mintr = dynamic_cast<MProfileInterrupts *>(
             tc->getCpuPtr()->getInterruptController(tc->threadId()));
         assert(mintr);
-        mintr->setupStackPending();
+        mintr->setupStackPending(false);
         stackingCompleteCallback = [mintr]() {
             mintr->removeStackWritePending();
         };
@@ -370,7 +370,7 @@ MMMU::readFromStack(Addr frameptr, uint32_t numWords, ThreadContext *tc)
     auto *mintr = dynamic_cast<MProfileInterrupts *>(
         tc->getCpuPtr()->getInterruptController(tc->threadId()));
     assert(mintr);
-    mintr->setupStackPending();
+    mintr->setupStackPending(true);
 
     if (isTimingMode) {
         // New generation for this unstacking operation.

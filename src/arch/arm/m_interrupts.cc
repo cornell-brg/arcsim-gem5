@@ -137,6 +137,7 @@ MProfileInterrupts::clearAll()
     pendingSignal = scs->hasDeliverableIRQ();
     lastAckedExcNum = -1;
     stackOperating = false;
+    unstacking = false;
     stackPriority = 256;
     returningExcNum = -1;
 }
@@ -145,9 +146,10 @@ MProfileInterrupts::clearAll()
 // MMU will call to notify when stack read/write finishes
 
 void
-MProfileInterrupts::setupStackPending()
+MProfileInterrupts::setupStackPending(bool reading)
 {
     stackOperating = true;
+    unstacking = reading;
     stackPriority = scs->getCurrentExcPriority();
     returningExcNum = scs->getCurrentExcNum();
 }
@@ -230,15 +232,21 @@ MProfileInterrupts::getInterrupt()
             return NoFault;
         }
 
-        // Higher priority: allow preemption, abandon unstacking.
+        // Higher priority: allow preemption.  An exception return's
+        // unstacking is abandoned.  Stacking writes (a frame being
+        // pushed, a lazy FP save) are left to finish, as the frame of
+        // a late-arriving exception on real hardware: the preempting
+        // exception's frame goes below them.
         DPRINTF(MProfileStacking,
                 "getInterrupt: preempting with higher-priority "
-                "exc#%d (pri=%d > stack pri=%d)\n",
-                pendingExc, pendingPri, stackPriority);
+                "exc#%d (pri=%d > stack pri=%d) unstacking=%d\n",
+                pendingExc, pendingPri, stackPriority, unstacking);
 
-        auto *mmu = dynamic_cast<MMMU *>(tc->getMMUPtr());
-        assert(mmu);
-        mmu->abandonUnstacking();
+        if (unstacking) {
+            auto *mmu = dynamic_cast<MMMU *>(tc->getMMUPtr());
+            assert(mmu);
+            mmu->abandonUnstacking();
+        }
     }
 
     // Promote it to active and take it.

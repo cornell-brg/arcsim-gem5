@@ -79,6 +79,9 @@ class MProfileInterrupts : public BaseInterrupts
     int lastAckedExcNum = -1;
 
     bool stackOperating = false;
+    /** The operation in progress is an exception return's unstacking
+     *  (reads), not a push or a lazy FP save (writes). */
+    bool unstacking = false;
     int16_t stackPriority = 256;
 
     /** Exception number being returned from during unstacking.
@@ -150,9 +153,10 @@ class MProfileInterrupts : public BaseInterrupts
      */
     void excReturn(ThreadContext *tc, uint32_t exc_return);
 
-    /** Called by MMU when stacking/unstacking starts.
+    /** Called by MMU when stacking (reading false) or unstacking
+     *  (reading true) starts.
      *  Sets stackOperating, stackPriority, returningExcNum. */
-    void setupStackPending();
+    void setupStackPending(bool reading);
 
     /** Called by MMU (via callback) when stacking/unstacking completes.
      *  Deactivates returningExcNum and clears stacking state. */
