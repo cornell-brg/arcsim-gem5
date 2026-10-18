@@ -40,8 +40,10 @@
  *
  * M-profile FP instructions differ from A-profile in three ways:
  *   1. Access control: CPACR.CP10/CP11 only (no EL2/EL3 traps)
- *   2. Every FP instruction sets CONTROL.FPCA = 1 [DDI0403E B1.4.2]
- *   3. Lazy stacking: check FPCCR.LSPEN for deferred FP save
+ *   2. The first FP instruction of a context sets CONTROL.FPCA = 1
+ *      (with FPCCR.ASPEN) [DDI0403E B1.4.2, B1.5.7]
+ *   3. Lazy stacking: an FP instruction makes the FP save that
+ *      exception entry deferred (FPCCR.LSPACT)
  *
  * Design: MFpOp base class handles the common wrapper (enable check,
  * FPCA, lazy stacking).  Children override doFpOp() for the actual
@@ -122,7 +124,8 @@ class MFpOp : public PredOp
   protected:
     Fault checkMProfileFPEnabled(ThreadContext *tc) const;
     void setFPCA(ThreadContext *tc) const;
-    Fault completeLazyStacking(ThreadContext *tc) const;
+    void completeLazyStacking(ThreadContext *tc) const;
+    Fault executeFPCheck(ThreadContext *tc) const;
 
     virtual Fault doFpOp(ExecContext *xc,
                          trace::InstRecord *traceData) const = 0;

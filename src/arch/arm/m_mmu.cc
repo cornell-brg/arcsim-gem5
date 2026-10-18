@@ -91,7 +91,7 @@ MTLB::translateAtomic(const RequestPtr &req, ThreadContext *tc,
     // A fetch past the top of the 32-bit space is one made ahead of a
     // fetch from 0xFFFFFFFC (the return to thread mode on the process
     // stack): it reports the same fault, for the same PC.
-    if (mode == BaseMMU::Execute && vaddr >= 0xFFFFFFF0) {
+    if (mode == BaseMMU::Execute && vaddr >= MProfileExcReturnBase) {
         return std::make_shared<MProfileExcReturnFetch>();
     }
 
@@ -111,7 +111,7 @@ MTLB::translateTiming(const RequestPtr &req, ThreadContext *tc,
 
     // EXC_RETURN detection — the same as translateAtomic(): the fetch
     // only reports the fault.
-    if (mode == BaseMMU::Execute && vaddr >= 0xFFFFFFF0) {
+    if (mode == BaseMMU::Execute && vaddr >= MProfileExcReturnBase) {
         translation->finish(std::make_shared<MProfileExcReturnFetch>(),
                             req, tc, mode);
         return;
@@ -290,10 +290,21 @@ MMMU::stackingComplete()
 
 void
 MMMU::storeToStack(Addr frameptr, const std::vector<uint32_t> &values,
-                   ThreadContext *tc)
+                   ThreadContext *tc, bool visible_now)
 {
     RequestorID rid = stackingRequestorId;
     bool isTimingMode = tc->getSystemPtr()->isTimingMode();
+
+    if (visible_now && isTimingMode) {
+        for (uint32_t i = 0; i < values.size(); ++i) {
+            auto req = std::make_shared<Request>(frameptr + i * 4, 4,
+                Request::UNCACHEABLE, Request::funcRequestorId);
+            Packet pkt(req, MemCmd::WriteReq);
+            pkt.allocate();
+            pkt.setLE<uint32_t>(values[i]);
+            stackingPort.sendFunctional(&pkt);
+        }
+    }
 
     if (isTimingMode) {
         // New generation for this stacking operation.

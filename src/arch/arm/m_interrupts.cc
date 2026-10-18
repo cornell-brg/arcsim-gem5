@@ -69,6 +69,7 @@
 #include "arch/arm/m_interrupts.hh"
 
 #include "arch/arm/m_faults.hh"
+#include "arch/arm/m_fp_insts.hh"
 #include "arch/arm/m_mmu.hh"
 #include "arch/arm/m_system.hh"
 #include "arch/arm/pcstate.hh"
@@ -175,7 +176,8 @@ MProfileInterrupts::removeStackWritePending()
             "returningExcNum=%d\n",
             stackOperating, returningExcNum);
 
-    assert(returningExcNum > 0);
+    // A lazy FP save can be made in Thread mode, with no exception
+    // active.
     returningExcNum = -1;
 
     stackOperating = false;
@@ -258,9 +260,17 @@ bool
 MProfileInterrupts::validateExcReturn(ThreadContext *tc, uint32_t exc_return,
                   const char *&reason)
 {
-    // Check 1: bits[31:4] must be 0xFFFFFFF (reserved encoding)
-    if ((exc_return & 0xFFFFFFF0) != 0xFFFFFFF0) {
-        reason = "reserved (bits[31:4] != 0xFFFFFFF)";
+    // Check 1: bits[31:5] must be ones (reserved encoding)
+    if ((exc_return & 0xFFFFFFE0) != 0xFFFFFFE0) {
+        reason = "reserved (bits[31:5] not all ones)";
+        return false;
+    }
+
+    // Check 1b: bit[4] (FType) = 0, a frame with FP state, needs an FPU
+    auto *msys = dynamic_cast<ArmMSystem *>(tc->getSystemPtr());
+    if (!(exc_return & 0x10) &&
+        !(msys && msys->has(ArmExtension::M_PROFILE_FPU_SP))) {
+        reason = "FP frame (bit[4]=0) without an FPU";
         return false;
     }
 
@@ -298,16 +308,33 @@ MProfileInterrupts::excReturnUnstack(ThreadContext *tc, uint32_t exc_return)
              "Invalid EXC_RETURN 0x%08x: %s. "
              "This indicates a firmware bug (corrupted LR). "
              "Valid values: 0xFFFFFFF1 (Handler/MSP), "
-             "0xFFFFFFF9 (Thread/MSP), 0xFFFFFFFD (Thread/PSP). "
+             "0xFFFFFFF9 (Thread/MSP), 0xFFFFFFFD (Thread/PSP), "
+             "and with an FP frame 0xFFFFFFE1, 0xFFFFFFE9, 0xFFFFFFED. "
              "(DDI0403E B1.5.8)",
              exc_return, reason);
 
 
     // Decode EXC_RETURN (DDI0403E B1.5.8).
+    //   bit[4] = 0: the frame holds FP state (FType)
     //   bit[3] = 0: return to Handler mode, 1: return to Thread mode
     //   bit[2] = 0: restore from MSP,       1: restore from PSP
+    bool fpFrame = !(exc_return & 0x10);
     bool returnToThread = (exc_return & 0x8);
     bool restoreFromPSP = (exc_return & 0x4);
+
+    // An FP frame's s0-s15 and FPSCR are popped unless its lazy save is
+    // still pending: then the registers hold that state yet, and the
+    // save is dropped (PopStack, DDI0403E B1.5.8).
+    bool popFP = false;
+    if (fpFrame) {
+        FPCCR_M fpccr = tc->readMiscRegNoEffect(MISCREG_M_FPCCR);
+        if (fpccr.lspact) {
+            fpccr.lspact = 0;
+            tc->setMiscRegNoEffect(MISCREG_M_FPCCR, fpccr);
+        } else {
+            popFP = true;
+        }
+    }
 
     MiscRegIndex spReg = restoreFromPSP ? MISCREG_M_PSP : MISCREG_M_MSP;
 
@@ -343,9 +370,10 @@ MProfileInterrupts::excReturnUnstack(ThreadContext *tc, uint32_t exc_return)
     assert(mmu && "M-profile CPU must use MMMU");
     DPRINTFS(MProfileStacking, tc->getCpuPtr(),
              "excReturnUnstack: calling readFromStack "
-             "frameptr=%#x restoreFromPSP=%d\n",
-             frameptr, restoreFromPSP);
-    std::vector<uint32_t> frame = mmu->readFromStack(frameptr, 8, tc);
+             "frameptr=%#x restoreFromPSP=%d fpFrame=%d popFP=%d\n",
+             frameptr, restoreFromPSP, fpFrame, popFP);
+    std::vector<uint32_t> frame =
+        mmu->readFromStack(frameptr, popFP ? 25 : 8, tc);
 
     // Frame layout (DDI0403E B1.5.6):
     //   [0]=R0, [1]=R1, [2]=R2, [3]=R3,
@@ -361,9 +389,16 @@ MProfileInterrupts::excReturnUnstack(ThreadContext *tc, uint32_t exc_return)
     tc->setReg(int_reg::R12, (RegVal)frame[4]);
     tc->setReg(int_reg::Lr,  (RegVal)frame[5]);
 
+    // [8..23]=S0-S15, [24]=FPSCR
+    if (popFP) {
+        for (RegIndex i = 0; i < 16; ++i)
+            tc->setReg(vfpSRegId(i), (RegVal)frame[8 + i]);
+        tc->setMiscRegNoEffect(MISCREG_FPSCR, (RegVal)frame[24]);
+    }
+
     // Restore SP — undo alignment padding if frameptralign was set.
     // Write both R13 (authoritative) and misc reg copy.
-    uint32_t sp = frameptr + 0x20;
+    uint32_t sp = frameptr + (fpFrame ? 0x68 : 0x20);
     if (xpsr.frameptralign)
         sp += 4;
     tc->setReg(int_reg::Sp, (RegVal)sp);
@@ -374,9 +409,12 @@ MProfileInterrupts::excReturnUnstack(ThreadContext *tc, uint32_t exc_return)
     // Returning to Thread/MSP or Handler (bit[2]=0) → SPSEL=0.
     // DDI0403E B1.4.4: CONTROL.SPSEL is only meaningful in Thread mode
     // and is restored by exception return.
+    // CONTROL.FPCA is set again when the frame held FP state: the
+    // returned-to context has one.
     {
         CONTROL_M ctrl = tc->readMiscRegNoEffect(MISCREG_M_CONTROL);
         ctrl.spsel = restoreFromPSP ? 1 : 0;
+        ctrl.fpca = fpFrame ? 1 : 0;
         tc->setMiscRegNoEffect(MISCREG_M_CONTROL, ctrl);
     }
 

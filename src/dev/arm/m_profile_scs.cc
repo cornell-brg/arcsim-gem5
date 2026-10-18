@@ -826,7 +826,8 @@ MProfileSCS::writeFpExt(Addr addr, uint32_t data)
         tc->setMiscRegNoEffect(ArmISA::MISCREG_M_FPCCR, data);
         break;
       case 0xF38:
-        tc->setMiscRegNoEffect(ArmISA::MISCREG_M_FPCAR, data);
+        // FPCAR: bits [2:0] are RES0.
+        tc->setMiscRegNoEffect(ArmISA::MISCREG_M_FPCAR, data & ~0x7u);
         break;
       case 0xF3C:
         // FPDSCR: default FPSCR for new FP contexts.
