@@ -308,6 +308,13 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         board.icode_router.mem_side_ports = board.sram.port
     board.mem_mode = "timing"
     board.cpu = RiscvMinorCPU(cpu_id=0)
+    # Peripheral space is device memory: accesses go in order and a load reads the
+    # device, never a store still in the store buffer (APB and AHB peripherals, the
+    # testbench IO block and SIO).
+    board.cpu.mmu.pma_checker.uncacheable = [
+        AddrRange(0x40000000, 0x60000000),
+        AddrRange(0xC0000000, 0xE0000000),
+    ]
     board.cpu.clk_domain = board.clk_domain
     board.cpu.isa = [RiscvISA(
         # M and U modes, as Hazard3 on the RP2350 and in arcsim-soc
@@ -337,6 +344,15 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     ]
     for line in board.tb_irq_lines:
         board.tb_io.irq = line.pin
+    if dma:
+        # DMA_IRQ_0 to DMA_IRQ_3 are IRQs 10 to 13, as on the RP2350; the controller
+        # ORs them with the testbench IO block's lines of the same numbers, as
+        # arcsim-soc's soc.v does.
+        board.dma_irq_lines = [
+            Xh3irqLine(controller=board.xh3irq, irq_num=10 + n) for n in range(4)
+        ]
+        for line in board.dma_irq_lines:
+            board.dma.irq = line.pin
     board.tb_soft_irq_line = RiscvIntLine(int_num=3)
     board.tb_io.soft_irq = board.tb_soft_irq_line.pin
     board.tb_timer_irq_line = RiscvIntLine(int_num=7)
