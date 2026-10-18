@@ -208,6 +208,28 @@ class MProfileReset : public ArmMFault
 };
 
 /**
+ * A fetch from an EXC_RETURN address (0xFFFFFFF0-0xFFFFFFFF): the PC was
+ * loaded with an EXC_RETURN value by POP {PC} or LDM {PC} (DDI0403E
+ * B1.5.8).  Translating the fetch only reports it; the exception return
+ * happens when the fault is invoked, which a pipelined CPU does only for
+ * the oldest instruction on the path it commits.  A fetch made ahead of
+ * that (the next sequential address, or down a mispredicted path) is
+ * discarded with its stream and has no effect.  The EXC_RETURN value is
+ * the PC of the instruction the fault is invoked for: a fetch made ahead
+ * past the top of the address space (after 0xFFFFFFFC) reports this fault
+ * too, and a CPU may carry it on the instruction at the PC it fetched
+ * ahead for.
+ */
+class MProfileExcReturnFetch : public FaultBase
+{
+  public:
+
+    FaultName name() const override { return "M-profile exception return"; }
+    void invoke(ThreadContext *tc,
+                const StaticInstPtr &inst = nullStaticInstPtr) override;
+};
+
+/**
  * Perform M-profile exception return (unstack).
  *
  * Called when a branch target is detected as an EXC_RETURN value.

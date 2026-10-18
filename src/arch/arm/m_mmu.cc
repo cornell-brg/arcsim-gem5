@@ -81,46 +81,18 @@ MTLB::translateAtomic(const RequestPtr &req, ThreadContext *tc,
 {
     Addr vaddr = req->getVaddr();
 
-    // EXC_RETURN detection for POP {PC} / LDM {PC}.
-    //
-    // When an LDM/POP micro-op loads an EXC_RETURN value (0xFFFFFFF_)
-    // into PC, the CPU tries to fetch the next instruction from that
-    // address.  On real Cortex-M hardware, the bus matrix detects this
-    // address range and triggers exception return instead of a memory
-    // access.  In gem5, there's no memory at 0xFFFFFFF_ so the fetch
-    // would panic.
-    //
-    // We detect this in the MMU translate path (before the fetch
-    // reaches memory) and return an ArmMFault that performs the
-    // exception return.  The fault's invoke() calls
-    // mProfileExcReturn() which pops the exception frame.
-    //
-    // DDI0403E B1.5.8: Exception return occurs when PC is loaded
-    // with a value where bits[31:4] are all 1s (EXC_RETURN prefix).
-    // Valid range: 0xFFFFFFF0–0xFFFFFFFF.  The low 4 bits encode
-    // which SP and mode to restore to.
-    if (mode == BaseMMU::Execute &&
-        (vaddr & 0xFFFFFFF0) == 0xFFFFFFF0) {
-        // Exception return: deactivate via interrupt controller, then
-        // unstack CPU state.  MProfileInterrupts::excReturn() handles both.
-        // excReturn() calls mProfileExcReturnUnstack() which uses
-        // pc.npc(retAddr).  In this MMU path, advancePC() is NOT called
-        // (the fault path skips curStaticInst->advancePC()), so we must
-        // manually advance the PC after excReturn returns.
-        auto *mintr = dynamic_cast<MProfileInterrupts *>(
-            tc->getCpuPtr()->getInterruptController(tc->threadId()));
-        assert(mintr && "M-profile CPU must use MProfileInterrupts");
-        mintr->excReturn(tc, (uint32_t)vaddr);
-        // excReturn set _npc = retAddr.  Advance _pc = _npc now so
-        // that the next fetch (after ReExec::invoke no-op) comes from retAddr,
-        // not from 0xFFFFFFF8 again (which would re-trigger this path).
-        auto &pc_base = tc->pcState();
-        auto pc = pc_base.as<PCState>();
-        pc.advance();  // _pc = _npc (retAddr)
-        tc->pcState(pc);
-        // Return a fault to skip fetchInstMem() and preExecute().
-        // ReExec::invoke is a no-op; the CPU re-checks PC on the next tick.
-        return std::make_shared<ReExec>();
+    // EXC_RETURN detection for POP {PC} / LDM {PC} (DDI0403E B1.5.8):
+    // the PC holds an EXC_RETURN value and the CPU fetches from it.  On
+    // real hardware the bus matrix turns that fetch into the exception
+    // return; there is no memory there.  The fetch reports a fault and
+    // nothing else: the return happens when the fault is invoked, so a
+    // CPU that fetches ahead (the next address, a predicted path) and
+    // later discards that fetch leaves the architectural state alone.
+    // A fetch past the top of the 32-bit space is one made ahead of a
+    // fetch from 0xFFFFFFFC (the return to thread mode on the process
+    // stack): it reports the same fault, for the same PC.
+    if (mode == BaseMMU::Execute && vaddr >= 0xFFFFFFF0) {
+        return std::make_shared<MProfileExcReturnFetch>();
     }
 
     // M-profile: VA == PA, no translation.
@@ -137,30 +109,11 @@ MTLB::translateTiming(const RequestPtr &req, ThreadContext *tc,
 {
     Addr vaddr = req->getVaddr();
 
-    // EXC_RETURN detection — same logic as translateAtomic().
-    // Without this, TimingSimpleCPU/MinorCPU panic trying to fetch
-    // from 0xFFFFFFF_ (no memory at that address).
-    //
-    // Timing note: the detection itself is correctly placed (the real
-    // bus matrix intercepts this address before it reaches memory, so
-    // no icache latency should be charged).  However,
-    // mProfileExcReturnUnstack() reads the 8-word exception frame via
-    // physProxy (functional port) — zero memory latency.  On real
-    // Cortex-M4 this unstacking takes ~12 cycles through the bus
-    // matrix → SRAM.  A future fix should route these reads through
-    // the timed memory system.  The same inaccuracy exists in
-    // translateAtomic() and in ArmMFault::invoke() (frame push).
-    if (mode == BaseMMU::Execute &&
-        (vaddr & 0xFFFFFFF0) == 0xFFFFFFF0) {
-        auto *mintr = dynamic_cast<MProfileInterrupts *>(
-            tc->getCpuPtr()->getInterruptController(tc->threadId()));
-        assert(mintr && "M-profile CPU must use MProfileInterrupts");
-        mintr->excReturn(tc, (uint32_t)vaddr);
-        auto &pc_base = tc->pcState();
-        auto pc = pc_base.as<PCState>();
-        pc.advance();
-        tc->pcState(pc);
-        translation->finish(std::make_shared<ReExec>(), req, tc, mode);
+    // EXC_RETURN detection — the same as translateAtomic(): the fetch
+    // only reports the fault.
+    if (mode == BaseMMU::Execute && vaddr >= 0xFFFFFFF0) {
+        translation->finish(std::make_shared<MProfileExcReturnFetch>(),
+                            req, tc, mode);
         return;
     }
 

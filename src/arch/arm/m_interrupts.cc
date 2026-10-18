@@ -413,6 +413,14 @@ MProfileInterrupts::excReturnUnstack(ThreadContext *tc, uint32_t exc_return)
     pc.illegalExec(false);
     // NPC = return address; advance() copies to PC.
     pc.npc(retAddr & ~(Addr)0x1);
+    // The stacked IT state: returning into an IT block resumes it, so the
+    // block's remaining instructions stay conditional. advance() makes
+    // nextItstate the resumed instruction's itstate; zero means none.
+    ITSTATE it = 0;
+    it.top6 = xpsr.iciIt2;
+    it.bottom2 = xpsr.iciIt1;
+    pc.itstate(0);
+    pc.nextItstate(it);
     tc->pcState(pc);
 
     DPRINTF(Faults, "M-profile exception return: EXC_RETURN=%#x "
