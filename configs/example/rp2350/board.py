@@ -311,6 +311,10 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
                               latency=f"{sram_latency_ns}ns")
     board.mem_ranges.append(board.tcdm.range)
     board.tcdm.port = board.sram_bus.mem_side_ports
+    # Stand-in for the HWPE's 1MiB periph port addr range at 0x50800000 (soc.v)
+    board.hwpe_periph = SimpleMemory(range=AddrRange(0x50800000, size="1MiB"), latency=f"{sram_latency_ns}ns")
+    board.mem_ranges.append(board.hwpe_periph.range)
+    board.hwpe_periph.port = board.sram_bus.mem_side_ports
     if board._banked_sram:
         board.icode_router.mem_side_ports = board.sram.port
     board.mem_mode = "timing"
