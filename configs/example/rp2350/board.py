@@ -304,6 +304,13 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     from m5.objects import Hazard3TbIO
     board.tb_io = Hazard3TbIO(pio_latency="1ns")
     board.tb_io.pio = board.sram_bus.mem_side_ports
+    # Stand-in for the HWPE's 128 KiB TCDM at 0x60000000 (soc.v): a plain
+    # memory, without the TCDM's banks or their timing. The HWPE itself is
+    # not modelled.
+    board.tcdm = SimpleMemory(range=AddrRange(0x60000000, size="128KiB"),
+                              latency=f"{sram_latency_ns}ns")
+    board.mem_ranges.append(board.tcdm.range)
+    board.tcdm.port = board.sram_bus.mem_side_ports
     if board._banked_sram:
         board.icode_router.mem_side_ports = board.sram.port
     board.mem_mode = "timing"
