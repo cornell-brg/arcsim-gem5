@@ -389,8 +389,7 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     board.cpu.icache_port = board.icode_router.cpu_side_ports
     board.cpu.dcache_port = board.dcode_router.cpu_side_ports
     board.workload = RiscvBareMetal(
-        bootloader=firmware, semihosting=RiscvSemihosting(),
-        auto_reset_vect=False, reset_vect=0x10000040,
+        bootloader=firmware, semihosting=RiscvSemihosting()
     )
     return board
 
