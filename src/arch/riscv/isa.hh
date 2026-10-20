@@ -134,14 +134,17 @@ class ISA : public BaseISA
     bool _enableXh3bextm;
 
     // mcountinhibit: while CY (IR) is set, mcycle (minstret) reads the value
-    // it had when the bit was set; otherwise it reads the CPU's count less
-    // the cycles (instructions) that passed while it was held.
+    // it had when the bit was set, or was last written; otherwise it reads the
+    // CPU's count less an offset, which a write sets so that the counter reads
+    // the value written.
     uint64_t heldCycle = 0;
     uint64_t heldInstret = 0;
     uint64_t cycleOffset = 0;
     uint64_t instretOffset = 0;
     uint64_t cycleCount() const;
     uint64_t instretCount() const;
+    void writeCycleCount(uint64_t value);
+    void writeInstretCount(uint64_t value);
 
   public:
     using Params = RiscvISAParams;
