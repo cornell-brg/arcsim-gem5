@@ -51,7 +51,7 @@ parser.add_argument("--dma", action=argparse.BooleanOptionalAction,
 parser.add_argument("--xip-model", choices=("legacy", "qmi"),
                     help="qmi selects the cache banks and flash interface "
                     "timing of a Pico 2; the XIP knobs apply only to legacy")
-parser.add_argument("--tick-limit", type=int, default=10_000_000_000)
+parser.add_argument("--tick-limit", type=int, default=100_000_000_000)
 args = parser.parse_args()
 if not args.firmware.is_file():
     parser.error(f"Firmware ELF does not exist: {args.firmware}")
