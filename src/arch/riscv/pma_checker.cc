@@ -55,7 +55,8 @@ namespace RiscvISA
 
 PMAChecker::PMAChecker(const Params &params) :
 BasePMAChecker(params),
-uncacheable(params.uncacheable.begin(), params.uncacheable.end())
+uncacheable(params.uncacheable.begin(), params.uncacheable.end()),
+accessible(params.accessible.begin(), params.accessible.end())
 {
     for (auto& range: params.misaligned) {
         misaligned.insert(range, true);
@@ -69,7 +70,15 @@ PMAChecker::check(const RequestPtr &req, BaseMMU::Mode mode, Addr vaddr)
         req->setFlags(Request::UNCACHEABLE | Request::STRICT_ORDER);
     }
 
-    return hasMisaligned() ? checkPAddrAlignment(req, mode, vaddr) : NoFault;
+    Fault fault =
+        hasMisaligned() ? checkPAddrAlignment(req, mode, vaddr) : NoFault;
+    // Nothing is there: an access fault, raised before the access leaves
+    // the core, so it is precise for stores too.
+    if (fault == NoFault && !isAccessible(req->getPaddr(), req->getSize())) {
+        fault = createAccessFault(
+            (req->hasVaddr() ? req->getVaddr() : vaddr), mode);
+    }
+    return fault;
 }
 
 Fault
@@ -126,6 +135,7 @@ PMAChecker::takeOverFrom(BasePMAChecker *old)
     assert(derived_old != nullptr);
     uncacheable = derived_old->uncacheable;
     misaligned = derived_old->misaligned;
+    accessible = derived_old->accessible;
 }
 
 Fault
@@ -166,6 +176,41 @@ PMAChecker::createMisalignFault(
         panic("Execute mode request should not reach here.");
     }
     return std::make_shared<AddressFault>(vaddr, code, virtualized);
+}
+
+Fault
+PMAChecker::createAccessFault(Addr vaddr, BaseMMU::Mode mode)
+{
+    RiscvISA::ExceptionCode code;
+    switch (mode) {
+      case BaseMMU::Read:
+        code = ExceptionCode::LOAD_ACCESS;
+        break;
+      case BaseMMU::Write:
+        code = ExceptionCode::STORE_ACCESS;
+        break;
+      case BaseMMU::Execute:
+        code = ExceptionCode::INST_ACCESS;
+        break;
+      default:
+        panic("Unknown MMU mode %d.", mode);
+    }
+    return std::make_shared<AddressFault>(vaddr, code);
+}
+
+bool
+PMAChecker::isAccessible(const Addr addr, const unsigned size)
+{
+    if (accessible.empty()) {
+        return true;
+    }
+    AddrRange range(addr, addr + size);
+    for (auto const &accessible_range: accessible) {
+        if (range.isSubset(accessible_range)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool

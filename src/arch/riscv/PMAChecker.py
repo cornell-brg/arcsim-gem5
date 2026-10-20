@@ -57,3 +57,8 @@ class PMAChecker(BasePMAChecker):
         [],
         "Address ranges support misaligned load/store to memory",
     )
+    accessible = VectorParam.AddrRange(
+        [],
+        "Address ranges loads, stores and instruction fetches may access; "
+        "an access outside them is an access fault. Empty: no check",
+    )

@@ -321,6 +321,20 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         # routines use.
         enable_Xh3bextm=True,
     )]
+    # Loads, stores and fetches outside what this board has are access
+    # faults, as rtl-sim's bus errors are; the core raises them before the
+    # access leaves it, so they are precise.
+    from m5.objects.PMAChecker import PMAChecker
+    accessible = list(board.mem_ranges)  # flash, SRAM, HWPE-Periph, TCDM
+    if xip_model == "qmi":
+        accessible.append(AddrRange(int(board.flash.maintenance_base),
+                                    size=XIP_SIZE))
+    if dma:
+        # Its four register blocks (normal, XOR, SET, CLR), rp2350_dma.cc
+        accessible.append(AddrRange(int(board.dma.pio_addr), size=0x4000))
+    accessible.append(AddrRange(int(board.sio.pio_addr), size=0x10000))
+    accessible.append(AddrRange(int(board.tb_io.pio_addr), size=0x200))
+    board.cpu.mmu.pma_checker = PMAChecker(accessible=accessible)
     # Hazard3's interrupt controller, with the RP2350's 52 IRQs and 4 priority
     # bits (arcsim-soc's config_rp2350_default.vh). Devices reach it through
     # Xh3irqLine.
