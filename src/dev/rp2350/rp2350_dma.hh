@@ -88,6 +88,9 @@ class RP2350DMA : public BasicPioDevice
         CTRL_BSWAP = 1u << 24,
         CTRL_SNIFF_EN = 1u << 25,
         CTRL_BUSY = 1u << 26,
+        CTRL_WRITE_ERROR = 1u << 29,
+        CTRL_READ_ERROR = 1u << 30,
+        CTRL_AHB_ERROR = 1u << 31,
         // What software can write: everything below BUSY
         CTRL_WRITABLE = CTRL_BUSY - 1,
         CTRL_UNMODELLED = CTRL_HIGH_PRIORITY | CTRL_INCR_READ_REV |
@@ -117,6 +120,7 @@ class RP2350DMA : public BasicPioDevice
         uint32_t ctrl = 0;
         bool busy = false;
         bool aborting = false;
+        uint32_t errors = 0;        // CTRL_READ_ERROR and CTRL_WRITE_ERROR
         unsigned credit = 0;        // DREQ pulses not yet used
         unsigned inFlight = 0;      // transfers started and not yet written
 
@@ -198,6 +202,7 @@ class RP2350DMA : public BasicPioDevice
 
     void trigger(unsigned index);
     void abort(unsigned index);
+    void busError(unsigned index, uint32_t error);
     void finish(unsigned index);
     bool requesting(const Channel &channel) const;
     Transfer *start(unsigned index);

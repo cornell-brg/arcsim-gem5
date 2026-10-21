@@ -17,11 +17,12 @@ class RP2350DMA(BasicPioDevice):
 
     One read and one write leave on the two manager ports each clock cycle,
     round-robin over the channels that have a transfer to make, so the DMA
-    competes for the bus like the chip's.
+    competes for the bus like the chip's. A bus error sets the channel's
+    READ_ERROR or WRITE_ERROR, halts it and raises its interrupt.
 
     Not modelled: the CRC sniffer, the pacing timers, byte swapping, decrementing
-    addresses, channel priority, bus errors, the security and MPU registers and
-    the debug registers. Their registers read 0 and ignore writes, with a
+    addresses, channel priority, the security and MPU registers and the debug
+    registers. Their registers read 0 and ignore writes, with a
     warning the first time one is touched.
 
     Reference: RP2350 datasheet, section 12.6 (DMA).

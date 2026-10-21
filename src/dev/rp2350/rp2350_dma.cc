@@ -119,7 +119,9 @@ RP2350DMA::readChannel(unsigned index, Reg reg) const
       case Reg::WriteAddr: return c.writeAddr;
       // The transfers left, under the mode last written
       case Reg::TransCount: return (c.countReload & ~CountMask) | c.count;
-      case Reg::Ctrl: return c.ctrl | (c.busy ? CTRL_BUSY : 0);
+      case Reg::Ctrl:
+        return c.ctrl | (c.busy ? CTRL_BUSY : 0) | c.errors |
+               (c.errors ? CTRL_AHB_ERROR : 0);
     }
     panic("RP2350DMA: bad channel register");
 }
@@ -238,6 +240,9 @@ RP2350DMA::writeRegister(Addr offset, uint32_t value, Op op)
           default: current = readChannel(index, reg); break;
         }
         const uint32_t written = combine(current);
+        // CTRL's error flags: writing one clears them
+        if (reg == Reg::Ctrl)
+            c.errors &= ~(op == Op::Clr ? 0 : value);
         writeChannel(index, reg, written);
         // The last register of each row triggers the channel, unless 0
         // is written: a null trigger, which interrupts a quiet channel.
@@ -384,6 +389,22 @@ RP2350DMA::abort(unsigned index)
         finish(index);
 }
 
+// A bus error halts the channel: no further transfers start, the ones in
+// flight complete, and it neither chains nor carries on. Its interrupt is
+// raised even when it is quiet.
+void
+RP2350DMA::busError(unsigned index, uint32_t error)
+{
+    Channel &c = channels[index];
+    c.errors |= error;
+    raise(1u << index);
+    if (!c.busy)
+        return;
+    c.aborting = true;
+    if (c.inFlight == 0)
+        finish(index);
+}
+
 // The end of a transfer sequence: every transfer written, or flushed
 // after an abort.
 void
@@ -456,14 +477,29 @@ RP2350DMA::start(unsigned index)
 void
 RP2350DMA::recvResponse(PacketPtr pkt, bool is_read)
 {
-    fatal_if(pkt->isError(), "RP2350DMA: bus error on a %s of %#x; bus "
-             "errors are not modelled", is_read ? "read" : "write",
-             pkt->getAddr());
     auto *t = dynamic_cast<Transfer *>(pkt->popSenderState());
     panic_if(!t, "RP2350DMA: response without its transfer");
+    const bool error = pkt->isError();
     delete pkt;
 
-    if (is_read) {
+    // A bus error ends the transfer and halts its channel.
+    if (error) {
+        const unsigned index = t->channel;
+        DPRINTF(RP2350DMA, "ch%d bus error on a %s of %#x\n", index,
+                is_read ? "read" : "write",
+                is_read ? t->readAddr : t->writeAddr);
+        if (is_read) {
+            // Its data never came: it is not written
+            dataFifo.erase(std::find(dataFifo.begin(), dataFifo.end(), t));
+            --readsInFlight;
+        } else {
+            --writesInFlight;
+        }
+        delete t;
+        --channels[index].inFlight;
+        busError(index, is_read ? CTRL_READ_ERROR : CTRL_WRITE_ERROR);
+        wake();
+    } else if (is_read) {
         t->haveData = true;
         t->dataTick = curTick();
         --readsInFlight;
@@ -597,6 +633,7 @@ RP2350DMA::serialize(CheckpointOut &cp) const
         paramOut(cp, csprintf("ch%d.ctrl", i), c.ctrl);
         paramOut(cp, csprintf("ch%d.busy", i), c.busy);
         paramOut(cp, csprintf("ch%d.aborting", i), c.aborting);
+        paramOut(cp, csprintf("ch%d.errors", i), c.errors);
         paramOut(cp, csprintf("ch%d.credit", i), c.credit);
     }
     SERIALIZE_SCALAR(intr);
@@ -619,6 +656,7 @@ RP2350DMA::unserialize(CheckpointIn &cp)
         paramIn(cp, csprintf("ch%d.ctrl", i), c.ctrl);
         paramIn(cp, csprintf("ch%d.busy", i), c.busy);
         paramIn(cp, csprintf("ch%d.aborting", i), c.aborting);
+        paramIn(cp, csprintf("ch%d.errors", i), c.errors);
         paramIn(cp, csprintf("ch%d.credit", i), c.credit);
     }
     UNSERIALIZE_SCALAR(intr);
