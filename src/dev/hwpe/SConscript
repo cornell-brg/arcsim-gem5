@@ -1,0 +1,7 @@
+Import('*')
+
+SimObject('HWPE.py', sim_objects=['HWPEBase', 'HWPEEmpty'])
+Source('hwpe_base.cc')
+Source('hwpe_empty.cc')
+
+DebugFlag('HWPE')

@@ -305,16 +305,24 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     board.tb_io = Hazard3TbIO(pio_latency="1ns")
     board.tb_io.pio = board.sram_bus.mem_side_ports
     # Stand-in for the HWPE's 128 KiB TCDM at 0x60000000 (soc.v): a plain
-    # memory, without the TCDM's banks or their timing. The HWPE itself is
-    # not modelled.
+    # memory, without the TCDM's banks or their timing, behind a crossbar of
+    # its own that the core (through the SRAM bus) and the HWPE share, so
+    # the HWPE's accesses do not cross the SRAM bus. 32 bytes wide: an HWPE
+    # beat of 256 bits.
     board.tcdm = SimpleMemory(range=AddrRange(0x60000000, size="128KiB"),
                               latency=f"{sram_latency_ns}ns")
     board.mem_ranges.append(board.tcdm.range)
-    board.tcdm.port = board.sram_bus.mem_side_ports
-    # Stand-in for the HWPE's 1MiB periph port addr range at 0x50800000 (soc.v)
-    board.hwpe_periph = SimpleMemory(range=AddrRange(0x50800000, size="1MiB"), latency=f"{sram_latency_ns}ns")
-    board.mem_ranges.append(board.hwpe_periph.range)
-    board.hwpe_periph.port = board.sram_bus.mem_side_ports
+    board.tcdm_xbar = _router(board.fast_clock)
+    board.tcdm_xbar.width = 32
+    board.sram_bus.mem_side_ports = board.tcdm_xbar.cpu_side_ports
+    board.tcdm_xbar.mem_side_ports = board.tcdm.port
+    # The HWPE (soc.v): its registers at 0x50800000 on the SRAM bus, its
+    # data port on the TCDM crossbar. No engine yet (HWPEEmpty); its done
+    # event (irq) stays unconnected, as in soc.v.
+    from m5.objects import HWPEEmpty
+    board.hwpe = HWPEEmpty(pio_latency="1ns")
+    board.hwpe.pio = board.sram_bus.mem_side_ports
+    board.hwpe.tcdm_port = board.tcdm_xbar.cpu_side_ports
     if board._banked_sram:
         board.icode_router.mem_side_ports = board.sram.port
     board.mem_mode = "timing"
@@ -336,7 +344,7 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     # faults, as rtl-sim's bus errors are; the core raises them before the
     # access leaves it, so they are precise.
     from m5.objects.PMAChecker import PMAChecker
-    accessible = list(board.mem_ranges)  # flash, SRAM, HWPE-Periph, TCDM
+    accessible = list(board.mem_ranges)  # flash, SRAM, TCDM
     if xip_model == "qmi":
         accessible.append(AddrRange(int(board.flash.maintenance_base),
                                     size=XIP_SIZE))
@@ -345,6 +353,8 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         accessible.append(AddrRange(int(board.dma.pio_addr), size=0x4000))
     accessible.append(AddrRange(int(board.sio.pio_addr), size=0x10000))
     accessible.append(AddrRange(int(board.tb_io.pio_addr), size=0x200))
+    accessible.append(AddrRange(int(board.hwpe.pio_addr),
+                                size=int(board.hwpe.pio_size)))
     board.cpu.mmu.pma_checker = PMAChecker(accessible=accessible)
     # Hazard3's interrupt controller, with the RP2350's 52 IRQs and 4 priority
     # bits (arcsim-soc's config_rp2350_default.vh). Devices reach it through
