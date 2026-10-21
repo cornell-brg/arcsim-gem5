@@ -10,7 +10,9 @@ class RP2350DMA(BasicPioDevice):
     Models the 16 channels' READ_ADDR, WRITE_ADDR, TRANS_COUNT and CTRL (with
     their three alias rows and trigger registers), INTR, INTE/INTF/INTS for the
     four interrupt outputs, MULTI_CHAN_TRIGGER, CHAN_ABORT and N_CHANNELS, each
-    also through the atomic XOR, SET and CLR aliases. A channel transfers 1, 2
+    also through the atomic XOR, SET and CLR aliases. A byte or halfword
+    store reaches a register replicated across the 32-bit bus, and a narrow
+    load takes its lanes of the whole register (datasheet 2.1.5). A channel transfers 1, 2
     or 4 bytes at a time with incrementing or fixed addresses, a ring on either
     address, the normal, self-triggering and endless count modes, chaining, and
     pacing by a peripheral's data request line (dreq()) or none.

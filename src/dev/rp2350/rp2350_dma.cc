@@ -120,8 +120,8 @@ RP2350DMA::readChannel(unsigned index, Reg reg) const
       // The transfers left, under the mode last written
       case Reg::TransCount: return (c.countReload & ~CountMask) | c.count;
       case Reg::Ctrl:
-        return c.ctrl | (c.busy ? CTRL_BUSY : 0) | c.errors |
-               (c.errors ? CTRL_AHB_ERROR : 0);
+        return c.ctrl | (c.busy ? uint32_t(CTRL_BUSY) : 0u) | c.errors |
+               (c.errors ? uint32_t(CTRL_AHB_ERROR) : 0u);
     }
     panic("RP2350DMA: bad channel register");
 }
@@ -298,14 +298,23 @@ RP2350DMA::writeRegister(Addr offset, uint32_t value, Op op)
     }
 }
 
+// A narrow access (RP2350 datasheet 2.1.5): a store reaches the register
+// replicated across the 32-bit bus, whatever its size and address bits 1:0,
+// and a load takes its lanes of the whole register.
 Tick
 RP2350DMA::read(PacketPtr pkt)
 {
     const Addr byte = pkt->getAddr() - pioAddr;
-    fatal_if(pkt->getSize() != 4 || (byte & 3),
-             "RP2350DMA: %d-byte read at %#x; registers take 32-bit accesses",
-             pkt->getSize(), byte);
-    pkt->setLE<uint32_t>(readRegister(byte % BLOCK_SIZE));
+    const unsigned size = pkt->getSize();
+    fatal_if((size != 1 && size != 2 && size != 4) || (byte & (size - 1)),
+             "RP2350DMA: %d-byte read at %#x", size, byte);
+    const uint32_t value = readRegister((byte & ~Addr(3)) % BLOCK_SIZE) >>
+                           (8 * (byte & 3));
+    switch (size) {
+      case 1: pkt->setLE<uint8_t>(value); break;
+      case 2: pkt->setLE<uint16_t>(value); break;
+      default: pkt->setLE<uint32_t>(value); break;
+    }
     pkt->makeAtomicResponse();
     return pioDelay;
 }
@@ -314,11 +323,17 @@ Tick
 RP2350DMA::write(PacketPtr pkt)
 {
     const Addr byte = pkt->getAddr() - pioAddr;
-    fatal_if(pkt->getSize() != 4 || (byte & 3),
-             "RP2350DMA: %d-byte write at %#x; registers take 32-bit accesses",
-             pkt->getSize(), byte);
-    writeRegister(byte % BLOCK_SIZE, pkt->getLE<uint32_t>(),
-                  static_cast<Op>(byte / BLOCK_SIZE));
+    const unsigned size = pkt->getSize();
+    fatal_if((size != 1 && size != 2 && size != 4) || (byte & (size - 1)),
+             "RP2350DMA: %d-byte write at %#x", size, byte);
+    uint32_t value;
+    switch (size) {
+      case 1: value = pkt->getLE<uint8_t>() * 0x01010101u; break;
+      case 2: value = pkt->getLE<uint16_t>() * 0x00010001u; break;
+      default: value = pkt->getLE<uint32_t>(); break;
+    }
+    const Addr word = byte & ~Addr(3);
+    writeRegister(word % BLOCK_SIZE, value, static_cast<Op>(word / BLOCK_SIZE));
     pkt->makeAtomicResponse();
     return pioDelay;
 }
