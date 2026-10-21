@@ -51,7 +51,7 @@ parser.add_argument("--dma", action=argparse.BooleanOptionalAction,
 parser.add_argument("--xip-model", choices=("legacy", "qmi"),
                     help="qmi selects the cache banks and flash interface "
                     "timing of a Pico 2; the XIP knobs apply only to legacy")
-parser.add_argument("--tick-limit", type=int, default=10_000_000_000)
+parser.add_argument("--tick-limit", type=int, default=100_000_000_000)
 args = parser.parse_args()
 if not args.firmware.is_file():
     parser.error(f"Firmware ELF does not exist: {args.firmware}")
@@ -83,7 +83,7 @@ board.exit_on_work_items = True
 root = Root(full_system=True, system=board)
 m5.instantiate()
 print(f"RP2350 core={args.core} cpu_id=0 clock=150MHz")
-print("XIP=0x10000000+4MiB cache=16KiB/2-way/8B")
+print("XIP=0x10000000+16MiB cache=16KiB/2-way/8B")
 if args.xip_model == "qmi":
     print("XIP model=qmi: two cache banks, flash interface timing of a Pico 2")
 else:

@@ -19,7 +19,7 @@ from m5.objects import (
 
 CLOCK = "150MHz"
 XIP_BASE = 0x10000000
-XIP_SIZE = "16MiB"  # Pico 2's fitted external flash
+XIP_SIZE = "16MiB"  # flash
 
 # Physical windows; the legacy model lumps each striped group together.
 SRAM_REGIONS = (
@@ -304,6 +304,17 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     from m5.objects import Hazard3TbIO
     board.tb_io = Hazard3TbIO(pio_latency="1ns")
     board.tb_io.pio = board.sram_bus.mem_side_ports
+    # Stand-in for the HWPE's 128 KiB TCDM at 0x60000000 (soc.v): a plain
+    # memory, without the TCDM's banks or their timing. The HWPE itself is
+    # not modelled.
+    board.tcdm = SimpleMemory(range=AddrRange(0x60000000, size="128KiB"),
+                              latency=f"{sram_latency_ns}ns")
+    board.mem_ranges.append(board.tcdm.range)
+    board.tcdm.port = board.sram_bus.mem_side_ports
+    # Stand-in for the HWPE's 1MiB periph port addr range at 0x50800000 (soc.v)
+    board.hwpe_periph = SimpleMemory(range=AddrRange(0x50800000, size="1MiB"), latency=f"{sram_latency_ns}ns")
+    board.mem_ranges.append(board.hwpe_periph.range)
+    board.hwpe_periph.port = board.sram_bus.mem_side_ports
     if board._banked_sram:
         board.icode_router.mem_side_ports = board.sram.port
     board.mem_mode = "timing"
@@ -328,6 +339,19 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         # routines use.
         enable_Xh3bextm=True,
     )]
+    # Loads, stores and fetches outside what this board has are access
+    # faults, as rtl-sim's bus errors are; the core raises them before the
+    # access leaves it, so they are precise.
+    accessible = list(board.mem_ranges)  # flash, SRAM, HWPE-Periph, TCDM
+    if xip_model == "qmi":
+        accessible.append(AddrRange(int(board.flash.maintenance_base),
+                                    size=XIP_SIZE))
+    if dma:
+        # Its four register blocks (normal, XOR, SET, CLR), rp2350_dma.cc
+        accessible.append(AddrRange(int(board.dma.pio_addr), size=0x4000))
+    accessible.append(AddrRange(int(board.sio.pio_addr), size=0x10000))
+    accessible.append(AddrRange(int(board.tb_io.pio_addr), size=0x200))
+    board.cpu.mmu.pma_checker.accessible = accessible
     # Hazard3's interrupt controller, with the RP2350's 52 IRQs and 4 priority
     # bits (arcsim-soc's config_rp2350_default.vh). Devices reach it through
     # Xh3irqLine.
@@ -380,8 +404,7 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     board.cpu.icache_port = board.icode_router.cpu_side_ports
     board.cpu.dcache_port = board.dcode_router.cpu_side_ports
     board.workload = RiscvBareMetal(
-        bootloader=firmware, semihosting=RiscvSemihosting(),
-        auto_reset_vect=False, reset_vect=0x10000040,
+        bootloader=firmware, semihosting=RiscvSemihosting()
     )
     return board
 

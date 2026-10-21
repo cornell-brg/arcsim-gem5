@@ -121,6 +121,16 @@ class PMAChecker : public BasePMAChecker
     Fault createMisalignFault(
         Addr vaddr, BaseMMU::Mode mode, bool virtualized = false);
 
+    /*
+     * Create access-fault exception based on the MMU mode
+     */
+    Fault createAccessFault(Addr vaddr, BaseMMU::Mode mode);
+
+    /*
+     * Check if the whole access lies in one accessible range
+     */
+    bool isAccessible(const Addr addr, const unsigned size);
+
     inline bool addressAlign(const Addr addr, const Addr size);
 
     /*
@@ -135,6 +145,7 @@ class PMAChecker : public BasePMAChecker
 
     AddrRangeList uncacheable;
     AddrRangeMap<bool, 3> misaligned;
+    AddrRangeList accessible;
 };
 
 } // namespace RiscvISA
