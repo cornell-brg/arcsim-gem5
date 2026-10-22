@@ -14,7 +14,8 @@ WindowInstCounter::WindowInstCounter(const WindowInstCounterParams &p)
       openPCs(p.open_pcs.begin(), p.open_pcs.end()),
       closePCs(p.close_pcs.begin(), p.close_pcs.end()),
       out(p.file, std::ios::out | std::ios::trunc),
-      classes(!p.classes_file.empty())
+      classes(!p.classes_file.empty()),
+      names(!p.names_file.empty())
 {
     fatal_if(openPCs.empty() || closePCs.empty(),
              "%s: needs at least one open and one close address", name());
@@ -23,6 +24,10 @@ WindowInstCounter::WindowInstCounter(const WindowInstCounterParams &p)
         classesOut.open(p.classes_file, std::ios::out | std::ios::trunc);
         fatal_if(!classesOut, "%s: cannot write %s", name(),
                  p.classes_file);
+    }
+    if (names) {
+        namesOut.open(p.names_file, std::ios::out | std::ios::trunc);
+        fatal_if(!namesOut, "%s: cannot write %s", name(), p.names_file);
     }
 }
 
@@ -41,6 +46,9 @@ WindowInstCounter::committed(const BaseCPU::CommittedOp &op)
     const StaticInst &inst = *op.inst;
     if (counting && classes)
         ++opClasses[inst.opClass()];
+    // getName() is not const; it only reads the mnemonic.
+    if (counting && names && inst.isMicroop())
+        ++opNames[const_cast<StaticInst &>(inst).getName()];
     if (counting) {
         DPRINTF(WindowInstCounter, "%#x %s: %s%s\n", op.pc,
                 inst.disassemble(op.pc), enums::OpClassStrings[inst.opClass()],
@@ -57,13 +65,15 @@ WindowInstCounter::committed(const BaseCPU::CommittedOp &op)
     const Addr pc = op.pc;
     if (counting) {
         ++count;
-        if (classes) {
-            fatal_if(inst.isMicroop() && !op.macro,
-                     "%s: the CPU does not report the macro-op of a "
-                     "micro-op, which the instruction classes need; use the "
-                     "atomic CPU or no classes file", name());
-            ++instClasses[(op.macro ? op.macro : op.inst)->opClass()];
-        }
+        fatal_if((classes || names) && inst.isMicroop() && !op.macro,
+                 "%s: the CPU does not report the macro-op of a micro-op, "
+                 "which the instruction classes and names need; use the "
+                 "atomic CPU or neither file", name());
+        const StaticInst *whole = op.macro ? op.macro : op.inst;
+        if (classes)
+            ++instClasses[whole->opClass()];
+        if (names)
+            ++instNames[const_cast<StaticInst *>(whole)->getName()];
     }
     if (closePCs.count(pc)) {
         if (counting) {
@@ -71,6 +81,8 @@ WindowInstCounter::committed(const BaseCPU::CommittedOp &op)
             out.flush();
             if (classes)
                 writeClasses();
+            if (names)
+                writeNames();
             DPRINTF(WindowInstCounter, "window closes at %#x: %llu\n", pc,
                     (unsigned long long)count);
         } else {
@@ -85,6 +97,8 @@ WindowInstCounter::committed(const BaseCPU::CommittedOp &op)
         count = 0;
         instClasses.fill(0);
         opClasses.fill(0);
+        instNames.clear();
+        opNames.clear();
     }
 }
 
@@ -108,6 +122,22 @@ WindowInstCounter::writeClasses()
     }
     classesOut << '\n';
     classesOut.flush();
+}
+
+void
+WindowInstCounter::writeNames()
+{
+    const char *sep = "";
+    for (const auto &[n, count] : instNames) {
+        namesOut << sep << "i." << n << '=' << count;
+        sep = " ";
+    }
+    for (const auto &[n, count] : opNames) {
+        namesOut << sep << "o." << n << '=' << count;
+        sep = " ";
+    }
+    namesOut << '\n';
+    namesOut.flush();
 }
 
 } // namespace gem5

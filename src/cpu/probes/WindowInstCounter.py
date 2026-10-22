@@ -5,8 +5,8 @@ from m5.params import *
 class WindowInstCounter(ProbeListenerObject):
     """Counts the instructions a core retires inside windows that open and
     close at given addresses, and writes one count per window to a file and,
-    with classes_file, the same instructions by OpClass to another
-    (window_inst_counter.hh). Set manager to the CPU to count on."""
+    with classes_file and names_file, the same instructions by OpClass and
+    by name to others (window_inst_counter.hh). Set manager to the CPU to count on."""
 
     type = "WindowInstCounter"
     cxx_header = "cpu/probes/window_inst_counter.hh"
@@ -19,4 +19,10 @@ class WindowInstCounter(ProbeListenerObject):
         "",
         "the file each window's instructions and micro-ops by OpClass are "
         "written to (empty: none); needs the atomic CPU",
+    )
+    names_file = Param.String(
+        "",
+        "the file each window's instructions, and the micro-ops of the "
+        "split ones, by name are written to (empty: none); needs the atomic "
+        "CPU",
     )
