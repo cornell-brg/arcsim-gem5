@@ -9,7 +9,7 @@ from m5.objects import Root
 from m5.stats import dump as stats_dump
 from m5.stats import reset as stats_reset
 
-from board import SCRATCH_BANK_BANDWIDTH, make_board, memory_models
+from board import HWPES, SCRATCH_BANK_BANDWIDTH, make_board, memory_models
 
 # Firmware output (Hazard3TbIO) goes straight to the file descriptor; line
 # buffering keeps this script's prints in order with it under -r.
@@ -51,6 +51,9 @@ parser.add_argument("--dma", action=argparse.BooleanOptionalAction,
 parser.add_argument("--xip-model", choices=("legacy", "qmi"),
                     help="qmi selects the cache banks and flash interface "
                     "timing of a Pico 2; the XIP knobs apply only to legacy")
+parser.add_argument("--hwpe", choices=tuple(HWPES), default="vvadd",
+                    help="The HWPE on the Hazard3 board, as arcsim-soc's "
+                    "CONFIG_HWPE")
 parser.add_argument("--tick-limit", type=int, default=100_000_000_000)
 args = parser.parse_args()
 if not args.firmware.is_file():
@@ -72,6 +75,7 @@ board = make_board(
     arm_timing=args.arm_timing,
     dma=args.dma,
     xip_model=args.xip_model,
+    hwpe=args.hwpe,
 )
 if args.xip_model == "legacy":
     board.xip_cache.tag_latency = args.xip_hit_latency_cycles
@@ -95,6 +99,8 @@ if args.sram_model == "banked":
     print("SRAM model=banked: ten banks, 32-bit grants at 150MHz, zero wait states")
 else:
     print(f"SRAM model=legacy; scratch bank effective bandwidth={args.scratch_bank_bandwidth}")
+if args.core == "hazard3-proxy":
+    print(f"HWPE={args.hwpe} at 0x50800000, TCDM=0x60000000+128KiB")
 roi_start = None
 roi_number = 0
 exit_code = 0

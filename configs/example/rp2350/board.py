@@ -35,6 +35,17 @@ SRAM_REGIONS = (
 # which is about 572 MiB/s.
 SCRATCH_BANK_BANDWIDTH = "572MiB/s"
 
+# The HWPEs for the Hazard3 board, keyed by arcsim-soc's CONFIG_HWPE names:
+# the class and its parameters. vvadd is vvadd-wide with one element per beat.
+HWPES = {
+    "empty": ("HWPEEmpty", {}),
+    "vvadd": ("HWPEVvaddWide", {"elems": 1}),
+    "vvadd-wide-1": ("HWPEVvaddWide", {"elems": 1}),
+    "vvadd-wide-2": ("HWPEVvaddWide", {"elems": 2}),
+    "vvadd-wide-4": ("HWPEVvaddWide", {"elems": 4}),
+    "vvadd-wide-8": ("HWPEVvaddWide", {"elems": 8}),
+}
+
 
 # 64 bit 0 extra latency crossbar
 def _router(clock_domain):
@@ -281,7 +292,7 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
 
 
 def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
-                scratch_bank_bandwidth, sram_model, dma, xip_model):
+                scratch_bank_bandwidth, sram_model, dma, xip_model, hwpe):
     from m5.objects import RiscvSystem
     from m5.objects.RiscvCPU import RiscvMinorCPU
     from m5.objects.RiscvFsWorkload import RiscvBareMetal
@@ -317,10 +328,12 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     board.sram_bus.mem_side_ports = board.tcdm_xbar.cpu_side_ports
     board.tcdm_xbar.mem_side_ports = board.tcdm.port
     # The HWPE (soc.v): its registers at 0x50800000 on the SRAM bus, its
-    # data port on the TCDM crossbar. No engine yet (HWPEEmpty); its done
-    # event (irq) stays unconnected, as in soc.v.
-    from m5.objects import HWPEEmpty
-    board.hwpe = HWPEEmpty(pio_latency="1ns")
+    # data port on the TCDM crossbar. Its done event (irq) stays
+    # unconnected, as in soc.v.
+    import m5.objects
+    hwpe_class, hwpe_params = HWPES[hwpe]
+    board.hwpe = getattr(m5.objects, hwpe_class)(pio_latency="1ns",
+                                                 **hwpe_params)
     board.hwpe.pio = board.sram_bus.mem_side_ports
     board.hwpe.tcdm_port = board.tcdm_xbar.cpu_side_ports
     if board._banked_sram:
@@ -423,7 +436,7 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                scratch_bank_bandwidth=SCRATCH_BANK_BANDWIDTH,
                arm_predictor="m4", arm_divider="rp2350-m33",
                sram_model=None, arm_timing="tuned", dma=None,
-               xip_model=None, model="legacy"):
+               xip_model=None, model="legacy", hwpe="vvadd"):
     """Return exactly one active core with the RP2350 memory baseline.
 
     model names the memory system: "legacy" is the lumped SRAM windows and
@@ -434,13 +447,15 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     dma adds the DMA controller (RP2350DMA) at 0x50000000-0x50003fff; on the
     Hazard3 proxy its interrupt outputs are left unconnected. xip_model
     "qmi" replaces the generic cache and fixed miss delay in front of flash
-    with RP2350XIP."""
+    with RP2350XIP. hwpe names the Hazard3 board's HWPE (HWPES)."""
     sram_model, dma, xip_model = memory_models(model, sram_model, dma,
                                                 xip_model)
     if sram_model not in ("legacy", "banked"):
         raise ValueError(f"Unknown SRAM model: {sram_model}")
     if xip_model not in ("legacy", "qmi"):
         raise ValueError(f"Unknown XIP model: {xip_model}")
+    if hwpe not in HWPES:
+        raise ValueError(f"Unknown HWPE: {hwpe}")
     if core == "arm-m4-proxy":
         return _make_arm(firmware, xip_miss_ns=xip_miss_ns,
                          sram_latency_ns=sram_latency_ns,
@@ -454,5 +469,5 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                            sram_latency_ns=sram_latency_ns,
                            scratch_bank_bandwidth=scratch_bank_bandwidth,
                            sram_model=sram_model, dma=dma,
-                           xip_model=xip_model)
+                           xip_model=xip_model, hwpe=hwpe)
     raise ValueError(f"Unknown RP2350 core selector: {core}")  

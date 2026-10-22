@@ -45,7 +45,7 @@ HWPEBase::TcdmPort::recvTimingResp(PacketPtr pkt)
 void
 HWPEBase::TcdmPort::recvReqRetry()
 {
-    // A soft clear may have dropped the packet the TCDM refused
+    // Nothing to resend if a soft clear has dropped the refused packet
     if (!held)
         return;
     PacketPtr pkt = held;
@@ -60,6 +60,7 @@ HWPEBase::TcdmPort::recvReqRetry()
 HWPEBase::HWPEBase(const Params &p)
     : BasicPioDevice(p, p.pio_size),
       requestorId(p.system->getRequestorId(this)),
+      streamer(*this),
       tcdmPort(name() + ".tcdm_port", *this),
       numContexts(p.num_contexts),
       startLatency(p.start_latency),
@@ -115,7 +116,7 @@ HWPEBase::unmodelled(Addr offset, bool is_write)
              name(), offset, is_write ? "write" : "read");
 }
 
-// One bit per context with a job queued or running, at the context's byte.
+// STATUS: bit 8*n is set while context n has a job queued or running.
 uint32_t
 HWPEBase::status() const
 {
@@ -167,7 +168,8 @@ HWPEBase::readRegister(Addr offset)
     return 0;
 }
 
-// mask: the bytes the access writes; the others keep their value.
+// mask selects the bytes the access writes; the other bytes keep their
+// value.
 void
 HWPEBase::writeRegister(Addr offset, uint32_t value, uint32_t mask)
 {
@@ -178,7 +180,7 @@ HWPEBase::writeRegister(Addr offset, uint32_t value, uint32_t mask)
       case SOFT_CLEAR:
         softClear((value & mask) == 0);
         return;
-      // Read only, or nothing to do
+      // Read-only registers, and registers whose writes have no effect
       case ACQUIRE:
       case FINISHED:
       case STATUS:
@@ -308,8 +310,12 @@ HWPEBase::softClear(bool registers)
         deschedule(doneEvent);
     if (running)
         clearJob();
-    // Responses of accesses sent before now go to clearedTcdmResp()
+    streamer.clear();
+    // From now on, responses to accesses sent before this point go to
+    // clearedTcdmResp() (see TcdmState)
     ++clears;
+    // A packet the TCDM refused was never accepted, so no response will
+    // come for it: hand it to clearedTcdmResp() now
     if (PacketPtr pkt = tcdmPort.drop()) {
         delete pkt->popSenderState();
         --outstanding;
@@ -364,7 +370,19 @@ HWPEBase::sendTcdm(PacketPtr pkt)
 void
 HWPEBase::recvTcdmResp(PacketPtr pkt)
 {
-    panic("%s: TCDM response to an HWPE without TCDM accesses", name());
+    streamer.recvResp(pkt);
+}
+
+void
+HWPEBase::tcdmRetried()
+{
+    streamer.retried();
+}
+
+void
+HWPEBase::clearedTcdmResp(PacketPtr pkt)
+{
+    streamer.dropPacket(pkt);
 }
 
 void
@@ -399,6 +417,7 @@ HWPEBase::drain()
 void
 HWPEBase::drainResume()
 {
+    streamer.wake();
     resumeJob();
 }
 
@@ -418,7 +437,7 @@ HWPEBase::serialize(CheckpointOut &cp) const
     SERIALIZE_SCALAR(jobId);
     SERIALIZE_SCALAR(doneJobs);
     SERIALIZE_SCALAR(finished);
-    // Events, by when they are due; MaxTick if not scheduled
+    // Each event as the tick it is due at; MaxTick if not scheduled
     const Tick start_tick =
         startEvent.scheduled() ? startEvent.when() : MaxTick;
     const Tick done_tick = doneEvent.scheduled() ? doneEvent.when() : MaxTick;
@@ -427,6 +446,10 @@ HWPEBase::serialize(CheckpointOut &cp) const
     SERIALIZE_SCALAR(start_tick);
     SERIALIZE_SCALAR(done_tick);
     SERIALIZE_SCALAR(irq_lower_tick);
+    // serializeJob() must come before the streamer's section: values
+    // written after a subsection end up inside that subsection
+    serializeJob(cp);
+    streamer.serializeSection(cp, "streamer");
 }
 
 void
@@ -461,10 +484,14 @@ HWPEBase::unserialize(CheckpointIn &cp)
     if (done_tick != MaxTick)
         schedule(doneEvent, done_tick);
     if (irq_lower_tick != MaxTick && irqPin) {
-        // High at the checkpoint: the pin's sink restores its own state
+        // The IRQ was high at the checkpoint. Set it high again without
+        // notifying the receiver, which restores its own state from its
+        // own checkpoint section
         irqPin->set(true, true);
         schedule(irqLowerEvent, irq_lower_tick);
     }
+    unserializeJob(cp);
+    streamer.unserializeSection(cp, "streamer");
 }
 
 } // namespace gem5
