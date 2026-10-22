@@ -157,7 +157,7 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
 
 def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
               scratch_bank_bandwidth, arm_predictor, arm_divider, sram_model,
-              arm_timing, dma, xip_model):
+              arm_timing, dma, xip_model, cpu):
     from m5.objects import ArmMSystem, ArmSemihosting
     from m5.objects.ArmMSystem import ArmMReleaseCortexM33
     from m5.objects.ArmMFsWorkload import ArmMFsWorkload
@@ -209,8 +209,12 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     board.cpuid = 0x410FC241
 
     # The CortexM33CPU timing, tuned against a Pico 2 (the default), or the
-    # CortexM4CPU's as it was before its tuning against the STM32G474
-    if arm_timing == "tuned":
+    # CortexM4CPU's as it was before its tuning against the STM32G474; or the
+    # atomic CPU, with no core timing.
+    if cpu == "atomic":
+        from m5.objects.ArmMCPU import ArmMAtomicSimpleCPU
+        board.cpu = ArmMAtomicSimpleCPU(cpu_id=0)
+    elif arm_timing == "tuned":
         from gem5.prebuilt.cortexm.cpu.cortex_m33 import CortexM33CPU
         board.cpu = CortexM33CPU(cpu_id=0)
     elif arm_timing == "pre-tuning":
@@ -223,23 +227,24 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     else:
         raise ValueError(f"Unknown Arm timing: {arm_timing}")
 
-    # For playing around with different branch predictors and dividers
-    for unit in board.cpu.executeFuncUnits.funcUnits:
-        if isinstance(unit, DynamicLatencyIntDivFU):
-            unit.rp2350_m33_timing = arm_divider == "rp2350-m33"
-    if arm_predictor in ("local", "local-small"):
-        board.cpu.branchPred.conditionalBranchPred = LocalBP(
-            localPredictorSize=2048, localCtrBits=2
-        )
-    if arm_predictor in ("local", "large-btb"):
-        board.cpu.branchPred.btb = SimpleBTB(
-            numEntries=1024, tagBits=16, instShiftAmt=1
-        )
+    if cpu == "minor":
+        # For playing around with different branch predictors and dividers
+        for unit in board.cpu.executeFuncUnits.funcUnits:
+            if isinstance(unit, DynamicLatencyIntDivFU):
+                unit.rp2350_m33_timing = arm_divider == "rp2350-m33"
+        if arm_predictor in ("local", "local-small"):
+            board.cpu.branchPred.conditionalBranchPred = LocalBP(
+                localPredictorSize=2048, localCtrBits=2
+            )
+        if arm_predictor in ("local", "large-btb"):
+            board.cpu.branchPred.btb = SimpleBTB(
+                numEntries=1024, tagBits=16, instShiftAmt=1
+            )
 
-    # The Cortex-M33 has no write buffer: a store that the bus makes wait
-    # holds the instructions behind it. Only the banked SRAM has banks to
-    # lose; the legacy memories keep the store buffer's timing.
-    board.cpu.executeWaitedStoreHoldsInsts = board._banked_sram
+        # The Cortex-M33 has no write buffer: a store that the bus makes wait
+        # holds the instructions behind it. Only the banked SRAM has banks to
+        # lose; the legacy memories keep the store buffer's timing.
+        board.cpu.executeWaitedStoreHoldsInsts = board._banked_sram
 
     board.cpu.clk_domain = board.clk_domain
     board.mem_mode = board.cpu.memory_mode()
@@ -281,9 +286,9 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
 
 
 def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
-                scratch_bank_bandwidth, sram_model, dma, xip_model):
+                scratch_bank_bandwidth, sram_model, dma, xip_model, cpu):
     from m5.objects import RiscvSystem
-    from m5.objects.RiscvCPU import RiscvMinorCPU
+    from m5.objects.RiscvCPU import RiscvAtomicSimpleCPU, RiscvMinorCPU
     from m5.objects.RiscvFsWorkload import RiscvBareMetal
     from m5.objects.RiscvISA import RiscvISA
     from m5.objects.RiscvSemihosting import RiscvSemihosting
@@ -317,8 +322,11 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     board.hwpe_periph.port = board.sram_bus.mem_side_ports
     if board._banked_sram:
         board.icode_router.mem_side_ports = board.sram.port
-    board.mem_mode = "timing"
-    board.cpu = RiscvMinorCPU(cpu_id=0)
+    if cpu == "atomic":
+        board.cpu = RiscvAtomicSimpleCPU(cpu_id=0)
+    else:
+        board.cpu = RiscvMinorCPU(cpu_id=0)
+    board.mem_mode = board.cpu.memory_mode()
     # Peripheral space is device memory: accesses go in order and a load reads the
     # device, never a store still in the store buffer (APB and AHB peripherals, the
     # testbench IO block and SIO).
@@ -381,24 +389,25 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     board.tb_io.soft_irq = board.tb_soft_irq_line.pin
     board.tb_timer_irq_line = RiscvIntLine(int_num=7)
     board.tb_io.timer_irq = board.tb_timer_irq_line.pin
-    board.cpu.decodeInputWidth = 1
-    board.cpu.executeInputWidth = 1
-    board.cpu.executeIssueLimit = 1
-    board.cpu.executeCommitLimit = 1
-    board.cpu.fetch1LineWidth = 8
-    board.cpu.fetch1LineSnapWidth = 8
-    board.cpu.fetch1FetchLimit = 2
-    board.cpu.fetch1ToFetch2ForwardDelay = 1
-    board.cpu.fetch1ToFetch2BackwardDelay = 0
-    board.cpu.executeBranchDelay = 1
-    units = MinorDefaultFUPool()
-    for unit in units.funcUnits:
-        if isinstance(unit, (MinorDefaultIntFU, MinorDefaultIntMulFU)):
-            unit.opLat = 1
-        elif isinstance(unit, MinorDefaultIntDivFU):
-            unit.opLat = 19
-            unit.issueLat = 19
-    board.cpu.executeFuncUnits = units
+    if cpu == "minor":
+        board.cpu.decodeInputWidth = 1
+        board.cpu.executeInputWidth = 1
+        board.cpu.executeIssueLimit = 1
+        board.cpu.executeCommitLimit = 1
+        board.cpu.fetch1LineWidth = 8
+        board.cpu.fetch1LineSnapWidth = 8
+        board.cpu.fetch1FetchLimit = 2
+        board.cpu.fetch1ToFetch2ForwardDelay = 1
+        board.cpu.fetch1ToFetch2BackwardDelay = 0
+        board.cpu.executeBranchDelay = 1
+        units = MinorDefaultFUPool()
+        for unit in units.funcUnits:
+            if isinstance(unit, (MinorDefaultIntFU, MinorDefaultIntMulFU)):
+                unit.opLat = 1
+            elif isinstance(unit, MinorDefaultIntDivFU):
+                unit.opLat = 19
+                unit.issueLat = 19
+        board.cpu.executeFuncUnits = units
     board.cpu.createThreads()
     board.cpu.createInterruptController()
     board.cpu.icache_port = board.icode_router.cpu_side_ports
@@ -428,8 +437,12 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                scratch_bank_bandwidth=SCRATCH_BANK_BANDWIDTH,
                arm_predictor="m4", arm_divider="rp2350-m33",
                sram_model=None, arm_timing="tuned", dma=None,
-               xip_model=None, model="legacy"):
+               xip_model=None, model="legacy", cpu="minor"):
     """Return exactly one active core with the RP2350 memory baseline.
+
+    cpu is "minor", the timed core (CortexM33CPU, or the Hazard3 proxy, a
+    RISC-V MinorCPU), or "atomic", gem5's atomic CPU as an instruction-level
+    simulator: the same ISA and devices, no core timing.
 
     model names the memory system: "legacy" is the lumped SRAM windows and
     the generic cache in front of flash; "accurate" is the banked SRAM, the
@@ -446,6 +459,8 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
         raise ValueError(f"Unknown SRAM model: {sram_model}")
     if xip_model not in ("legacy", "qmi"):
         raise ValueError(f"Unknown XIP model: {xip_model}")
+    if cpu not in ("minor", "atomic"):
+        raise ValueError(f"Unknown CPU: {cpu}")
     if core == "arm-m4-proxy":
         return _make_arm(firmware, xip_miss_ns=xip_miss_ns,
                          sram_latency_ns=sram_latency_ns,
@@ -453,11 +468,11 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                          arm_predictor=arm_predictor,
                          arm_divider=arm_divider, sram_model=sram_model,
                          arm_timing=arm_timing, dma=dma,
-                         xip_model=xip_model)
+                         xip_model=xip_model, cpu=cpu)
     if core == "hazard3-proxy":
         return _make_riscv(firmware, xip_miss_ns=xip_miss_ns,
                            sram_latency_ns=sram_latency_ns,
                            scratch_bank_bandwidth=scratch_bank_bandwidth,
                            sram_model=sram_model, dma=dma,
-                           xip_model=xip_model)
+                           xip_model=xip_model, cpu=cpu)
     raise ValueError(f"Unknown RP2350 core selector: {core}")  
