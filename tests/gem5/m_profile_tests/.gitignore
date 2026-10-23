@@ -1,0 +1,2 @@
+# objdump listings the Makefiles write beside each test ELF; generated, so not kept.
+*.dump
