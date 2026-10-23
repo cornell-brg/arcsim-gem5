@@ -341,6 +341,10 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     board.hwpe = getattr(m5.objects, hwpe_class)(pio_latency="1ns",
                                                  **hwpe_params)
     board.hwpe.pio = board.sram_bus.mem_side_ports
+    # Its registers are in mem_ranges, as the placeholder memory there was, so
+    # runners that place stand-ins outside mem_ranges leave them alone.
+    board.mem_ranges.append(AddrRange(int(board.hwpe.pio_addr),
+                                      size=int(board.hwpe.pio_size)))
     board.hwpe.tcdm_port = board.tcdm_xbar.cpu_side_ports
     if board._banked_sram:
         board.icode_router.mem_side_ports = board.sram.port
@@ -372,7 +376,7 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     # Loads, stores and fetches outside what this board has are access
     # faults, as rtl-sim's bus errors are; the core raises them before the
     # access leaves it, so they are precise.
-    accessible = list(board.mem_ranges)  # flash, SRAM, TCDM
+    accessible = list(board.mem_ranges)  # flash, SRAM, TCDM, HWPE registers
     if xip_model == "qmi":
         accessible.append(AddrRange(int(board.flash.maintenance_base),
                                     size=XIP_SIZE))
@@ -381,8 +385,6 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         accessible.append(AddrRange(int(board.dma.pio_addr), size=0x4000))
     accessible.append(AddrRange(int(board.sio.pio_addr), size=0x10000))
     accessible.append(AddrRange(int(board.tb_io.pio_addr), size=0x200))
-    accessible.append(AddrRange(int(board.hwpe.pio_addr),
-                                size=int(board.hwpe.pio_size)))
     board.cpu.mmu.pma_checker.accessible = accessible
     # Hazard3's interrupt controller, with the RP2350's 52 IRQs and 4 priority
     # bits (arcsim-soc's config_rp2350_default.vh). Devices reach it through
