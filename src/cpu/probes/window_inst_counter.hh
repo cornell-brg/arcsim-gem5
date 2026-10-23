@@ -26,6 +26,27 @@
 // kept as micro-ops write them; a result is the register after it. Values are taken as
 // 32 bits (both cores are 32-bit). Floating-point and condition registers are not counted.
 //
+// With an activity file (Arm Thumb cores, atomic CPU), each window adds a line there of
+// ten counts, separated by spaces, with the definitions of the energy fit's m33width.py:
+//   1, 2  the 16-bit and the 32-bit instructions;
+//   3     those that use the shifter (thumb_traits.hh);
+//   4     the bits that change from each instruction's encoding to the next one's (a
+//         16-bit encoding as its halfword, a 32-bit one as both, the first high),
+//         counted from the instruction before the window's first;
+//   5-7   data accesses, one for each instruction or micro-op with a memory access
+//         (as the execution trace's ExecEffAddr shows them), by where its address is:
+//         reads of flash (0x10000000-0x1fffffff), reads of SRAM and writes to SRAM
+//         (0x20000000-0x2fffffff), a read or a write as the whole instruction's
+//         mnemonic says (thumb_traits.hh);
+//   8     taken control transfers: instructions after which the next one executed is
+//         not the next in memory (the window's first is not counted);
+//   9, 10 unit switching, from each instruction's kind (thumb_traits.hh): instructions
+//         whose kind differs from the previous one's, and those whose kind none of the
+//         previous four had, the previous ones counted across windows.
+// A split instruction counts when its first micro-op commits, as the execution trace
+// shows its macro-op then, so the micro-ops of one that closes a window are outside it
+// and those of one that opens a window inside it.
+//
 // With a stats file and the full names of scalar statistics (e.g.
 // system.flash.cache.chained), each window adds a line there with how much each grew
 // over the window, as name=value pairs in the order given. Any CPU model; the
@@ -52,6 +73,7 @@
 #include "base/stats/info.hh"
 #include "cpu/base.hh"
 #include "cpu/op_class.hh"
+#include "cpu/probes/thumb_traits.hh"
 #include "params/WindowInstCounter.hh"
 #include "sim/probe/probe_listener_object.hh"
 
@@ -73,8 +95,20 @@ class WindowInstCounter : public ProbeListenerObject
     void writeNames();
     void writeFlips();
     void writeStats();
+    void writeActivity();
     void countFlips(const StaticInst &inst, const StaticInst &whole);
     void copyRegisters();
+
+    struct Encoded
+    {
+        uint32_t enc;
+        unsigned width;
+        thumb::Traits traits;
+    };
+    const Encoded &encoded(const StaticInst &whole);
+    void activityInst(const StaticInst &whole, Addr pc);
+    void activityAccess(const BaseCPU::CommittedOp &op,
+                        const StaticInst &whole);
 
     std::unordered_set<Addr> openPCs;
     std::unordered_set<Addr> closePCs;
@@ -83,12 +117,14 @@ class WindowInstCounter : public ProbeListenerObject
     std::ofstream namesOut;
     std::ofstream flipsOut;
     std::ofstream statsOut;
+    std::ofstream activityOut;
     const std::vector<std::string> statNames;
     std::vector<const statistics::ScalarInfo *> statInfos;
     std::vector<double> statStart;
     const bool classes;
     const bool names;
     const bool flips;
+    const bool activity;
     BaseCPU *cpu;
     bool counting = false;
     uint64_t count = 0;
@@ -102,6 +138,18 @@ class WindowInstCounter : public ProbeListenerObject
     std::array<std::array<RegVal, Slots>, Num_OpClasses> lastSrc{};
     std::array<std::array<RegVal, Slots>, Num_OpClasses> lastDest{};
     std::map<std::string, std::pair<uint64_t, uint64_t>> nameFlips;  // s, d
+
+    // The activity file's window opens and closes at a split instruction's
+    // first micro-op, so it keeps its own.
+    bool activityOpen = false;
+    std::array<uint64_t, 10> activityCounts{};
+    uint32_t lastEnc = 0;
+    Addr nextPC = 0;
+    bool nextPCValid = false;
+    std::array<thumb::Kind, 4> kinds{};  // the last ones, oldest first
+    size_t numKinds = 0;
+    // Machine instruction (encoding, IT state, width) -> what it is.
+    std::unordered_map<uint64_t, Encoded> encodings;
 };
 
 } // namespace gem5

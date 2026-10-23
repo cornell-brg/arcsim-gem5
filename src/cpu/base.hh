@@ -43,6 +43,7 @@
 #define __CPU_BASE_HH__
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "arch/generic/interrupts.hh"
@@ -523,9 +524,12 @@ class BaseCPU : public ClockedObject
      * @param pc PC of the instruction that just committed
      * @param macro The macro-op inst is a micro-op of, when the CPU model
      *              keeps it (null otherwise)
+     * @param eff_addr The address of inst's memory access, when it made one
+     *                 and the CPU model reports it
      */
     virtual void probeInstCommit(const StaticInstPtr &inst, Addr pc,
-                                 const StaticInstPtr &macro);
+                                 const StaticInstPtr &macro,
+                                 std::optional<Addr> eff_addr = std::nullopt);
     /** The same, for a CPU model that does not keep the macro-op */
     void probeInstCommit(const StaticInstPtr &inst, Addr pc);
 
@@ -533,13 +537,17 @@ class BaseCPU : public ClockedObject
      * What the CommittedOps probe point reports for every committed
      * instruction or micro-op: the instruction, the macro-op it is a
      * micro-op of (null when it is not a micro-op, or when the CPU model
-     * does not keep it) and its PC.
+     * does not keep it), its PC and the address of its memory access (the
+     * last one, as the execution trace's ExecEffAddr shows it; empty when
+     * it made none or the CPU model does not report it, which only the
+     * atomic CPU does).
      */
     struct CommittedOp
     {
         const StaticInst *inst;
         const StaticInst *macro;
         Addr pc;
+        std::optional<Addr> effAddr;
     };
 
    protected:
