@@ -47,6 +47,7 @@
 #include "arch/arm/insts/vfp.hh"    // vfp{S,U}FixedToFpS, vfpFpToFixed
 #include "arch/arm/m_faults.hh"
 #include "arch/arm/m_insts.hh"     // mProfilePredicateHolds (IT-block gate)
+#include "arch/arm/m_system.hh"
 #include "arch/arm/regs/int.hh"
 #include "arch/arm/regs/misc.hh"
 #include "arch/arm/regs/misc_types.hh"
@@ -348,31 +349,51 @@ MFpOp::checkMProfileFPEnabled(ThreadContext *tc) const
 void
 MFpOp::setFPCA(ThreadContext *tc) const
 {
-    // Set CONTROL.FPCA (bit 2) = 1 to indicate FP context is active.
-    // This tells exception entry to stack the extended FP frame.
-    // [DDI0403E B1.4.2]: "the processor sets this bit to 1 on
-    // execution of a floating-point instruction."
+    // With automatic state preservation (FPCCR.ASPEN), the first FP
+    // instruction of a context makes a new FP context: it sets
+    // CONTROL.FPCA, which tells exception entry to stack the extended
+    // frame, and takes FPSCR's defaults from FPDSCR [ExecuteFPCheck:
+    // FPSCR<26:22> = FPDSCR<26:22> in DDI0403E, FPSCR = FPDSCR in
+    // DDI0553].
+    FPCCR_M fpccr = tc->readMiscRegNoEffect(MISCREG_M_FPCCR);
     CONTROL_M ctrl = tc->readMiscRegNoEffect(MISCREG_M_CONTROL);
-    if (!ctrl.fpca) {
-        ctrl.fpca = 1;
-        tc->setMiscRegNoEffect(MISCREG_M_CONTROL, ctrl);
+    if (!fpccr.aspen || ctrl.fpca)
+        return;
+    const RegVal fpdscr = tc->readMiscRegNoEffect(MISCREG_M_FPDSCR);
+    auto *msys = dynamic_cast<ArmMSystem *>(tc->getSystemPtr());
+    RegVal fpscr;
+    if (msys && msys->has(ArmExtension::M_PROFILE_ARMV8M)) {
+        fpscr = fpdscr;
+    } else {
+        constexpr RegVal mask = 0x07C00000;
+        fpscr = (tc->readMiscRegNoEffect(MISCREG_FPSCR) & ~mask) |
+                (fpdscr & mask);
     }
+    tc->setMiscRegNoEffect(MISCREG_FPSCR, fpscr);
+    ctrl.fpca = 1;
+    tc->setMiscRegNoEffect(MISCREG_M_CONTROL, ctrl);
+}
+
+void
+MFpOp::completeLazyStacking(ThreadContext *tc) const
+{
+    // A lazy save that exception entry deferred (FPCCR.LSPACT) is made
+    // by the first FP instruction after it [DDI0403E B1.5.7].
+    FPCCR_M fpccr = tc->readMiscRegNoEffect(MISCREG_M_FPCCR);
+    if (fpccr.lspact)
+        preserveFPState(tc);
 }
 
 Fault
-MFpOp::completeLazyStacking(ThreadContext *tc) const
+MFpOp::executeFPCheck(ThreadContext *tc) const
 {
-    // Stub: lazy stacking not yet implemented.
-    // When FPCCR.LSPEN=1 and FPCCR.LSPACT=1, the hardware deferred
-    // saving FP registers during exception entry.  The first FP
-    // instruction in the handler must complete that deferred save.
-    // [DDI0403E B1.5.7]
-    //
-    // Full implementation requires:
-    //   1. Check FPCCR.LSPACT — if 0, nothing to do.
-    //   2. Read FPCAR for the deferred save address.
-    //   3. Push S0-S15 + FPSCR to that address.
-    //   4. Clear FPCCR.LSPACT.
+    // ExecuteFPCheck [DDI0403E B1.5.7]: the access check, then the
+    // pending lazy save, then a new FP context.
+    Fault fault = checkMProfileFPEnabled(tc);
+    if (fault != NoFault)
+        return fault;
+    completeLazyStacking(tc);
+    setFPCA(tc);
     return NoFault;
 }
 
@@ -412,20 +433,13 @@ MFpOp::execute(ExecContext *xc, trace::InstRecord *traceData) const
             mnemonic,
             tc->pcState().as<ArmISA::PCState>().instAddr());
 
-    // 1. Check FP access permission (CPACR.CP10)
-    Fault fault = checkMProfileFPEnabled(tc);
+    // 1. Check FP access permission (CPACR.CP10), make a pending lazy
+    // save, and make a new FP context if there is none
+    Fault fault = executeFPCheck(tc);
     if (fault != NoFault)
         return fault;
 
-    // 2. Set CONTROL.FPCA = 1 (FP context now active)
-    setFPCA(tc);
-
-    // 3. Complete lazy stacking if pending
-    fault = completeLazyStacking(tc);
-    if (fault != NoFault)
-        return fault;
-
-    // 4. Dispatch to child's actual FP computation
+    // 2. Dispatch to child's actual FP computation
     return doFpOp(xc, traceData);
 }
 
@@ -1258,9 +1272,8 @@ MFpLdrS::execute(ExecContext *xc, trace::InstRecord *traceData) const
     // Skip everything below (FP-enable check, FPCA, memory access).
     // See mProfilePredicateHolds in m_insts.hh.
     if (!mProfilePredicateHolds(tc, condCode)) return NoFault;
-    Fault fault = checkMProfileFPEnabled(tc);
+    Fault fault = executeFPCheck(tc);
     if (fault != NoFault) return fault;
-    setFPCA(tc);
 
     // PC-relative base for VLDR (literal). Thumb semantics (ARM ARM
     // A6.1.2): the architected PC inside any instruction is
@@ -1291,9 +1304,8 @@ MFpLdrS::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
     // Skip everything below (FP-enable check, FPCA, memory access).
     // See mProfilePredicateHolds in m_insts.hh.
     if (!mProfilePredicateHolds(tc, condCode)) return NoFault;
-    Fault fault = checkMProfileFPEnabled(tc);
+    Fault fault = executeFPCheck(tc);
     if (fault != NoFault) return fault;
-    setFPCA(tc);
 
     // PC-relative base for VLDR (literal). Thumb semantics (ARM ARM
     // A6.1.2): the architected PC inside any instruction is
@@ -1350,9 +1362,8 @@ MFpStrS::execute(ExecContext *xc, trace::InstRecord *traceData) const
     // Skip everything below (FP-enable check, FPCA, memory access).
     // See mProfilePredicateHolds in m_insts.hh.
     if (!mProfilePredicateHolds(tc, condCode)) return NoFault;
-    Fault fault = checkMProfileFPEnabled(tc);
+    Fault fault = executeFPCheck(tc);
     if (fault != NoFault) return fault;
-    setFPCA(tc);
 
     Addr base = tc->getReg(RegId(intRegClass, rn));
     Addr addr = add ? (base + imm) : (base - imm);
@@ -1370,9 +1381,8 @@ MFpStrS::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
     // Skip everything below (FP-enable check, FPCA, memory access).
     // See mProfilePredicateHolds in m_insts.hh.
     if (!mProfilePredicateHolds(tc, condCode)) return NoFault;
-    Fault fault = checkMProfileFPEnabled(tc);
+    Fault fault = executeFPCheck(tc);
     if (fault != NoFault) return fault;
-    setFPCA(tc);
 
     Addr base = tc->getReg(RegId(intRegClass, rn));
     Addr addr = add ? (base + imm) : (base - imm);
@@ -1417,9 +1427,8 @@ MFpLdrD::execute(ExecContext *xc, trace::InstRecord *traceData) const
     // Skip everything below (FP-enable check, FPCA, memory access).
     // See mProfilePredicateHolds in m_insts.hh.
     if (!mProfilePredicateHolds(tc, condCode)) return NoFault;
-    Fault fault = checkMProfileFPEnabled(tc);
+    Fault fault = executeFPCheck(tc);
     if (fault != NoFault) return fault;
-    setFPCA(tc);
 
     // PC-relative base for VLDR (literal). Thumb semantics (ARM ARM
     // A6.1.2): the architected PC inside any instruction is
@@ -1452,9 +1461,8 @@ MFpLdrD::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
     // Skip everything below (FP-enable check, FPCA, memory access).
     // See mProfilePredicateHolds in m_insts.hh.
     if (!mProfilePredicateHolds(tc, condCode)) return NoFault;
-    Fault fault = checkMProfileFPEnabled(tc);
+    Fault fault = executeFPCheck(tc);
     if (fault != NoFault) return fault;
-    setFPCA(tc);
 
     // PC-relative base for VLDR (literal). Thumb semantics (ARM ARM
     // A6.1.2): the architected PC inside any instruction is
@@ -1513,9 +1521,8 @@ MFpStrD::execute(ExecContext *xc, trace::InstRecord *traceData) const
     // Skip everything below (FP-enable check, FPCA, memory access).
     // See mProfilePredicateHolds in m_insts.hh.
     if (!mProfilePredicateHolds(tc, condCode)) return NoFault;
-    Fault fault = checkMProfileFPEnabled(tc);
+    Fault fault = executeFPCheck(tc);
     if (fault != NoFault) return fault;
-    setFPCA(tc);
 
     Addr base = tc->getReg(RegId(intRegClass, rn));
     Addr addr = add ? (base + imm) : (base - imm);
@@ -1536,9 +1543,8 @@ MFpStrD::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
     // Skip everything below (FP-enable check, FPCA, memory access).
     // See mProfilePredicateHolds in m_insts.hh.
     if (!mProfilePredicateHolds(tc, condCode)) return NoFault;
-    Fault fault = checkMProfileFPEnabled(tc);
+    Fault fault = executeFPCheck(tc);
     if (fault != NoFault) return fault;
-    setFPCA(tc);
 
     Addr base = tc->getReg(RegId(intRegClass, rn));
     Addr addr = add ? (base + imm) : (base - imm);

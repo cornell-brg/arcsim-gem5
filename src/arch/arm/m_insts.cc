@@ -359,9 +359,9 @@ BxMProfile::execute(ExecContext *xc,
     RegVal target = tc->getReg(RegId(intRegClass, op1));
 
     // EXC_RETURN detection (DDI0403E B1.5.8):
-    // If bits[31:4] are all 1s, this is an exception return magic value,
-    // not a branch address.  Valid range: 0xFFFFFFF0–0xFFFFFFFF.
-    if ((target & 0xFFFFFFF0) == 0xFFFFFFF0) {
+    // If bits[31:5] are all 1s, this is an exception return magic value,
+    // not a branch address.  Valid range: 0xFFFFFFE0–0xFFFFFFFF.
+    if (isMProfileExcReturn(target)) {
         // Exception return: deactivate via interrupt controller, then
         // unstack CPU state.  MProfileInterrupts::excReturn() handles both.
         DPRINTF(MProfileStacking,

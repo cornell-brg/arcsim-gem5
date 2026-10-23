@@ -58,7 +58,11 @@ TESTS = cortexm4_basic test_cps test_mrs_msr test_bx_exc_return \
         test_rp2350_xip \
         test_rp2350_store_wait \
         test_rp2350_fetch_ahead \
-        test_nvic_pend_enable
+        test_nvic_pend_enable \
+        test_fp_stacking \
+        test_late_arrival \
+        test_fp_stacking_rp2350 \
+        test_late_arrival_rp2350
 
 all: $(addsuffix .elf, $(TESTS)) freertos-tests
 
@@ -71,6 +75,15 @@ freertos-tests:
 test_fpv5.o test_fpv5_undefined.o test_coproc_nocp.o test_coproc_rp2350.o: ASFLAGS = -mcpu=cortex-m33 -mfpu=fpv5-sp-d16 -mthumb
 
 test_it_fp_load_store.o: ASFLAGS = -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mthumb
+
+# The FP context tests, for the STM32F405 platform and, from the same
+# source, for the RP2350 board from SRAM
+FP_CONTEXT_TESTS = test_fp_stacking test_late_arrival
+$(addsuffix .o, $(FP_CONTEXT_TESTS)): ASFLAGS = -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mthumb
+$(addsuffix _rp2350.o, $(FP_CONTEXT_TESTS)): %_rp2350.o: %.S
+	$(AS) -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mthumb --defsym RP2350=1 $< -o $@
+$(addsuffix _rp2350.elf, $(FP_CONTEXT_TESTS)): LDFLAGS = -T rp2350_sram.ld --no-warn-rwx-segments
+$(addsuffix _rp2350.elf, $(FP_CONTEXT_TESTS)): rp2350_sram.ld
 
 # The load-acquire and store-release instructions are ARMv8-M's
 test_v8m_exclusive.o test_v8m_exclusive_undefined.o: ASFLAGS = -mcpu=cortex-m33 -mthumb

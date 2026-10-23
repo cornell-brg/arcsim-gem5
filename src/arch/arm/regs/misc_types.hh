@@ -1221,6 +1221,19 @@ namespace ArmISA
                                 // (0=privileged, 1=unprivileged)
     EndBitUnion(CONTROL_M)
 
+    // FP Context Control Register, FPCCR (DDI0403E B3.2)
+    BitUnion32(FPCCR_M)
+        Bitfield<31> aspen;     // automatic state preservation
+        Bitfield<30> lspen;     // lazy state preservation
+        Bitfield<8> monrdy;
+        Bitfield<6> bfrdy;
+        Bitfield<5> mmrdy;
+        Bitfield<4> hfrdy;
+        Bitfield<3> thread;     // the lazy frame was stacked from Thread mode
+        Bitfield<1> user;       // ... by unprivileged code
+        Bitfield<0> lspact;     // a lazy save is pending
+    EndBitUnion(FPCCR_M)
+
     BitUnion32(AIRCR_t)
         Bitfield<31, 16> vectkey;    // Must write 0x05FA
         Bitfield<15> endianness;     // Data endianness (read-only)

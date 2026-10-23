@@ -49,6 +49,7 @@ Xh3irq::Xh3irq(const Params &p)
       _numIrqs(p.num_irqs),
       priorityMask(0xf & ~(0xf >> p.priority_bits)),
       enable(p.num_irqs), force(p.num_irqs), level(p.num_irqs),
+      highLines(p.num_irqs),
       priority(p.num_irqs)
 {
     fatal_if(p.num_irqs == 0 || p.num_irqs > MaxIrqs,
@@ -227,7 +228,9 @@ void
 Xh3irq::setLevel(uint32_t irq, bool high)
 {
     panic_if(irq >= _numIrqs, "Xh3irq: no interrupt %u", irq);
-    level[irq] = high;
+    panic_if(!high && highLines[irq] == 0, "Xh3irq: interrupt %u lowered more than raised", irq);
+    highLines[irq] += high ? 1 : -1;
+    level[irq] = highLines[irq] != 0;
     update();
 }
 
@@ -258,6 +261,7 @@ Xh3irq::serialize(CheckpointOut &cp) const
     SERIALIZE_CONTAINER(enable_b);
     SERIALIZE_CONTAINER(force_b);
     SERIALIZE_CONTAINER(level_b);
+    SERIALIZE_CONTAINER(highLines);
     SERIALIZE_CONTAINER(priority);
     SERIALIZE_SCALAR(pppreempt);
     SERIALIZE_SCALAR(ppreempt);
@@ -278,6 +282,7 @@ Xh3irq::unserialize(CheckpointIn &cp)
     fromBytes(enable, enable_b);
     fromBytes(force, force_b);
     fromBytes(level, level_b);
+    UNSERIALIZE_CONTAINER(highLines);
     UNSERIALIZE_CONTAINER(priority);
     UNSERIALIZE_SCALAR(pppreempt);
     UNSERIALIZE_SCALAR(ppreempt);
@@ -299,7 +304,7 @@ void
 Xh3irqLine::edge(bool high)
 {
     if (delay == 0) {
-        controller->setLevel(irqNum, high);
+        apply(high);
         return;
     }
     // The first register takes the level at the next rising edge after now;
@@ -317,11 +322,21 @@ void
 Xh3irqLine::deliver()
 {
     while (!inFlight.empty() && inFlight.front().first <= curTick()) {
-        controller->setLevel(irqNum, inFlight.front().second);
+        apply(inFlight.front().second);
         inFlight.pop_front();
     }
     if (!inFlight.empty())
         schedule(deliverEvent, inFlight.front().first);
+}
+
+// A device may raise a raised pin again; the controller hears only changes.
+void
+Xh3irqLine::apply(bool high)
+{
+    if (high == delivered)
+        return;
+    delivered = high;
+    controller->setLevel(irqNum, high);
 }
 
 Port &

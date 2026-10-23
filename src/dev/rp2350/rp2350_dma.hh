@@ -46,11 +46,6 @@ class RP2350DMA : public BasicPioDevice
   private:
     static constexpr unsigned NumChannels = 16;
     static constexpr unsigned NumIrqs = 4;
-    // Transfers that have been read and not yet written. The chip's FIFO
-    // depths are not documented; this lets an unpaced copy between
-    // single-cycle memories run at the one transfer per cycle the datasheet
-    // gives.
-    static constexpr unsigned DataFifoDepth = 8;
     // The DREQ counter is six bits and saturates.
     static constexpr unsigned MaxCredit = 63;
 
@@ -65,6 +60,7 @@ class RP2350DMA : public BasicPioDevice
         INTS0 = 0x40C,
         IRQS_END = 0x440,
         MULTI_CHAN_TRIGGER = 0x450,
+        FIFO_LEVELS = 0x460,
         CHAN_ABORT = 0x464,
         N_CHANNELS = 0x468,
         BLOCK_SIZE = 0x1000,
@@ -113,32 +109,43 @@ class RP2350DMA : public BasicPioDevice
 
     struct Channel
     {
-        uint32_t readAddr = 0;
+        uint32_t readAddr = 0;      // the address generator's
         uint32_t writeAddr = 0;
         uint32_t countReload = 0;   // TRANS_COUNT as last written
-        uint32_t count = 0;         // transfers left in this sequence
+        uint32_t count = 0;         // transfers left to generate
         uint32_t ctrl = 0;
         bool busy = false;
         bool aborting = false;
-        uint32_t errors = 0;        // CTRL_READ_ERROR and CTRL_WRITE_ERROR
+        bool readError = false;
+        bool writeError = false;
+        // Triggered with a count of 0: one null transfer ends the sequence.
+        bool nullPending = false;
         unsigned credit = 0;        // DREQ pulses not yet used
-        unsigned inFlight = 0;      // transfers started and not yet written
+        unsigned inFlight = 0;      // transfers generated and not yet written
 
         unsigned treq() const { return (ctrl >> CTRL_TREQ_SEL_LSB) & 0x3F; }
         unsigned chainTo() const { return (ctrl >> CTRL_CHAIN_TO_LSB) & 0xF; }
         unsigned mode() const { return countReload >> 28; }
+        unsigned size() const;
+        bool failed() const { return readError || writeError; }
+        // An address the chip adjusts: incrementing, without a ring on it
+        bool linearRead() const;
+        bool linearWrite() const;
     };
 
-    // One transfer on its way from the read manager to the write manager.
+    // One transfer, through the read and write address FIFOs (RAF, WAF) and
+    // the transfer data FIFO (TDF), as on the chip (datasheet figure 122).
     struct Transfer : public Packet::SenderState
     {
         unsigned channel;
         Addr readAddr;
         Addr writeAddr;
         unsigned size;
+        bool null = false;          // a null transfer: no bus access
+        bool dead = false;          // its read failed or was skipped
         uint8_t data[4] = {0, 0, 0, 0};
-        bool haveData = false;
-        Tick dataTick = 0;
+        Cycles generated{0};        // when the address generator made it
+        Cycles ready{0};            // when its data is in the TDF
     };
 
     class ManagerPort : public RequestPort
@@ -160,10 +167,23 @@ class RP2350DMA : public BasicPioDevice
         PacketPtr held = nullptr;
     };
 
+    // A transfer leaving the pipeline at a later cycle: written (a write
+    // answered) or dropped.
+    struct Retire
+    {
+        Cycles when;
+        unsigned channel;
+        bool dropped;               // gives its step back
+        bool null;
+    };
+
     ManagerPort readPort;
     ManagerPort writePort;
     std::vector<std::unique_ptr<IntSourcePin<RP2350DMA>>> irqPins;
     RequestorID requestorId;
+    const unsigned rafDepth;
+    const unsigned wafDepth;
+    const unsigned tdfDepth;
 
     std::array<Channel, NumChannels> channels;
     uint32_t intr = 0;                      // one bit per channel
@@ -172,13 +192,17 @@ class RP2350DMA : public BasicPioDevice
     // Channels chained to, to trigger at the next clock edge.
     uint32_t pendingTriggers = 0;
     unsigned nextChannel = 0;               // round-robin position
-    // Transfers read or being read, oldest first.
-    std::deque<Transfer *> dataFifo;
-    unsigned writesInFlight = 0;
-    unsigned readsInFlight = 0;
-    // The start of the clock cycle the last read left in
-    Tick lastReadCycle = MaxTick;
-    const Tick window;
+
+    std::deque<Transfer *> raf;             // oldest first
+    std::deque<Transfer *> waf;
+    std::deque<Transfer *> tdf;             // read, or skipped, not yet written
+    Transfer *reading = nullptr;            // the read on the bus
+    Transfer *writing = nullptr;            // the write on the bus
+    Cycles readFree{0};                     // the first cycle a read may leave
+    Cycles writeFree{0};
+    Cycles lastTdfPush{0};
+    bool tdfPushed = false;                 // a read's data went in this cycle
+    std::deque<Retire> retiring;            // oldest first
 
     EventFunctionWrapper tickEvent;
 
@@ -196,22 +220,29 @@ class RP2350DMA : public BasicPioDevice
     uint32_t readRegister(Addr offset);
     void writeRegister(Addr offset, uint32_t value, Op op);
     uint32_t readChannel(unsigned index, Reg reg) const;
-    void writeChannel(unsigned index, Reg reg, uint32_t value);
+    void writeChannel(unsigned index, Reg reg, uint32_t value, Op op,
+                      uint32_t raw);
     void unmodelled(Addr offset, bool is_write);
     void unmodelledOnce(Addr key, const char *what);
 
+    // The cycle the current tick falls in
+    Cycles nowCycle() const;
+
     void trigger(unsigned index);
     void abort(unsigned index);
-    void busError(unsigned index, uint32_t error);
     void finish(unsigned index);
+    void checkFinish(unsigned index);
+    void fail(unsigned index, bool on_read);
     bool requesting(const Channel &channel) const;
-    Transfer *start(unsigned index);
+    void generate(unsigned index, Cycles now);
     void recvResponse(PacketPtr pkt, bool is_read);
     void raise(uint32_t channel_bits);
     void updateIrqs();
 
     void tick();
-    void startRead();
+    void retire(Cycles now);
+    void readSide(Cycles now);
+    void writeSide(Cycles now);
     void wake();
     bool idle() const;
 };

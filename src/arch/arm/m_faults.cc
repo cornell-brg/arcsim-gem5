@@ -28,6 +28,8 @@
 
 #include "arch/arm/m_faults.hh"
 
+#include "arch/arm/m_fp_insts.hh"
+#include "arch/arm/m_interrupts.hh"
 #include "arch/arm/m_mmu.hh"
 #include "arch/arm/m_system.hh"
 #include "arch/arm/pcstate.hh"
@@ -112,19 +114,71 @@ ArmMFault::getHandlerAddress(ThreadContext *tc) const
 }
 
 uint32_t
-ArmMFault::computeExcReturn(bool was_handler, bool used_psp)
+ArmMFault::computeExcReturn(bool was_handler, bool used_psp, bool fp_frame)
 {
-    // EXC_RETURN encoding (non-FP, DDI0403E B1.5.8):
-    //   bits[31:4] = 0xFFFFFFF
+    // EXC_RETURN encoding (DDI0403E B1.5.8):
+    //   bits[31:5] = ones
+    //   bit[4] = 0: the frame holds FP state, 1: it does not (FType)
     //   bit[3] = 0: return to Handler mode, 1: return to Thread mode
     //   bit[2] = 0: restore from MSP,       1: restore from PSP
     //   bits[1:0] = 0b01 (reserved, always 1)
+    uint32_t value;
     if (was_handler)
-        return 0xFFFFFFF1;  // Handler, MSP
+        value = 0xFFFFFFF1;  // Handler, MSP
     else if (used_psp)
-        return 0xFFFFFFFD;  // Thread, PSP
+        value = 0xFFFFFFFD;  // Thread, PSP
     else
-        return 0xFFFFFFF9;  // Thread, MSP
+        value = 0xFFFFFFF9;  // Thread, MSP
+    return fp_frame ? value & ~0x10u : value;
+}
+
+// UpdateFPCCR (DDI0403E B1.5.6): record where the deferred FP save goes
+// and the context it is made for.  Called while the background context
+// is still current.  The HFRDY, MMRDY, BFRDY and MONRDY bits are left as
+// they are: they only steer which fault a lazy save may raise, and the
+// lazy save here does not fault.
+static void
+updateFPCCR(ThreadContext *tc, uint32_t fp_addr)
+{
+    XPSR xpsr = tc->readMiscRegNoEffect(MISCREG_M_XPSR);
+    CONTROL_M ctrl = tc->readMiscRegNoEffect(MISCREG_M_CONTROL);
+    const bool thread = xpsr.exception == 0;
+    FPCCR_M fpccr = tc->readMiscRegNoEffect(MISCREG_M_FPCCR);
+    fpccr.lspact = 1;
+    fpccr.thread = thread;
+    fpccr.user = thread && ctrl.npriv;
+    tc->setMiscRegNoEffect(MISCREG_M_FPCCR, fpccr);
+    tc->setMiscRegNoEffect(MISCREG_M_FPCAR, fp_addr & ~0x7u);
+}
+
+// s0-s15 and FPSCR, in frame order.
+static void
+appendFPState(ThreadContext *tc, std::vector<uint32_t> &words)
+{
+    for (RegIndex i = 0; i < 16; ++i)
+        words.push_back((uint32_t)tc->getReg(vfpSRegId(i)));
+    words.push_back((uint32_t)tc->readMiscRegNoEffect(MISCREG_FPSCR));
+}
+
+void
+preserveFPState(ThreadContext *tc)
+{
+    const uint32_t fpcar =
+        (uint32_t)tc->readMiscRegNoEffect(MISCREG_M_FPCAR) & ~0x7u;
+    std::vector<uint32_t> words;
+    appendFPState(tc, words);
+
+    DPRINTF(MProfileStacking, "preserveFPState: lazy save to %#x\n", fpcar);
+
+    // The FP instruction that makes the save goes on before the timed
+    // writes land, so they are made visible at once as well.
+    auto *mmu = dynamic_cast<MMMU *>(tc->getMMUPtr());
+    assert(mmu && "M-profile CPU must use MMMU");
+    mmu->storeToStack(fpcar, words, tc, true);
+
+    FPCCR_M fpccr = tc->readMiscRegNoEffect(MISCREG_M_FPCCR);
+    fpccr.lspact = 0;
+    tc->setMiscRegNoEffect(MISCREG_M_FPCCR, fpccr);
 }
 
 // =========================================================================
@@ -170,7 +224,7 @@ syncXpsrToCCRegs(ThreadContext *tc)
 uint32_t
 ArmMFault::pushExceptionFrame(ThreadContext *tc,
                               const StaticInstPtr &inst,
-                              uint32_t sp, bool stkalign)
+                              uint32_t sp, bool stkalign, bool fp_frame)
 {
     auto pcState = tc->pcState().as<PCState>();
 
@@ -219,11 +273,21 @@ ArmMFault::pushExceptionFrame(ThreadContext *tc,
     XPSR xpsr = tc->readMiscRegNoEffect(MISCREG_M_XPSR);
     xpsr.t  = pcState.thumb() ? 1 : 0;  // xPSR[24] = T (Thumb)
 
+    // IT state (DDI0403E B1.4.2: EPSR.ICI/IT, xPSR[26:25] and [15:10]).
+    // gem5 keeps it in PCState, not in MISCREG_M_XPSR (as A-profile
+    // faults.cc does for the saved CPSR), so stack the live state: an
+    // exception taken inside an IT block must resume the block's
+    // remaining conditional instructions as conditional.
+    ITSTATE it = pcState.itstate();
+    xpsr.iciIt2 = it.top6;
+    xpsr.iciIt1 = it.bottom2;
+
     // Stack alignment (DDI0403E B1.5.6):
     // If STKALIGN is set and SP is not 8-byte aligned, insert 4 bytes
     // of padding and record it in xPSR.frameptralign (bit 9) so that
-    // exception return can undo the padding.
-    bool needPad = stkalign && (sp & 0x4);
+    // exception return can undo the padding.  The extended frame is
+    // aligned whatever STKALIGN says.
+    bool needPad = (stkalign || fp_frame) && (sp & 0x4);
     if (needPad) {
         sp -= 4;
         xpsr.frameptralign = 1;
@@ -231,8 +295,9 @@ ArmMFault::pushExceptionFrame(ThreadContext *tc,
         xpsr.frameptralign = 0;
     }
 
-    // Decrement SP by 32 bytes (8 words) for the exception frame.
-    uint32_t frameptr = sp - 0x20;
+    // Decrement SP by 32 bytes (8 words) for the exception frame, or
+    // by 104 (26 words) for the extended frame.
+    uint32_t frameptr = sp - (fp_frame ? 0x68 : 0x20);
 
     // Build the 8-word frame as a vector for MMMU::storeToStack().
     // Order matches the hardware frame layout (DDI0403E B1.5.6):
@@ -248,6 +313,17 @@ ArmMFault::pushExceptionFrame(ThreadContext *tc,
         (uint32_t)returnAddr,
         (uint32_t)xpsr,
     };
+
+    // The extended frame's FP words: stacked now with FPCCR.LSPEN clear,
+    // otherwise left for the first FP instruction to save (lazy).  The
+    // reserved word after FPSCR is not written.
+    if (fp_frame) {
+        FPCCR_M fpccr = tc->readMiscRegNoEffect(MISCREG_M_FPCCR);
+        if (fpccr.lspen)
+            updateFPCCR(tc, frameptr + 0x20);
+        else
+            appendFPState(tc, frame);
+    }
 
     // Push the frame through the timed memory system via MMMU.
     // This models the Cortex-M stacking sequencer: writes go through
@@ -339,8 +415,13 @@ ArmMFault::invoke(ThreadContext *tc, const StaticInstPtr &inst)
             _excNumber, sp, inHandler, usePSP,
             tc->pcState().as<PCState>().pc());
 
+    // CONTROL.FPCA (an FP context is active) selects the extended frame.
+    // It is RES0 without an FPU.
+    const bool fpFrame = ctrl.fpca;
+
     CCR_t ccr = tc->readMiscRegNoEffect(MISCREG_M_CCR);
-    uint32_t newSP = pushExceptionFrame(tc, inst, sp, ccr.stkalign);
+    uint32_t newSP = pushExceptionFrame(tc, inst, sp, ccr.stkalign,
+                                        fpFrame);
 
     // Update active-stack misc reg with post-push value.
     tc->setMiscRegNoEffect(spReg, newSP);
@@ -355,12 +436,15 @@ ArmMFault::invoke(ThreadContext *tc, const StaticInstPtr &inst)
     }
 
     // Clear CONTROL.SPSEL — handler always uses MSP (DDI0403E B1.4.4).
+    // Clear CONTROL.FPCA — the handler starts without an FP context
+    // (ExceptionTaken, DDI0403E B1.5.6).
     ctrl.spsel = 0;
+    ctrl.fpca = 0;
     tc->setMiscRegNoEffect(MISCREG_M_CONTROL, ctrl);
 
     // ---- 3. Set LR to EXC_RETURN ----
 
-    uint32_t excReturn = computeExcReturn(inHandler, usePSP);
+    uint32_t excReturn = computeExcReturn(inHandler, usePSP, fpFrame);
     tc->setReg(int_reg::Lr, (RegVal)excReturn);
 
     // ---- 4. Read handler address from VTOR vector table ----
@@ -395,6 +479,31 @@ ArmMFault::invoke(ThreadContext *tc, const StaticInstPtr &inst)
     DPRINTF(Faults, "M-profile exception entry: %s (exc %d) "
             "handler=%#x SP=%#x LR=%#x\n",
             name(), _excNumber, handlerAddr & ~0x1, newSP, excReturn);
+}
+
+// ---------------------------------------------------------------------------
+// MProfileExcReturnFetch::invoke — exception return from a fetch
+// ---------------------------------------------------------------------------
+
+void
+MProfileExcReturnFetch::invoke(ThreadContext *tc, const StaticInstPtr &inst)
+{
+    // Deactivate and unstack; excReturn() leaves the return address in
+    // the next PC, as for an instruction that advances afterwards.  A
+    // fault does not advance, so advance here: the PC becomes the return
+    // address.
+    auto *mintr = dynamic_cast<MProfileInterrupts *>(
+        tc->getCpuPtr()->getInterruptController(tc->threadId()));
+    assert(mintr && "M-profile CPU must use MProfileInterrupts");
+    auto pc = tc->pcState().as<PCState>();
+    const Addr at = pc.instAddr();
+    panic_if(!isMProfileExcReturn(at),
+             "M-profile exception return invoked at PC %#x, not an "
+             "EXC_RETURN address", at);
+    mintr->excReturn(tc, (uint32_t)at);
+    pc = tc->pcState().as<PCState>();
+    pc.advance();
+    tc->pcState(pc);
 }
 
 // ---------------------------------------------------------------------------

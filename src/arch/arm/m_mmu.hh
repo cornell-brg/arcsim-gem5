@@ -375,11 +375,16 @@ class MMMU : public BaseMMU
      *
      * @param frameptr  Stack address (decremented SP) for word 0.
      * @param values    Words to push.  Size determines number of
-     *                  writes (8 for basic, 26 for extended FPU).
+     *                  writes (8 for basic, 25 for the extended frame
+     *                  stacked at once, 17 for a lazy FP save).
      * @param tc        ThreadContext for clock period and requestor ID.
+     * @param visible_now  Also write the words functionally first, for a
+     *                  save the CPU runs on past (the lazy FP save), so
+     *                  that reads made before the timed writes land see
+     *                  them.
      */
     void storeToStack(Addr frameptr, const std::vector<uint32_t> &values,
-                      ThreadContext *tc);
+                      ThreadContext *tc, bool visible_now = false);
 
     /**
      * Pop exception frame from stack.

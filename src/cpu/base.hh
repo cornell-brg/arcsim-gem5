@@ -521,8 +521,26 @@ class BaseCPU : public ClockedObject
      *
      * @param inst Instruction that just committed
      * @param pc PC of the instruction that just committed
+     * @param macro The macro-op inst is a micro-op of, when the CPU model
+     *              keeps it (null otherwise)
      */
-    virtual void probeInstCommit(const StaticInstPtr &inst, Addr pc);
+    virtual void probeInstCommit(const StaticInstPtr &inst, Addr pc,
+                                 const StaticInstPtr &macro);
+    /** The same, for a CPU model that does not keep the macro-op */
+    void probeInstCommit(const StaticInstPtr &inst, Addr pc);
+
+    /**
+     * What the CommittedOps probe point reports for every committed
+     * instruction or micro-op: the instruction, the macro-op it is a
+     * micro-op of (null when it is not a micro-op, or when the CPU model
+     * does not keep it) and its PC.
+     */
+    struct CommittedOp
+    {
+        const StaticInst *inst;
+        const StaticInst *macro;
+        Addr pc;
+    };
 
    protected:
     /**
@@ -552,6 +570,9 @@ class BaseCPU : public ClockedObject
 
     /** Retired branches (any type) */
     probing::PMUUPtr ppRetiredBranches;
+
+    /** Every committed instruction and micro-op (CommittedOp) */
+    ProbePointArg<CommittedOp> *ppCommittedOps;
 
     /** CPU cycle counter even if any thread Context is suspended*/
     probing::PMUUPtr ppAllCycles;

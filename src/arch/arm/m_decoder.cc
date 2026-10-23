@@ -31,6 +31,7 @@
 #include <cmath>
 #include <cstring>
 
+#include "arch/arm/m_faults.hh"
 #include "arch/arm/m_fp_insts.hh"
 #include "arch/arm/m_insts.hh"
 #include "base/bitfield.hh"
@@ -148,12 +149,12 @@ MDecoder::moreBytes(const PCStateBase &_pc, Addr fetchPC)
     // so that decode() returns an exception-return instruction
     // instead of trying to decode from that address.
     //
-    // EXC_RETURN values have bits[31:4] all set (DDI0403E B1.5.8).
-    // Valid range: 0xFFFFFFF0–0xFFFFFFFF.
-    if ((pc.instAddr() & 0xFFFFFFF0) == 0xFFFFFFF0) {
+    // EXC_RETURN values have bits[31:5] all set (DDI0403E B1.5.8).
+    // Valid range: 0xFFFFFFE0–0xFFFFFFFF.
+    if (isMProfileExcReturn(pc.instAddr())) {
         _pendingExcReturn = true;
         _excReturnVal = (uint32_t)pc.instAddr();
-        // Don't try to fetch — the data at 0xFFFFFFF_ is unmapped.
+        // Don't try to fetch — there is no memory at an EXC_RETURN.
         // Set instDone so decode() can handle it.
         instDone = true;
         return;
@@ -216,7 +217,7 @@ MDecoder::decode(PCStateBase &_pc)
 
     // Handle POP {PC} / LDM {PC} EXC_RETURN.
     // moreBytes() detected that the fetch address is an EXC_RETURN
-    // value (0xFFFFFFF_) and set _pendingExcReturn.  Return a
+    // value and set _pendingExcReturn.  Return a
     // BxMProfile instruction that will call mProfileExcReturn().
     if (_pendingExcReturn) {
         _pendingExcReturn = false;

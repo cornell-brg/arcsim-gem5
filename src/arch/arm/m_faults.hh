@@ -58,6 +58,26 @@ namespace ArmISA
 {
 
 /**
+ * The lowest EXC_RETURN value: bits[31:5] are ones, and bit 4 (FType) is
+ * zero for a frame that holds FP state (DDI0403E B1.5.8).  A value from
+ * here to 0xFFFFFFFF loaded into the PC is an exception return.
+ */
+constexpr Addr MProfileExcReturnBase = 0xFFFFFFE0;
+
+inline bool
+isMProfileExcReturn(Addr value)
+{
+    return value >= MProfileExcReturnBase && value <= 0xFFFFFFFF;
+}
+
+/**
+ * PreserveFPState (DDI0403E B1.5.7): the lazy save that exception entry
+ * deferred, of s0-s15 and FPSCR to the frame at FPCAR, made by the first
+ * FP instruction after it.  Clears FPCCR.LSPACT.
+ */
+void preserveFPState(ThreadContext *tc);
+
+/**
  * M-profile exception numbers (DDI0403E Table B1-4).
  *
  * Used to index into the VTOR-based vector table:
@@ -135,25 +155,31 @@ class ArmMFault : public FaultBase
     static bool excAdvancesPC(int exc_num);
 
     /**
-     * Push the 8-word exception frame onto the given stack.
+     * Push the exception frame onto the given stack (PushStack, DDI0403E
+     * B1.5.6): 8 words, or with fp_frame the 26-word extended frame.
      *
-     * Frame layout per DDI0403E B1.5.6 (addresses relative to the
-     * new SP after decrement):
+     * Frame layout (addresses relative to the new SP after decrement):
      *
      *   SP+0x00: R0        SP+0x10: R12
      *   SP+0x04: R1        SP+0x14: LR  (pre-exception R14)
      *   SP+0x08: R2        SP+0x18: ReturnAddress (stacked PC)
      *   SP+0x0C: R3        SP+0x1C: xPSR (with frameptralign in bit 9)
+     *   SP+0x20: S0 ... SP+0x5C: S15, SP+0x60: FPSCR, SP+0x64: reserved
+     *
+     * The extended frame is always 8-byte aligned.  With FPCCR.LSPEN set
+     * its FP words are left for a lazy save (UpdateFPCCR): FPCAR records
+     * where they go and FPCCR.LSPACT that the save is pending.
      *
      * @param tc        Thread context.
      * @param inst      Faulting instruction (may be null for async).
      * @param sp        Current stack pointer value.
      * @param stkalign  True if CCR.STKALIGN is set.
+     * @param fp_frame  True for the extended frame (CONTROL.FPCA set).
      * @return  The new stack pointer (frame base after the push).
      */
     uint32_t pushExceptionFrame(ThreadContext *tc,
                                 const StaticInstPtr &inst,
-                                uint32_t sp, bool stkalign);
+                                uint32_t sp, bool stkalign, bool fp_frame);
 
     /** Read the handler address from VTOR + 4 * _excNumber. */
     Addr getHandlerAddress(ThreadContext *tc) const;
@@ -176,12 +202,16 @@ class ArmMFault : public FaultBase
      *   0xFFFFFFF1 — return to Handler mode, use MSP
      *   0xFFFFFFF9 — return to Thread mode,  use MSP
      *   0xFFFFFFFD — return to Thread mode,  use PSP
+     * and 0xFFFFFFE1, 0xFFFFFFE9, 0xFFFFFFED for the same with the
+     * extended frame (bit 4, FType, clear).
      *
      * @param was_handler  True if the exception was taken from Handler mode.
      * @param used_psp     True if PSP was the active stack when the
      *                     exception was taken.
+     * @param fp_frame     True if the frame holds FP state.
      */
-    static uint32_t computeExcReturn(bool was_handler, bool used_psp);
+    static uint32_t computeExcReturn(bool was_handler, bool used_psp,
+                                     bool fp_frame);
 };
 
 /**
@@ -208,10 +238,32 @@ class MProfileReset : public ArmMFault
 };
 
 /**
+ * A fetch from an EXC_RETURN address (0xFFFFFFE0-0xFFFFFFFF): the PC was
+ * loaded with an EXC_RETURN value by POP {PC} or LDM {PC} (DDI0403E
+ * B1.5.8).  Translating the fetch only reports it; the exception return
+ * happens when the fault is invoked, which a pipelined CPU does only for
+ * the oldest instruction on the path it commits.  A fetch made ahead of
+ * that (the next sequential address, or down a mispredicted path) is
+ * discarded with its stream and has no effect.  The EXC_RETURN value is
+ * the PC of the instruction the fault is invoked for: a fetch made ahead
+ * past the top of the address space (after 0xFFFFFFFC) reports this fault
+ * too, and a CPU may carry it on the instruction at the PC it fetched
+ * ahead for.
+ */
+class MProfileExcReturnFetch : public FaultBase
+{
+  public:
+
+    FaultName name() const override { return "M-profile exception return"; }
+    void invoke(ThreadContext *tc,
+                const StaticInstPtr &inst = nullStaticInstPtr) override;
+};
+
+/**
  * Perform M-profile exception return (unstack).
  *
  * Called when a branch target is detected as an EXC_RETURN value.
- * Detection condition: (new_pc & 0xFFFFFFF0) == 0xFFFFFFF0
+ * Detection condition: isMProfileExcReturn(new_pc)
  *
  * Pops the 8-word exception frame from the appropriate stack (MSP or
  * PSP, as encoded in the EXC_RETURN value), restores registers and

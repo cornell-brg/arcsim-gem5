@@ -210,6 +210,20 @@ m_profile_test(
     extra_args=["--cpu-type", "timing", "--release", "m33",
                 "--rp2350-coprocessors"],
 )
+# The FP context on exception entry and return, eager and lazy, and a
+# higher-priority exception arriving while a frame or a lazy FP save is
+# still being written
+for cpu_type in ("atomic", "timing", "minor"):
+    m_profile_test(
+        f"fp_stacking_{cpu_type}",
+        "test_fp_stacking.elf",
+        extra_args=["--cpu-type", cpu_type],
+    )
+    m_profile_test(
+        f"late_arrival_{cpu_type}",
+        "test_late_arrival.elf",
+        extra_args=["--cpu-type", cpu_type],
+    )
 
 
 def m_profile_rp2350_test(name, firmware_name, ok_message, slow_sio=False):
@@ -349,6 +363,14 @@ m_profile_rp2350_dma_test(
 m_profile_rp2350_test(
     "rp2350_order", "test_rp2350_order.elf", r"RP2350_ORDER_OK",
     slow_sio=True,
+)
+# The same FP context tests on the RP2350 board's Arm proxy
+m_profile_rp2350_test(
+    "rp2350_fp_stacking", "test_fp_stacking_rp2350.elf", r"FP_STACKING_OK"
+)
+m_profile_rp2350_test(
+    "rp2350_late_arrival", "test_late_arrival_rp2350.elf",
+    r"LATE_ARRIVAL_OK",
 )
 
 
