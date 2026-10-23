@@ -1,8 +1,11 @@
 #include "cpu/probes/window_inst_counter.hh"
 
+#include "arch/generic/isa.hh"
 #include "base/logging.hh"
+#include "base/statistics.hh"
 #include "base/trace.hh"
 #include "cpu/static_inst.hh"
+#include "cpu/thread_context.hh"
 #include "debug/WindowInstCounter.hh"
 #include "enums/OpClass.hh"
 
@@ -15,7 +18,10 @@ WindowInstCounter::WindowInstCounter(const WindowInstCounterParams &p)
       closePCs(p.close_pcs.begin(), p.close_pcs.end()),
       out(p.file, std::ios::out | std::ios::trunc),
       classes(!p.classes_file.empty()),
-      names(!p.names_file.empty())
+      names(!p.names_file.empty()),
+      flips(!p.flips_file.empty()),
+      cpu(p.cpu),
+      statNames(p.stats)
 {
     fatal_if(openPCs.empty() || closePCs.empty(),
              "%s: needs at least one open and one close address", name());
@@ -29,6 +35,31 @@ WindowInstCounter::WindowInstCounter(const WindowInstCounterParams &p)
         namesOut.open(p.names_file, std::ios::out | std::ios::trunc);
         fatal_if(!namesOut, "%s: cannot write %s", name(), p.names_file);
     }
+    if (flips) {
+        fatal_if(!cpu, "%s: a flips file needs the cpu, to read registers",
+                 name());
+        flipsOut.open(p.flips_file, std::ios::out | std::ios::trunc);
+        fatal_if(!flipsOut, "%s: cannot write %s", name(), p.flips_file);
+    }
+    fatal_if(statNames.empty() != p.stats_file.empty(),
+             "%s: stats and stats_file go together", name());
+    if (!statNames.empty()) {
+        statsOut.open(p.stats_file, std::ios::out | std::ios::trunc);
+        fatal_if(!statsOut, "%s: cannot write %s", name(), p.stats_file);
+    }
+}
+
+void
+WindowInstCounter::startup()
+{
+    // The statistics exist by now; find each by its full name.
+    for (const std::string &n : statNames) {
+        const auto *info =
+            dynamic_cast<const statistics::ScalarInfo *>(statistics::resolve(n));
+        fatal_if(!info, "%s: no scalar statistic named %s", name(), n);
+        statInfos.push_back(info);
+    }
+    statStart.assign(statInfos.size(), 0.0);
 }
 
 void
@@ -58,6 +89,8 @@ WindowInstCounter::committed(const BaseCPU::CommittedOp &op)
                                         op.macro->opClass()])
                          : std::string());
     }
+    if (counting && flips)
+        countFlips(inst, op.macro ? *op.macro : inst);
     if (inst.isMicroop() && !inst.isLastMicroop())
         return;
 
@@ -83,6 +116,10 @@ WindowInstCounter::committed(const BaseCPU::CommittedOp &op)
                 writeClasses();
             if (names)
                 writeNames();
+            if (flips)
+                writeFlips();
+            if (!statInfos.empty())
+                writeStats();
             DPRINTF(WindowInstCounter, "window closes at %#x: %llu\n", pc,
                     (unsigned long long)count);
         } else {
@@ -99,7 +136,96 @@ WindowInstCounter::committed(const BaseCPU::CommittedOp &op)
         opClasses.fill(0);
         instNames.clear();
         opNames.clear();
+        nameFlips.clear();
+        if (flips)
+            copyRegisters();
+        for (size_t i = 0; i < statInfos.size(); ++i)
+            statStart[i] = statInfos[i]->value();
     }
+}
+
+void
+WindowInstCounter::copyRegisters()
+{
+    ThreadContext *tc = cpu->getContext(0);
+    const BaseISA &isa = *tc->getIsaPtr();
+    const RegClass &ints = *isa.regClasses().at(IntRegClass);
+    copy.clear();
+    // Keyed by the flat register, as getReg() reads it (Arm banks some).
+    for (const RegId &id : ints)
+        copy[id.flatten(isa).index()] = tc->getReg(id);
+}
+
+void
+WindowInstCounter::countFlips(const StaticInst &inst, const StaticInst &whole)
+{
+    ThreadContext *tc = cpu->getContext(0);
+    const BaseISA &isa = *tc->getIsaPtr();
+    const OpClass oc = inst.opClass();
+    auto bits = [](RegVal a, RegVal b) {
+        return (uint64_t)__builtin_popcountll((a ^ b) & 0xffffffffULL);
+    };
+    uint64_t s = 0, d = 0;
+    int slot = 0;
+    for (int i = 0; i < inst.numSrcRegs() && slot < Slots; ++i) {
+        const RegId &id = inst.srcRegIdx(i);
+        if (!id.is(IntRegClass))
+            continue;
+        const RegIndex flat = id.flatten(isa).index();
+        auto it = copy.find(flat);
+        // Not in the copy: not written since the window opened, so as now.
+        const RegVal v = it != copy.end() ? it->second : tc->getReg(id);
+        s += bits(v, lastSrc[oc][slot]);
+        lastSrc[oc][slot++] = v;
+    }
+    slot = 0;
+    for (int i = 0; i < inst.numDestRegs(); ++i) {
+        const RegId &id = inst.destRegIdx(i);
+        if (!id.is(IntRegClass))
+            continue;
+        const RegVal v = tc->getReg(id);
+        copy[id.flatten(isa).index()] = v;
+        if (slot < Slots) {
+            d += bits(v, lastDest[oc][slot]);
+            lastDest[oc][slot++] = v;
+        }
+    }
+    if (s || d) {
+        auto &f = nameFlips[const_cast<StaticInst &>(whole).getName()];
+        f.first += s;
+        f.second += d;
+    }
+}
+
+void
+WindowInstCounter::writeStats()
+{
+    for (size_t i = 0; i < statInfos.size(); ++i) {
+        statsOut << (i ? " " : "") << statNames[i] << '='
+                 << statInfos[i]->value() - statStart[i];
+    }
+    statsOut << '\n';
+    statsOut.flush();
+}
+
+void
+WindowInstCounter::writeFlips()
+{
+    const char *sep = "";
+    for (const auto &[n, f] : nameFlips) {
+        if (f.first) {
+            flipsOut << sep << "s." << n << '=' << f.first;
+            sep = " ";
+        }
+    }
+    for (const auto &[n, f] : nameFlips) {
+        if (f.second) {
+            flipsOut << sep << "d." << n << '=' << f.second;
+            sep = " ";
+        }
+    }
+    flipsOut << '\n';
+    flipsOut.flush();
 }
 
 void
