@@ -352,6 +352,7 @@ BaseSimpleCPU::preExecute()
     // resets predicates
     t_info.setPredicate(true);
     t_info.setMemAccPredicate(true);
+    effAddr.reset();
 
     // decode the instruction
     set(preExecuteTempPC, thread->pcState());
@@ -518,7 +519,7 @@ BaseSimpleCPU::postExecute()
     }
 
     // Call CPU instruction commit probes
-    probeInstCommit(curStaticInst, instAddr, curMacroStaticInst);
+    probeInstCommit(curStaticInst, instAddr, curMacroStaticInst, effAddr);
 }
 
 void

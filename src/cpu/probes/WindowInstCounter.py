@@ -6,8 +6,10 @@ class WindowInstCounter(ProbeListenerObject):
     """Counts the instructions a core retires inside windows that open and
     close at given addresses, and writes one count per window to a file and,
     with classes_file and names_file, the same instructions by OpClass and
-    by name to others, with flips_file their operands' bit changes, and with stats_file
-    how much the named statistics grew over each window (window_inst_counter.hh). Set manager to the CPU to count on."""
+    by name to others, with flips_file their operands' bit changes, with activity_file
+    their widths, shifter uses, instruction-word bit changes, data accesses, taken
+    control transfers and unit switching, and with stats_file how much the named
+    statistics grew over each window (window_inst_counter.hh). Set manager to the CPU to count on."""
 
     type = "WindowInstCounter"
     cxx_header = "cpu/probes/window_inst_counter.hh"
@@ -41,4 +43,11 @@ class WindowInstCounter(ProbeListenerObject):
         "the file each window's instructions, and the micro-ops of the "
         "split ones, by name are written to (empty: none); needs the atomic "
         "CPU",
+    )
+    activity_file = Param.String(
+        "",
+        "the file each window's instruction activity (widths, shifter uses, "
+        "instruction-word bit changes, data accesses by region, taken "
+        "control transfers, unit switching) is written to (empty: none); "
+        "Arm Thumb only, needs the atomic CPU",
     )

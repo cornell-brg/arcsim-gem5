@@ -416,9 +416,11 @@ BaseCPU::probeInstCommit(const StaticInstPtr &inst, Addr pc)
 
 void
 BaseCPU::probeInstCommit(const StaticInstPtr &inst, Addr pc,
-                         const StaticInstPtr &macro)
+                         const StaticInstPtr &macro,
+                         std::optional<Addr> eff_addr)
 {
-    ppCommittedOps->notify(CommittedOp{inst.get(), macro.get(), pc});
+    ppCommittedOps->notify(CommittedOp{inst.get(), macro.get(), pc,
+                                       eff_addr});
 
     if (!inst->isMicroop() || inst->isLastMicroop()) {
         ppRetiredInsts->notify(1);

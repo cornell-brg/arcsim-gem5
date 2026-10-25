@@ -368,6 +368,7 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t *data, unsigned size,
 
     if (traceData)
         traceData->setMem(addr, size, flags);
+    effAddr = addr;
 
     dcache_latency = 0;
 
@@ -454,6 +455,7 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
 
     if (traceData)
         traceData->setMem(addr, size, flags);
+    effAddr = addr;
 
     dcache_latency = 0;
 
@@ -554,6 +556,7 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
 
     if (traceData)
         traceData->setMem(addr, size, flags);
+    effAddr = addr;
 
     //The address of the second part of this access if it needs to be split
     //across a cache line boundary.

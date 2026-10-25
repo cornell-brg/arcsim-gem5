@@ -1,6 +1,7 @@
 #include "cpu/probes/window_inst_counter.hh"
 
 #include "arch/generic/isa.hh"
+#include "base/bitfield.hh"
 #include "base/logging.hh"
 #include "base/statistics.hh"
 #include "base/trace.hh"
@@ -8,6 +9,7 @@
 #include "cpu/thread_context.hh"
 #include "debug/WindowInstCounter.hh"
 #include "enums/OpClass.hh"
+#include "sim/byteswap.hh"
 
 namespace gem5
 {
@@ -20,6 +22,7 @@ WindowInstCounter::WindowInstCounter(const WindowInstCounterParams &p)
       classes(!p.classes_file.empty()),
       names(!p.names_file.empty()),
       flips(!p.flips_file.empty()),
+      activity(!p.activity_file.empty()),
       cpu(p.cpu),
       statNames(p.stats)
 {
@@ -40,6 +43,11 @@ WindowInstCounter::WindowInstCounter(const WindowInstCounterParams &p)
                  name());
         flipsOut.open(p.flips_file, std::ios::out | std::ios::trunc);
         fatal_if(!flipsOut, "%s: cannot write %s", name(), p.flips_file);
+    }
+    if (activity) {
+        activityOut.open(p.activity_file, std::ios::out | std::ios::trunc);
+        fatal_if(!activityOut, "%s: cannot write %s", name(),
+                 p.activity_file);
     }
     fatal_if(statNames.empty() != p.stats_file.empty(),
              "%s: stats and stats_file go together", name());
@@ -91,6 +99,24 @@ WindowInstCounter::committed(const BaseCPU::CommittedOp &op)
     }
     if (counting && flips)
         countFlips(inst, op.macro ? *op.macro : inst);
+    if (activity) {
+        fatal_if(inst.isMicroop() && !op.macro,
+                 "%s: the CPU does not report the macro-op of a micro-op, "
+                 "which the activity file needs; use the atomic CPU",
+                 name());
+        const StaticInst &whole = op.macro ? *op.macro : inst;
+        // In the order the execution trace shows them: an instruction that
+        // is not split, with its access; a split one's macro-op before its
+        // first micro-op, and each micro-op with its access.
+        if (!inst.isMicroop()) {
+            activityAccess(op, whole);
+            activityInst(whole, op.pc);
+        } else {
+            if (inst.isFirstMicroop())
+                activityInst(whole, op.pc);
+            activityAccess(op, whole);
+        }
+    }
     if (inst.isMicroop() && !inst.isLastMicroop())
         return;
 
@@ -118,6 +144,8 @@ WindowInstCounter::committed(const BaseCPU::CommittedOp &op)
                 writeNames();
             if (flips)
                 writeFlips();
+            if (activity)
+                writeActivity();
             if (!statInfos.empty())
                 writeStats();
             DPRINTF(WindowInstCounter, "window closes at %#x: %llu\n", pc,
@@ -142,6 +170,89 @@ WindowInstCounter::committed(const BaseCPU::CommittedOp &op)
         for (size_t i = 0; i < statInfos.size(); ++i)
             statStart[i] = statInfos[i]->value();
     }
+}
+
+const WindowInstCounter::Encoded &
+WindowInstCounter::encoded(const StaticInst &whole)
+{
+    // asBytes() is not const; it only reads the machine instruction.
+    uint64_t mach = 0;
+    const_cast<StaticInst &>(whole).asBytes(&mach, sizeof(mach));
+    mach = letoh(mach);
+    const unsigned width = whole.size();
+    auto it = encodings.find(mach);
+    if (it == encodings.end()) {
+        // Arm's machine instruction: the encoding in the low bits, the IT
+        // state (condition, mask) in bits 55-48.
+        const uint32_t enc = mach & mask(width * 8);
+        const uint64_t itstate = bits(mach, 55, 48);
+        const int cond = bits(itstate, 3, 0) ? (int)bits(itstate, 7, 4) : -1;
+        it = encodings.emplace(
+            mach, Encoded{enc, width, thumb::traits(enc, width, cond)}).first;
+    }
+    return it->second;
+}
+
+void
+WindowInstCounter::activityInst(const StaticInst &whole, Addr pc)
+{
+    const Encoded &e = encoded(whole);
+    const thumb::Kind kind = e.traits.kind;
+    auto &c = activityCounts;
+    if (activityOpen) {
+        ++c[e.width == 2 ? 0 : 1];
+        c[2] += e.traits.shift;
+        c[3] += __builtin_popcount(e.enc ^ lastEnc);
+        if (nextPCValid && pc != nextPC)
+            ++c[7];
+        if (numKinds && kind != kinds[numKinds - 1])
+            ++c[8];
+        bool seen = false;
+        for (size_t i = 0; i < numKinds; ++i)
+            seen = seen || kinds[i] == kind;
+        if (!seen)
+            ++c[9];
+    }
+    if (numKinds == kinds.size()) {
+        for (size_t i = 1; i < kinds.size(); ++i)
+            kinds[i - 1] = kinds[i];
+        --numKinds;
+    }
+    kinds[numKinds++] = kind;
+    lastEnc = e.enc;
+    nextPC = pc + e.width;
+    nextPCValid = true;
+    // The same rule as the instruction count's window.
+    if (closePCs.count(pc)) {
+        activityOpen = false;
+    } else if (openPCs.count(pc)) {
+        activityOpen = true;
+        c.fill(0);
+        nextPCValid = false;
+    }
+}
+
+void
+WindowInstCounter::activityAccess(const BaseCPU::CommittedOp &op,
+                                  const StaticInst &whole)
+{
+    if (!activityOpen || !op.effAddr)
+        return;
+    const Addr region = *op.effAddr >> 28;
+    const bool write = encoded(whole).traits.write;
+    if (region == 1 && !write)
+        ++activityCounts[4];
+    else if (region == 2)
+        ++activityCounts[write ? 6 : 5];
+}
+
+void
+WindowInstCounter::writeActivity()
+{
+    for (size_t i = 0; i < activityCounts.size(); ++i)
+        activityOut << (i ? " " : "") << activityCounts[i];
+    activityOut << '\n';
+    activityOut.flush();
 }
 
 void

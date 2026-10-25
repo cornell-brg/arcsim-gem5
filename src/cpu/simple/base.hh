@@ -132,6 +132,10 @@ class BaseSimpleCPU : public BaseCPU
 
     std::unique_ptr<PCStateBase> preExecuteTempPC;
 
+    /** The address of the current op's memory access, for the
+     * CommittedOps probe point; CPU models that know it set it */
+    std::optional<Addr> effAddr;
+
   public:
     void checkForInterrupts();
     void setupFetchRequest(const RequestPtr &req);
