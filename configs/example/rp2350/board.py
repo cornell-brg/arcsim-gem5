@@ -422,11 +422,16 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         board.cpu.executeInputWidth = 1
         board.cpu.executeIssueLimit = 1
         board.cpu.executeCommitLimit = 1
-        board.cpu.fetch1LineWidth = 8
-        board.cpu.fetch1LineSnapWidth = 8
+        # Fetch and decode as one stage, as Hazard3's frontend: one aligned
+        # 32-bit fetch a cycle into its 2-word FIFO (FIFO_DEPTH = 2), two
+        # fetches on their way at once.
+        board.cpu.singleFetchStage = True
+        board.cpu.fetch1LineWidth = 4
+        board.cpu.fetch1LineSnapWidth = 4
         board.cpu.fetch1FetchLimit = 2
-        board.cpu.fetch1ToFetch2ForwardDelay = 1
+        board.cpu.fetch1ToFetch2ForwardDelay = 0  # bypassed with singleFetchStage
         board.cpu.fetch1ToFetch2BackwardDelay = 0
+        board.cpu.fetchReadAheadLimit = 8
         board.cpu.executeBranchDelay = 1
         units = MinorDefaultFUPool()
         for unit in units.funcUnits:
