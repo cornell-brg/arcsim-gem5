@@ -433,6 +433,14 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         board.cpu.fetch1ToFetch2BackwardDelay = 0
         board.cpu.fetchReadAheadLimit = 8
         board.cpu.executeBranchDelay = 1
+        # A taken branch or jump costs 2 cycles, as Hazard3's X to F loop
+        # (instruction_timings.adoc): a branch redirects fetch in its
+        # issue cycle, and a direct target, or jalr's from its register, is
+        # fetched while the branch is in Decode. This makes up for Minor's
+        # Decode stage, which Hazard3 does not have.
+        board.cpu.executeBranchAtIssue = True
+        board.cpu.fetchBranchTargetAtDecode = True
+        board.cpu.fetchRegisterTargetAtDecode = True
         units = MinorDefaultFUPool()
         for unit in units.funcUnits:
             if isinstance(unit, (MinorDefaultIntFU, MinorDefaultIntMulFU)):
