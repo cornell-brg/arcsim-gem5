@@ -54,6 +54,9 @@ parser.add_argument("--xip-model", choices=("legacy", "qmi"),
 parser.add_argument("--hwpe", choices=tuple(HWPES), default="vvadd",
                     help="The HWPE on the Hazard3 board, as arcsim-soc's "
                     "CONFIG_HWPE")
+parser.add_argument("--zfinx", action="store_true",
+                    help="Zfinx on the hazard3-proxy: floats in the x "
+                    "registers instead of F and D")
 parser.add_argument("--tick-limit", type=int, default=100_000_000_000)
 args = parser.parse_args()
 if not args.firmware.is_file():
@@ -76,6 +79,7 @@ board = make_board(
     dma=args.dma,
     xip_model=args.xip_model,
     hwpe=args.hwpe,
+    zfinx=args.zfinx,
 )
 if args.xip_model == "legacy":
     board.xip_cache.tag_latency = args.xip_hit_latency_cycles
@@ -101,6 +105,7 @@ else:
     print(f"SRAM model=legacy; scratch bank effective bandwidth={args.scratch_bank_bandwidth}")
 if args.core == "hazard3-proxy":
     print(f"HWPE={args.hwpe} at 0x50800000, TCDM=0x60000000+128KiB")
+    print(f"FPU={'zfinx' if args.zfinx else 'f+d'}")
 roi_start = None
 roi_number = 0
 exit_code = 0

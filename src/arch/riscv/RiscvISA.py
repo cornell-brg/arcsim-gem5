@@ -139,6 +139,13 @@ class RiscvISA(BaseISA):
         "Hazard3's bit extract multiple (h3.bextm, h3.bextmi, in custom-0); "
         "off, their encodings are illegal",
     )
+    enable_Zfinx = Param.Bool(
+        False,
+        "Zfinx: the single-precision instructions use the x registers "
+        "instead of the f registers. misa.F and misa.D read 0 and "
+        "mstatus.FS is hardwired to 0, so the instructions that need the f "
+        "registers (FP loads, stores and moves, D, Zfh, Zfa) are illegal",
+    )
 
     wfi_resume_on_pending = Param.Bool(
         False,
@@ -157,8 +164,11 @@ class RiscvISA(BaseISA):
             isa_extensions.append("rv32")
         elif self.riscv_type.value == "RV64":
             isa_extensions.append("rv64")
-        # use imafdc by default
-        isa_extensions.extend(["i", "m", "a", "f", "d", "c"])
+        # use imafdc by default; Zfinx replaces f and d
+        if self.enable_Zfinx.value:
+            isa_extensions.extend(["i", "m", "a", "c"])
+        else:
+            isa_extensions.extend(["i", "m", "a", "f", "d", "c"])
         # check for the vector extension
         if self.enable_rvv.value == True:
             isa_extensions.append("v")
@@ -169,6 +179,9 @@ class RiscvISA(BaseISA):
             isa_extensions.append("h")
 
         isa_string = "".join(isa_extensions)
+
+        if self.enable_Zfinx.value:
+            isa_string += "_Zfinx"  # Single-precision FP in x registers
 
         if self.enable_Zicbom_fs.value:
             isa_string += "_Zicbom"  # Cache-block Management Instructions
