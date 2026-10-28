@@ -220,13 +220,20 @@ class ForwardLineData /* : public ReportIF, public BubbleIF */
     /** Packet from which the line is taken */
     Packet *packet = nullptr;
 
+    /** Fetch went on to the target of the branch at predictedBranchPC,
+     *  whose last bytes this line holds */
+    bool predictedBranch = false;
+    Addr predictedBranchPC = 0;
+
   public:
     ForwardLineData() {}
     ForwardLineData(const ForwardLineData &other) :
         bubbleFlag(other.bubbleFlag), lineBaseAddr(other.lineBaseAddr),
         pc(other.pc->clone()), fetchAddr(other.fetchAddr),
         lineWidth(other.lineWidth), fault(other.fault), id(other.id),
-        line(other.line), packet(other.packet)
+        line(other.line), packet(other.packet),
+        predictedBranch(other.predictedBranch),
+        predictedBranchPC(other.predictedBranchPC)
     {}
     ForwardLineData &
     operator=(const ForwardLineData &other)
@@ -240,6 +247,8 @@ class ForwardLineData /* : public ReportIF, public BubbleIF */
         id = other.id;
         line = other.line;
         packet = other.packet;
+        predictedBranch = other.predictedBranch;
+        predictedBranchPC = other.predictedBranchPC;
         return *this;
     }
 

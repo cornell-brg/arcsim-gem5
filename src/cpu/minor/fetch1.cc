@@ -213,6 +213,8 @@ Fetch1::fetchLine(ThreadID tid)
      * Note that as instructions can span lines, this PC is only a
      * reliable 'new' PC if the next line has a new stream sequence number. */
     thread.fetchAddr = aligned_pc + request_size;
+
+    lineRequested(request);
 }
 
 std::ostream &
@@ -580,9 +582,14 @@ Fetch1::processResponse(Fetch1::FetchRequestPtr response,
     /* Make sequence numbers valid in return */
     line.id = response->id;
     /* Set the PC in case there was a sequence change */
-    set(line.pc, thread.pc);
+    if (response->streamPC)
+        set(line.pc, response->streamPC);
+    else
+        set(line.pc, thread.pc);
     /* Set fetch address to virtual address */
     line.fetchAddr = response->pc;
+    line.predictedBranch = response->predictedBranch;
+    line.predictedBranchPC = response->predictedBranchPC;
     /* Set the lineBase, which is a sizeof(MachInst) aligned address <=
      *  pc.instAddr() */
     line.lineBaseAddr = response->request->getVaddr();
@@ -832,12 +839,18 @@ Fetch1::FetchRequest::reportData(std::ostream &os) const
 
 bool Fetch1::FetchRequest::isDiscardable() const
 {
-    Fetch1ThreadInfo &thread = fetch.fetchInfo[id.threadId];
-
     /* Can't discard lines in TLB/memory */
     return state != InTranslation && state != RequestIssuing &&
-        (id.streamSeqNum != thread.streamSeqNum ||
-        id.predictionSeqNum != thread.predictionSeqNum);
+        fetch.isStale(id);
+}
+
+bool
+Fetch1::isStale(const InstId &id) const
+{
+    const Fetch1ThreadInfo &thread = fetchInfo[id.threadId];
+
+    return id.streamSeqNum != thread.streamSeqNum ||
+        id.predictionSeqNum != thread.predictionSeqNum;
 }
 
 void
@@ -1185,6 +1198,67 @@ SingleStageFetch1::readAheadFull()
 }
 
 void
+SingleStageFetch1::lineRequested(FetchRequestPtr request)
+{
+    if (!fetch2->predictLastBackwardBranch)
+        return;
+
+    ThreadID tid = request->id.threadId;
+    Fetch1ThreadInfo &thread = fetchInfo[tid];
+    Addr word = request->request->getVaddr() & ~Addr(3);
+
+    /* A prediction moves the thread's PC on before this line arrives */
+    set(request->streamPC, thread.pc);
+
+    /* The first word after a branch from Execute is sent without the
+     *  compare */
+    bool compare = !executeRedirected;
+    executeRedirected = false;
+
+    /* A 32-bit branch spanning two words goes to its target after the
+     *  second */
+    bool match = predictAfterThis;
+    predictAfterThis = false;
+
+    if (compare && fetch2->backwardBranchValid &&
+        word == (fetch2->backwardBranchPC & ~Addr(3)))
+    {
+        if (fetch2->backwardBranchOverhangs)
+            predictAfterThis = true;
+        else
+            match = true;
+    }
+
+    if (match) {
+        request->predictedBranch = true;
+        request->predictedBranchPC = fetch2->backwardBranchPC;
+        thread.predictionSeqNum++;
+        set(thread.pc, fetch2->backwardBranchTarget);
+        thread.fetchAddr = thread.pc->instAddr();
+
+        DPRINTF(Fetch, "SF1: predict backward branch pc=%#x after line"
+            " %#x: target=%#x predictionSeqNum=%d\n",
+            request->predictedBranchPC, word, thread.fetchAddr,
+            thread.predictionSeqNum);
+    }
+}
+
+bool
+SingleStageFetch1::isStale(const InstId &id) const
+{
+    if (!fetch2->predictLastBackwardBranch)
+        return Fetch1::isStale(id);
+
+    /* Lines from before a prediction are kept until decode has got past
+     *  the predicted branch */
+    const Fetch1ThreadInfo &thread = fetchInfo[id.threadId];
+
+    return id.streamSeqNum != thread.streamSeqNum ||
+        id.predictionSeqNum > thread.predictionSeqNum ||
+        fetch2->predictionPassed(id);
+}
+
+void
 SingleStageFetch1::evaluate()
 {
     /* --- Fetch1 phase: I-cache management --- */
@@ -1229,6 +1303,10 @@ SingleStageFetch1::evaluate()
         fetch2->sureBranch = nullptr;
         fetch2->lastBranch = nullptr;
         sendOnSpeculation = false;
+        /* A target line taken here was fetched without the compare, and
+         *  fetching carries on after it */
+        executeRedirected = !have_target_line;
+        predictAfterThis = false;
     } else if (fetch2->decodedBranchTarget) {
         /* The direct branch decoded last cycle is in Decode now.  The
          *  targets of two older branches not yet through Execute are

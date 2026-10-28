@@ -276,22 +276,21 @@ class SingleStageFetch2 : public Fetch2
     /** See fetchBranchSpeculation in BaseMinorCPU.py */
     bool branchSpeculation;
 
+  public:
     /** See fetchPredictLastBackwardBranch in BaseMinorCPU.py */
     bool predictLastBackwardBranch;
 
-    /** The last conditional branch taken backward, predicted taken while
-     *  valid */
+    /** The last conditional branch taken backward, its target, and
+     *  whether it is 32-bit and ends in the word after its first;
+     *  predicted taken by Fetch1 while valid */
     bool backwardBranchValid = false;
     Addr backwardBranchPC = 0;
+    std::unique_ptr<PCStateBase> backwardBranchTarget;
+    bool backwardBranchOverhangs = false;
 
-    /** The word Execute's last branch went to, and the stream it began.
-     *  Hazard3 fetches that word without its predictor's address compare,
-     *  so a branch starting in it is not predicted */
-    Addr executeTargetWord = 0;
-    InstSeqNum executeTargetStreamSeqNum = 0;
-    InstSeqNum executeTargetPredictionSeqNum = 0;
+    /** Has decode gone past the prediction of a line with this id? */
+    bool predictionPassed(const InstId &id) const;
 
-  public:
     /** See fetchRegisterTargetAtDecode in BaseMinorCPU.py */
     bool registerTargetAtDecode;
 
