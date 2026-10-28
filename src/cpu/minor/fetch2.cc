@@ -918,6 +918,13 @@ SingleStageFetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
             /* Decode starts again at the target's line, not after the
              *  branch should its line end with it */
             thread.havePC = false;
+            /* The fall-through line is fetched from Decode as a direct
+             *  branch's target is, to start from should Execute not take
+             *  the branch: Hazard3 sends that address from X */
+            set(decodedBranchTarget, *inst->pc);
+            static_inst->advancePC(*decodedBranchTarget);
+            decodedBranchTid = inst->id.threadId;
+            decodedBranch = inst;
             DPRINTF(Fetch, "SF2: predicted backward branch pc=%#x"
                 " target=%#x\n", line_in->predictedBranchPC,
                 inst->predictedTarget->instAddr());
