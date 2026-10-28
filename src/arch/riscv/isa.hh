@@ -133,6 +133,9 @@ class ISA : public BaseISA
     // Hazard3's bit extract multiple (h3.bextm, h3.bextmi)
     bool _enableXh3bextm;
 
+    // Zfinx: single-precision FP in the x registers; no f registers
+    bool _enableZfinx;
+
     // mcountinhibit: while CY (IR) is set, mcycle (minstret) reads the value
     // it had when the bit was set, or was last written; otherwise it reads the
     // CPU's count less an offset, which a write sets so that the counter reads
@@ -234,6 +237,8 @@ class ISA : public BaseISA
     Xh3irq *xh3irq() const { return _xh3irq; }
 
     bool enableXh3bextm() const { return _enableXh3bextm; }
+
+    bool enableZfinx() const { return _enableZfinx; }
 
     virtual Addr getFaultHandlerAddr(
         RegIndex idx, uint64_t cause, bool intr) const;

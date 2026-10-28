@@ -300,7 +300,7 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
 
 def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
                 scratch_bank_bandwidth, sram_model, dma, xip_model, cpu,
-                hwpe):
+                hwpe, zfinx):
     from m5.objects import RiscvSystem
     from m5.objects.RiscvCPU import RiscvAtomicSimpleCPU, RiscvMinorCPU
     from m5.objects.RiscvFsWorkload import RiscvBareMetal
@@ -374,6 +374,8 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         # Hazard3's bit extract multiple, which the Pico SDK's float
         # routines use.
         enable_Xh3bextm=True,
+        # Single-precision FP in the x registers instead of F and D
+        enable_Zfinx=zfinx,
     )]
     # Loads, stores and fetches outside what this board has are access
     # faults, as rtl-sim's bus errors are; the core raises them before the
@@ -465,7 +467,8 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                scratch_bank_bandwidth=SCRATCH_BANK_BANDWIDTH,
                arm_predictor="m4", arm_divider="rp2350-m33",
                sram_model=None, arm_timing="tuned", dma=None,
-               xip_model=None, model="legacy", cpu="minor", hwpe="vvadd"):
+               xip_model=None, model="legacy", cpu="minor", hwpe="vvadd",
+               zfinx=False):
     """Return exactly one active core with the RP2350 memory baseline.
 
     cpu is "minor", the timed core (CortexM33CPU, or the Hazard3 proxy, a
@@ -480,7 +483,8 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     dma adds the DMA controller (RP2350DMA) at 0x50000000-0x50003fff; on the
     Hazard3 proxy its interrupt outputs are left unconnected. xip_model
     "qmi" replaces the generic cache and fixed miss delay in front of flash
-    with RP2350XIP. hwpe names the Hazard3 board's HWPE (HWPES)."""
+    with RP2350XIP. hwpe names the Hazard3 board's HWPE (HWPES). zfinx gives
+    the Hazard3 proxy Zfinx (floats in the x registers) instead of F and D."""
     sram_model, dma, xip_model = memory_models(model, sram_model, dma,
                                                 xip_model)
     if sram_model not in ("legacy", "banked"):
@@ -491,6 +495,8 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
         raise ValueError(f"Unknown CPU: {cpu}")
     if hwpe not in HWPES:
         raise ValueError(f"Unknown HWPE: {hwpe}")
+    if zfinx and core != "hazard3-proxy":
+        raise ValueError("Zfinx is only for the hazard3-proxy")
     if core == "arm-m4-proxy":
         return _make_arm(firmware, xip_miss_ns=xip_miss_ns,
                          sram_latency_ns=sram_latency_ns,
@@ -504,5 +510,6 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                            sram_latency_ns=sram_latency_ns,
                            scratch_bank_bandwidth=scratch_bank_bandwidth,
                            sram_model=sram_model, dma=dma,
-                           xip_model=xip_model, cpu=cpu, hwpe=hwpe)
+                           xip_model=xip_model, cpu=cpu, hwpe=hwpe,
+                           zfinx=zfinx)
     raise ValueError(f"Unknown RP2350 core selector: {core}")  

@@ -64,6 +64,8 @@ def operands {{
     'Rd': IntReg('ud', 'RD', 'IsInteger', 1),
     'Rs1': IntReg('ud', 'RS1', 'IsInteger', 2),
     'Rs2': IntReg('ud', 'RS2', 'IsInteger', 3),
+    # Zfinx's rs3 (fused multiply-add), in the bits of FS3
+    'Rs3': IntReg('ud', 'FS3', 'IsInteger', 4),
     'Rt': IntReg('ud', 'AMOTempReg', 'IsInteger', 4),
     'Rc1': IntReg('ud', 'RC1', 'IsInteger', 2),
     'Rc2': IntReg('ud', 'RC2', 'IsInteger', 3),

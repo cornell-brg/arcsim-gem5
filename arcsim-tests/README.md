@@ -46,6 +46,8 @@ because the gem5 board doesn't model everything rtl-sim does yet:
 - `test_vvadd`: on the vvadd HWPE (`--hwpe vvadd`).
 - `test_fast_cell`: on the FAST cell HWPE
   (`--hwpe fast-with-scoring-wide-multicycle-cell-best-k`).
+- `test_fp_f` and `test_fp_zfinx`: soc's `test_fp.c` built for F and for
+  Zfinx; the Zfinx one runs with `--zfinx`.
 
 The other tests run on the board's default HWPE (vvadd). soc builds an HWPE's
 test program only for the HWPE its tests are configured with, so
