@@ -1,8 +1,10 @@
 Import('*')
 
-SimObject('HWPE.py', sim_objects=['HWPEBase', 'HWPEEmpty', 'HWPEVvaddWide'])
+SimObject('HWPE.py', sim_objects=['HWPEBase', 'HWPEEmpty', 'HWPEVvaddWide',
+                                  'HWPEFastCellBestK'])
 Source('hwpe_base.cc')
 Source('hwpe_empty.cc')
+Source('hwpe_fast_cell_best_k.cc')
 Source('hwpe_streamer.cc')
 Source('hwpe_vvadd_wide.cc')
 

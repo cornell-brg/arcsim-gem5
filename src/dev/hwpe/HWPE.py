@@ -21,8 +21,10 @@ class HWPEBase(BasicPioDevice):
       0x10 RUNNING_JOB  the running job's id (the jobs done since the clear)
       0x14 SOFT_CLEAR   write: drop every job and reset the job state; a write
                         of 0 also clears the generic and job registers
-      0x18, 0x1C        the reserved and software event registers: read 0,
-                        writes ignored
+      0x18              read: the HWPE's ext_flags (0 unless the subclass
+                        gives a value); writes ignored
+      0x1C              the software event register: reads 0, writes
+                        ignored
       0x20 + 4n         generic register n, shared by every job
       0x40 + 4n         job register n of the context being programmed
     Everything else in the window reads 0 and ignores writes, with a warning
@@ -128,4 +130,68 @@ class HWPEVvaddWide(HWPEBase):
     )
     compute_interval = Param.Cycles(
         1, "Minimum cycles between taking two pairs of beats from a and b"
+    )
+
+
+class HWPEFastCellBestK(HWPEBase):
+    """
+    arcsim-xcel's FAST corner detector on one cell,
+    fast-with-scoring-wide-multicycle-cell-best-k
+    (fastTopWithScoringWideMulticycleCellBestK): a job runs FAST-n on one
+    cell_width x cell_height cell of a frame, and writes the cell's best k
+    corners after non-max suppression. The defaults are those of
+    arcsim-soc's hwpe_xcel wrapper.
+
+    Job registers: 0x40 IMAGE_PTR, the cell's top-left pixel (8-bit
+    pixels, row-major, rows frame_width bytes apart), and 0x44 CORNERS_PTR,
+    where the corner words go. 0x18 reads the corners the cell has (before
+    non-max suppression); a job's start and every soft clear reset it.
+
+    The engine scores each pixel of the cell without its 3-pixel border:
+    the largest d for which n contiguous pixels of the 16-pixel ring are
+    all more than d brighter, or all more than d darker, than the centre.
+    A pixel with a score of at least threshold is a corner. A corner is
+    kept when its score is greater than that of each of its 8 neighbours
+    (0 outside the scored area). The k kept corners with the highest
+    scores (on a tie, the first in raster order) are written as one beat
+    to CORNERS_PTR, best first, one word each: {score, row, col}, with row
+    and col in the cell, each log2 of the cell's height or width bits
+    wide. The beat's other words are not written (their byte enables are
+    off); without a corner, the beat is written with no byte enabled.
+
+    Timing: the cell is read as a 2D walk of beats of 4 * words bytes (one
+    pixel a byte), cell_width / (4 * words) beats a row. The engine takes
+    one pixel at a time: a pixel that completes a 7 x 7 window (row and col
+    at least 6) occupies it for cycles + 4 cycles, for the scoring
+    (fastScoreMulticycle); any other pixel for 2. After the last pixel,
+    the scoring, the non-max suppression and the best-k list take
+    cycles + 4 + (cell_width - 6) + 3 cycles before the corner beat goes to
+    the sink. So the job's time does not depend on the pixels.
+    """
+
+    type = "HWPEFastCellBestK"
+    cxx_class = "gem5::HWPEFastCellBestK"
+    cxx_header = "dev/hwpe/hwpe_fast_cell_best_k.hh"
+
+    num_io_regs = 2
+    # vvadd's values (the same control slave and streamer), not yet
+    # calibrated for this HWPE
+    start_latency = 6
+    done_latency = 3
+    cell_width = Param.Unsigned(64, "Pixels in a row of the cell")
+    cell_height = Param.Unsigned(64, "Rows of the cell")
+    frame_width = Param.Unsigned(
+        320, "Bytes from one row of the frame to the next"
+    )
+    n = Param.Unsigned(9, "Contiguous ring pixels a corner needs (FAST-n)")
+    threshold = Param.Unsigned(10, "Lowest score of a corner (at least 1)")
+    cycles = Param.Unsigned(
+        4, "Cycles of fastScoreMulticycle's arc stage: 1, 2, 4, 8 or 16"
+    )
+    k = Param.Unsigned(3, "Best corners written (1 to words)")
+    words = Param.Unsigned(
+        8, "32-bit words per TCDM access (the RTL's (MEM_DW - 32) / 32)"
+    )
+    buffer_depth = Param.Unsigned(
+        2, "Pixel beats buffered (the engine's pixel FIFO depth)"
     )

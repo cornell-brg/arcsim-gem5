@@ -42,12 +42,19 @@ because the gem5 board doesn't model everything rtl-sim does yet:
 
 - `test_memory`
 - `test_interconnect`
-- `test_vvadd`: needs the HWPE, which is still a placeholder on the board.
 - `test_dma`
+- `test_vvadd`: on the vvadd HWPE (`--hwpe vvadd`).
+- `test_fast_cell`: on the FAST cell HWPE
+  (`--hwpe fast-with-scoring-wide-multicycle-cell-best-k`).
+
+The other tests run on the board's default HWPE (vvadd). soc builds an HWPE's
+test program only for the HWPE its tests are configured with, so
+`make soc-tests` (and `make check-rebuild`) builds them once for each.
 
 soc's `*_randinit` variants only apply to Verilator, so they don't run here. The
 `TEST_CASE` that soc's tests were configured with is built into the ELFs, so it
 applies here too.
 
 To add a test, add `hazard3_test(<soc test> [<run.py arg>...])` to
-`CMakeLists.txt`. If soc moves its tests, change `SOC_TESTS` there.
+`CMakeLists.txt`, with `--hwpe <CONFIG_HWPE>` for an HWPE's test program (and
+its HWPE in `make soc-tests`). If soc moves its tests, change `SOC_TESTS` there.

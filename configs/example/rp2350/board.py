@@ -44,6 +44,8 @@ HWPES = {
     "vvadd-wide-2": ("HWPEVvaddWide", {"elems": 2}),
     "vvadd-wide-4": ("HWPEVvaddWide", {"elems": 4}),
     "vvadd-wide-8": ("HWPEVvaddWide", {"elems": 8}),
+    # Its wrapper's parameters are HWPEFastCellBestK's defaults
+    "fast-with-scoring-wide-multicycle-cell-best-k": ("HWPEFastCellBestK", {}),
 }
 
 

@@ -58,10 +58,14 @@ class HWPEBase : public BasicPioDevice
     // Called by the subclass when its job has ended. The base class shows
     // the job as done (STATUS, FINISHED, IRQ) done_latency cycles later.
     void jobDone();
-    // Called on a soft clear while a job runs: the subclass must drop its
-    // job state. Responses to TCDM accesses sent before the clear are not
-    // passed to recvTcdmResp() but to clearedTcdmResp().
+    // Called on every soft clear, whether a job runs or not: the subclass
+    // must drop its job state and reset whatever the RTL's clear resets.
+    // Responses to TCDM accesses sent before the clear are not passed to
+    // recvTcdmResp() but to clearedTcdmResp().
     virtual void clearJob() {}
+    // The value of 0x18: what the subclass gives the control slave as
+    // ext_flags (hwpe_ctrl_slave's ctrl_i.ext_flags), 0 if nothing
+    virtual uint32_t extFlags() const { return 0; }
     // Called when draining ends: the subclass may send TCDM accesses again.
     virtual void resumeJob() {}
     // Called whenever a stream changes: a source received data, or a sink

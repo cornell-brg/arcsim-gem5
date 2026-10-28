@@ -18,9 +18,13 @@ namespace gem5
 void
 AddressGen::start(const AddressGenConfig &_config)
 {
-    fatal_if(_config.dims != 1,
-             "HWPE: %d-dimensional address generation is not modelled",
+    fatal_if(_config.dims < 1 || _config.dims > 3,
+             "HWPE: %d-dimensional address generation; 1 to 3",
              _config.dims);
+    fatal_if(_config.dims >= 2 && _config.d0Len == 0,
+             "HWPE: %dD address generation with d0Len 0", _config.dims);
+    fatal_if(_config.dims == 3 && _config.d1Len == 0,
+             "HWPE: 3D address generation with d1Len 0");
     config = _config;
     count = 0;
 }
@@ -29,10 +33,21 @@ Addr
 AddressGen::next()
 {
     panic_if(done(), "HWPE: address generator stepped past its end");
-    // Only 1D. 2D and 3D would go here (see AddressGenConfig). Addresses
-    // wrap at 32 bits, as in the RTL.
-    const Addr addr =
-        (config.base + int64_t(count) * config.d0Stride) & mask(32);
+    // The position of access 'count' in its line, its line in its block,
+    // and its block (see AddressGenConfig)
+    uint64_t pos = count, line = 0, block = 0;
+    if (config.dims >= 2) {
+        pos = count % config.d0Len;
+        line = count / config.d0Len;
+    }
+    if (config.dims == 3) {
+        block = line / config.d1Len;
+        line %= config.d1Len;
+    }
+    // Addresses wrap at 32 bits, as in the RTL
+    const Addr addr = (config.base + int64_t(pos) * config.d0Stride +
+                       int64_t(line) * config.d1Stride +
+                       int64_t(block) * config.d2Stride) & mask(32);
     ++count;
     return addr;
 }
@@ -209,7 +224,20 @@ Sink::push(const uint8_t *data, unsigned bytes)
     panic_if(!room(), "HWPE: sink %s is full", name());
     panic_if(bytes > beatBytes, "HWPE: a %d-byte beat for sink %s of %d",
              bytes, name(), beatBytes);
-    beats.emplace_back(data, data + bytes);
+    beats.push_back(Beat{std::vector<uint8_t>(data, data + bytes), {}});
+    streamer.wake();
+}
+
+void
+Sink::pushMasked(const uint8_t *data, const std::vector<bool> &enables)
+{
+    panic_if(!room(), "HWPE: sink %s is full", name());
+    panic_if(enables.size() > beatBytes,
+             "HWPE: a %d-byte beat for sink %s of %d", enables.size(),
+             name(), beatBytes);
+    beats.push_back(Beat{std::vector<uint8_t>(data, data + enables.size()),
+                         std::vector<uint8_t>(enables.begin(),
+                                              enables.end())});
     streamer.wake();
 }
 
@@ -225,13 +253,18 @@ Sink::makeAccess()
     panic_if(gen.done(), "HWPE: sink %s got more beats than its job's",
              name());
     const Addr addr = gen.next();
-    const std::vector<uint8_t> &beat = beats.front();
-    PacketPtr pkt = new Packet(streamer.request(addr, beat.size()),
-                               MemCmd::WriteReq);
+    const Beat &beat = beats.front();
+    RequestPtr req = streamer.request(addr, beat.data.size());
+    PacketPtr pkt = new Packet(req, MemCmd::WriteReq);
     pkt->allocate();
-    pkt->setData(beat.data());
+    pkt->setData(beat.data.data());
+    // After setData(), which does not take a masked write
+    if (!beat.enables.empty())
+        req->setByteEnable(std::vector<bool>(beat.enables.begin(),
+                                             beat.enables.end()));
     tag(pkt, 0);
-    DPRINTF(HWPE, "%s: write %d bytes at %#x\n", name(), beat.size(), addr);
+    DPRINTF(HWPE, "%s: write %d bytes at %#x%s\n", name(), beat.data.size(),
+            addr, beat.enables.empty() ? "" : " (masked)");
     beats.pop_front();
     ++inFlight;
     ++accesses;
@@ -264,8 +297,10 @@ Sink::serialize(CheckpointOut &cp) const
     SERIALIZE_SCALAR(beatBytes);
     const unsigned num_beats = beats.size();
     SERIALIZE_SCALAR(num_beats);
-    for (unsigned n = 0; n < num_beats; ++n)
-        arrayParamOut(cp, csprintf("beat%d", n), beats[n]);
+    for (unsigned n = 0; n < num_beats; ++n) {
+        arrayParamOut(cp, csprintf("beat%d", n), beats[n].data);
+        arrayParamOut(cp, csprintf("beat%d.enables", n), beats[n].enables);
+    }
     gen.serializeSection(cp, "gen");
 }
 
@@ -278,8 +313,9 @@ Sink::unserialize(CheckpointIn &cp)
     UNSERIALIZE_SCALAR(num_beats);
     beats.clear();
     for (unsigned n = 0; n < num_beats; ++n) {
-        std::vector<uint8_t> beat;
-        arrayParamIn(cp, csprintf("beat%d", n), beat);
+        Beat beat;
+        arrayParamIn(cp, csprintf("beat%d", n), beat.data);
+        arrayParamIn(cp, csprintf("beat%d.enables", n), beat.enables);
         beats.push_back(std::move(beat));
     }
     inFlight = 0;

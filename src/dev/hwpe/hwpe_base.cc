@@ -132,9 +132,10 @@ HWPEBase::readRegister(Addr offset)
     switch (offset) {
       case TRIGGER:
       case SOFT_CLEAR:
-      case RESERVED:
       case SW_EVT:
         return 0;
+      case RESERVED:
+        return extFlags();
       case ACQUIRE:
         if (acquired)
             return AcquireLocked;
@@ -308,8 +309,7 @@ HWPEBase::softClear(bool registers)
         deschedule(startEvent);
     if (doneEvent.scheduled())
         deschedule(doneEvent);
-    if (running)
-        clearJob();
+    clearJob();
     streamer.clear();
     // From now on, responses to accesses sent before this point go to
     // clearedTcdmResp() (see TcdmState)

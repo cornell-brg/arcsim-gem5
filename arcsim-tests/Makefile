@@ -6,7 +6,9 @@
 #
 #   make check            run the tests on gem5, one line per test
 #   make check-verbose    the same, with each run's full output first
-#   make check-rebuild    build soc's tests first (make -C $ARCSIM_SOC_HOME/tests build)
+#   make check-rebuild    build soc's tests first (make soc-tests)
+#   make soc-tests        build soc's tests (make -C $ARCSIM_SOC_HOME/tests
+#                         build), once for each HWPE that has a test program
 #   make clean
 #
 # GEM5 (default ../build/RISCV/gem5.opt) is the gem5 binary, e.g.
@@ -32,8 +34,12 @@ check: configure
 check-verbose: configure
 	@CTEST_PARALLEL_LEVEL=$(JOBS) sh $(ARCSIM_TEST_HOME)/bin/arcsim-test-check -v $(BUILD)
 
+# soc builds an HWPE's test program only for the HWPE it is configured with, and
+# keeps the ELFs of earlier ones; vvadd, its default, last.
 soc-tests:
-	@$(MAKE) --no-print-directory -C $(ARCSIM_SOC_HOME)/tests build
+	@$(MAKE) --no-print-directory -C $(ARCSIM_SOC_HOME)/tests build \
+	         HWPE=fast-with-scoring-wide-multicycle-cell-best-k
+	@$(MAKE) --no-print-directory -C $(ARCSIM_SOC_HOME)/tests build HWPE=vvadd
 
 check-rebuild: soc-tests
 	@$(MAKE) --no-print-directory check

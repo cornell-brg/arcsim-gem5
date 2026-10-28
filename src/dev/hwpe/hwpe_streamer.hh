@@ -20,16 +20,17 @@ class HWPEBase;
 class Streamer;
 
 // Configuration of an address generator, with the fields of hwpe-stream's
-// ctrl_addressgen_v3_t. Only 1D (dims == 1) is modelled so far.
+// ctrl_addressgen_v3_t. dims is 1, 2 or 3: the RTL's dim_enable_1h of 2'b00,
+// 2'b01 and 2'b11.
 struct AddressGenConfig
 {
     Addr base = 0;            // address of the first access
     uint32_t totLen = 0;      // number of accesses
     int32_t d0Stride = 0;     // bytes from one access to the next
-    // Only for 2D and 3D (dims 2 and 3), not modelled yet: after d0Len
-    // accesses, the next line starts d1Stride bytes after the start of the
-    // previous line; after d1Len lines, the next block starts d2Stride
-    // bytes after the start of the previous block.
+    // Only for 2D and 3D (dims 2 and 3): after d0Len accesses, the next
+    // line starts d1Stride bytes after the start of the previous line;
+    // after d1Len lines (3D only), the next block starts d2Stride bytes
+    // after the start of the previous block. totLen ends the walk.
     uint32_t d0Len = 0;
     int32_t d1Stride = 0;
     uint32_t d1Len = 0;
@@ -150,13 +151,19 @@ class Sink : public StreamUnit
 
     // Starts a job: config.totLen beats of at most beat_bytes each.
     // TODO: an HWPE whose output length depends on the data (FAST's
-    // corners) needs a finish() that ends the job before totLen.
+    // corners, if one job wrote a beat per corner) needs a finish() that
+    // ends the job before totLen.
     void start(const AddressGenConfig &config, unsigned beat_bytes);
     // The engine's interface: room() says push() may be called. push()
     // hands over a beat of 'bytes' bytes, written from the beat's start
     // address (so the valid bytes must be contiguous from the start).
+    // pushMasked() hands over a beat with a byte enable for each of its
+    // bytes (the RTL's strb): only the enabled bytes are written. With no
+    // byte enabled the access is still made and writes nothing, as in the
+    // RTL.
     bool room() const { return beats.size() < depth; }
     void push(const uint8_t *data, unsigned bytes);
+    void pushMasked(const uint8_t *data, const std::vector<bool> &enables);
     // All beats have been written and acknowledged
     bool done() const;
 
@@ -170,9 +177,17 @@ class Sink : public StreamUnit
     void clear() override;
 
   private:
+    struct Beat
+    {
+        std::vector<uint8_t> data;
+        // One flag (0 or 1) per byte of data for a masked write; empty
+        // for an unmasked one
+        std::vector<uint8_t> enables;
+    };
+
     unsigned beatBytes = 0;
-    std::deque<std::vector<uint8_t>> beats;   // pushed, not yet sent
-    unsigned inFlight = 0;                    // sent, not yet acknowledged
+    std::deque<Beat> beats;     // pushed, not yet sent
+    unsigned inFlight = 0;      // sent, not yet acknowledged
 };
 
 // The HWPE's streamer (like hci_core_mux_dynamic): all stream units share
