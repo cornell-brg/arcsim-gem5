@@ -309,6 +309,10 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         MinorDefaultIntDivFU,
         MinorDefaultIntFU,
         MinorDefaultIntMulFU,
+        MinorDefaultMemFU,
+        MinorDefaultMiscFU,
+        MinorFUTiming,
+        minorMakeOpClassSet,
     )
 
     board = RiscvSystem()
@@ -451,10 +455,40 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         # conditional branch taken backward is predicted taken as it is
         # fetched, unless it starts in the word a branch from X went to.
         board.cpu.fetchPredictLastBackwardBranch = True
+        # A load's address phase is its X cycle, and the instruction after
+        # it is in X during the load's data phase.
+        board.cpu.executeLoadAccessAtIssue = True
         units = MinorDefaultFUPool()
         for unit in units.funcUnits:
+            if isinstance(unit, (MinorDefaultIntFU, MinorDefaultIntMulFU,
+                                 MinorDefaultIntDivFU, MinorDefaultMiscFU)):
+                # Results are forwarded to the next instruction in X, and
+                # one with a result delay (a load's) holds it back by that
+                # delay exactly
+                unit.timings = [
+                    MinorFUTiming(description="Hazard3Int",
+                                  srcRegsRelativeLats=[1])
+                ]
             if isinstance(unit, (MinorDefaultIntFU, MinorDefaultIntMulFU)):
                 unit.opLat = 1
+            elif isinstance(unit, MinorDefaultMemFU):
+                # A loaded register is ready a cycle after the load's data
+                # phase: an instruction in X that reads it waits a cycle,
+                # but a store's data is read in M, so a store of it does
+                # not (instruction_timings.adoc, data_dependency).
+                unit.timings = [
+                    MinorFUTiming(
+                        description="Hazard3Store",
+                        srcRegsRelativeLats=[1, 2],
+                        opClasses=minorMakeOpClassSet(
+                            ["MemWrite", "FloatMemWrite"]),
+                    ),
+                    MinorFUTiming(
+                        description="Hazard3Load",
+                        srcRegsRelativeLats=[1],
+                        resultUsePenalty=1,
+                    ),
+                ]
             elif isinstance(unit, MinorDefaultIntDivFU):
                 unit.opLat = 19
                 unit.issueLat = 19
