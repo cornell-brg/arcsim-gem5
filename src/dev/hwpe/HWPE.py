@@ -113,10 +113,14 @@ class HWPEVvaddWide(HWPEBase):
     cxx_header = "dev/hwpe/hwpe_vvadd_wide.hh"
 
     num_io_regs = 4
-    # Calibrated against rtl-sim (hwpe-vvadd, -wide-2, -wide-8): 6 cycles
-    # from the TRIGGER write to the first TCDM grant, and 4 cycles from the
-    # last write's grant to STATUS reading 0. Here the write's
-    # acknowledgement already takes 1 of those 4, so done_latency is 3.
+    # Calibrated against rtl-sim (hwpe-vvadd, -wide-2, -wide-8) with
+    # HCITcdm: 6 cycles from the TRIGGER write to the first TCDM grant.
+    # From the last write's grant to STATUS reading 0, rtl-sim takes 4
+    # cycles and gem5 5 (the write's acknowledgement takes a cycle and
+    # comes within the next). But for most jobs the streamer's round robin
+    # ends one cycle before the RTL's (hci_core_mux_dynamic orders the
+    # accesses differently), so 3 matches most jobs exactly and the others
+    # within one cycle.
     start_latency = 6
     done_latency = 3
     elems = Param.Unsigned(8, "Elements per TCDM access (1 to 8)")

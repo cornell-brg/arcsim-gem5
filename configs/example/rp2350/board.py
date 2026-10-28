@@ -321,21 +321,15 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     from m5.objects import Hazard3TbIO
     board.tb_io = Hazard3TbIO(pio_latency="1ns")
     board.tb_io.pio = board.sram_bus.mem_side_ports
-    # Stand-in for the HWPE's 128 KiB TCDM at 0x60000000 (soc.v): a plain
-    # memory, without the TCDM's banks or their timing, behind a crossbar of
-    # its own that the core (through the SRAM bus) and the HWPE share, so
-    # the HWPE's accesses do not cross the SRAM bus. 32 bytes wide: an HWPE
-    # beat of 256 bits.
-    board.tcdm = SimpleMemory(range=AddrRange(0x60000000, size="128KiB"),
-                              latency=f"{sram_latency_ns}ns")
+    # The HWPE's 128 KiB TCDM at 0x60000000 (soc.v): 16 banks shared by the
+    # core side, through the SRAM bus, and the HWPE.
+    from m5.objects import HCITcdm
+    board.tcdm = HCITcdm(clk_domain=board.clk_domain)
     board.mem_ranges.append(board.tcdm.range)
-    board.tcdm_xbar = _router(board.fast_clock)
-    board.tcdm_xbar.width = 32
-    board.sram_bus.mem_side_ports = board.tcdm_xbar.cpu_side_ports
-    board.tcdm_xbar.mem_side_ports = board.tcdm.port
+    board.tcdm.core_port = board.sram_bus.mem_side_ports
     # The HWPE (soc.v): its registers at 0x50800000 on the SRAM bus, its
-    # data port on the TCDM crossbar. Its done event (irq) stays
-    # unconnected, as in soc.v.
+    # data port on the TCDM. Its done event (irq) stays unconnected, as in
+    # soc.v.
     import m5.objects
     hwpe_class, hwpe_params = HWPES[hwpe]
     board.hwpe = getattr(m5.objects, hwpe_class)(pio_latency="1ns",
@@ -345,7 +339,7 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     # runners that place stand-ins outside mem_ranges leave them alone.
     board.mem_ranges.append(AddrRange(int(board.hwpe.pio_addr),
                                       size=int(board.hwpe.pio_size)))
-    board.hwpe.tcdm_port = board.tcdm_xbar.cpu_side_ports
+    board.hwpe.tcdm_port = board.tcdm.hwpe_port
     if board._banked_sram:
         board.icode_router.mem_side_ports = board.sram.port
     if cpu == "atomic":

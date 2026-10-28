@@ -1,9 +1,12 @@
 Import('*')
 
 SimObject('HWPE.py', sim_objects=['HWPEBase', 'HWPEEmpty', 'HWPEVvaddWide'])
+SimObject('HCITcdm.py', sim_objects=['HCITcdm'])
+Source('hci_tcdm.cc')
 Source('hwpe_base.cc')
 Source('hwpe_empty.cc')
 Source('hwpe_streamer.cc')
 Source('hwpe_vvadd_wide.cc')
 
 DebugFlag('HWPE')
+DebugFlag('HCITcdm')
