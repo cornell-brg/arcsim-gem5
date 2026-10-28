@@ -59,6 +59,7 @@ BitUnion64(ExtMachInst)
     Bitfield<63, 62>    rv_type;
     Bitfield<61>        compressed;
     Bitfield<60>        enable_zcd;
+    Bitfield<59>        enable_zfinx;
     // More bits for vector extension
     Bitfield<57, 41>    vl;     // [0, 2**16]
     Bitfield<40>        vill;

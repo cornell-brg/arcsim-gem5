@@ -349,6 +349,9 @@ def template CSRExecute {{
         }
 
         MISA csr_exts = csr_data_it->second.isaExts;
+        // Zfinx has the FP CSRs (fflags, frm, fcsr) with misa.F clear
+        if (isa->enableZfinx())
+            csr_exts.rvf = 0;
         if ((csr_exts & misa) != csr_exts) {
             return std::make_shared<IllegalInstFault>(
                     csprintf("%s is not support in the isa spec %d\n",

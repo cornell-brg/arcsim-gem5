@@ -44,6 +44,8 @@ because the gem5 board doesn't model everything rtl-sim does yet:
 - `test_interconnect`
 - `test_vvadd`: needs the HWPE, which is still a placeholder on the board.
 - `test_dma`
+- `test_fp_f` and `test_fp_zfinx`: soc's `test_fp.c` built for F and for
+  Zfinx; the Zfinx one runs with `--zfinx`.
 
 soc's `*_randinit` variants only apply to Verilator, so they don't run here. The
 `TEST_CASE` that soc's tests were configured with is built into the ELFs, so it

@@ -45,3 +45,6 @@ hazard3_test(test_interconnect)
 # Needs the HWPE (0x50800000), still a placeholder on the board
 hazard3_test(test_vvadd)
 hazard3_test(test_dma)
+# soc's test_fp.c, built for F and for Zfinx
+hazard3_test(test_fp_f)
+hazard3_test(test_fp_zfinx --zfinx)

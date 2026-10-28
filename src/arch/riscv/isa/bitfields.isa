@@ -35,6 +35,7 @@
 //
 def bitfield RVTYPE rv_type;
 def bitfield ENABLE_ZCD enable_zcd;
+def bitfield ENABLE_ZFINX enable_zfinx;
 
 def bitfield QUADRANT <1:0>;
 def bitfield OPCODE5 <6:2>;

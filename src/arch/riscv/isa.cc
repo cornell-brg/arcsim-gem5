@@ -309,7 +309,7 @@ ISA::ISA(const Params &p) : BaseISA(p, "riscv"),
     _privilegeModeSet(p.privilege_mode_set),
     _wfiResumeOnPending(p.wfi_resume_on_pending), _enableZcd(p.enable_Zcd),
     _enableSmrnmi(p.enable_Smrnmi), _xh3irq(p.xh3irq),
-    _enableXh3bextm(p.enable_Xh3bextm)
+    _enableXh3bextm(p.enable_Xh3bextm), _enableZfinx(p.enable_Zfinx)
 {
     _regClasses.push_back(&intRegClass);
     _regClasses.push_back(&floatRegClass);
@@ -394,8 +394,14 @@ void ISA::clear()
           panic("Privilege mode set config should not reach here");
     }
 
-    // mark FS is initial
-    status.fs = FPUStatus::INITIAL;
+    // mark FS is initial; with Zfinx there are no f registers, so F and D
+    // read 0 and FS is hardwired to off
+    if (enableZfinx()) {
+        misa.rvf = misa.rvd = 0;
+        status.fs = FPUStatus::OFF;
+    } else {
+        status.fs = FPUStatus::INITIAL;
+    }
 
     // _rvType dependent init.
     switch (_rvType) {
@@ -953,6 +959,9 @@ ISA::setMiscReg(RegIndex idx, RegVal val)
                 if (!getEnableRvv()) {
                     new_misa.rvv = 0;
                 }
+                if (enableZfinx()) {
+                    new_misa.rvf = new_misa.rvd = 0;
+                }
                 new_misa.rvs = cur_misa.rvs;
                 new_misa.rvu = cur_misa.rvu;
                 setMiscRegNoEffect(idx, new_misa);
@@ -969,6 +978,11 @@ ISA::setMiscReg(RegIndex idx, RegVal val)
                 if (!getEnableRvv()) {
                     // Always OFF is rvv is disabled.
                     val &= ~STATUS_VS_MASK;
+                }
+                if (enableZfinx()) {
+                    // Always OFF with Zfinx, so the instructions that use
+                    // the f registers stay illegal.
+                    val &= ~STATUS_FS_MASK;
                 }
                 setMiscRegNoEffect(idx, val);
             }
