@@ -385,6 +385,13 @@ class BaseMinorCPU(BaseCPU):
         " cycle, when every older instruction has been issued and none"
         " still has that register to write",
     )
+    fetchPredictLastBackwardBranch = Param.Bool(
+        False,
+        "With fetchBranchTargetAtDecode: the last conditional branch taken"
+        " backward is predicted taken as it is fetched, as Hazard3's"
+        " one-entry branch predictor (BRANCH_PREDICTOR); every other branch"
+        " as without",
+    )
     fetchFoldMasks = VectorParam.UInt64(
         [],
         "With fetchFoldMatches and fetchFoldKinds: instructions that take"

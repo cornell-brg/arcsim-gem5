@@ -441,6 +441,16 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         board.cpu.executeBranchAtIssue = True
         board.cpu.fetchBranchTargetAtDecode = True
         board.cpu.fetchRegisterTargetAtDecode = True
+        # Those target fetches, and what is fetched behind a branch not yet
+        # resolved, are made on speculation: RP2350XIP reads no line from
+        # flash for one, so a branch that is not taken starts no flash read
+        # Hazard3 would not make. A fall-through miss behind such a branch
+        # waits the cycle or two until it resolves.
+        board.cpu.fetchBranchSpeculation = True
+        # Hazard3's branch predictor (BRANCH_PREDICTOR = 1): the last
+        # conditional branch taken backward is predicted taken as it is
+        # fetched, unless it starts in the word a branch from X went to.
+        board.cpu.fetchPredictLastBackwardBranch = True
         units = MinorDefaultFUPool()
         for unit in units.funcUnits:
             if isinstance(unit, (MinorDefaultIntFU, MinorDefaultIntMulFU)):

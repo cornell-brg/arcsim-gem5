@@ -876,6 +876,7 @@ SingleStageFetch2::SingleStageFetch2(const std::string &name,
         next_stage_input_buffer),
     branchTargetAtDecode(params.fetchBranchTargetAtDecode),
     branchSpeculation(params.fetchBranchSpeculation),
+    predictLastBackwardBranch(params.fetchPredictLastBackwardBranch),
     registerTargetAtDecode(params.fetchRegisterTargetAtDecode),
     decodedBranchTid(InvalidThreadID)
 {
@@ -895,6 +896,35 @@ SingleStageFetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
         /* No dynamic prediction: a direct branch's target is fetched from
          *  Decode, anything else waits for Execute */
         const StaticInstPtr &static_inst = inst->staticInst;
+
+        /* Except the last conditional branch taken backward, predicted
+         *  taken as it is fetched: the new stream starts now.  Not in the
+         *  word Execute last branched to, fetched without the compare */
+        bool in_execute_target_word =
+            inst->id.streamSeqNum == executeTargetStreamSeqNum &&
+            inst->id.predictionSeqNum == executeTargetPredictionSeqNum &&
+            (inst->pc->instAddr() & ~Addr(3)) == executeTargetWord;
+        if (predictLastBackwardBranch && backwardBranchValid &&
+            static_inst->isDirectCtrl() && static_inst->isCondCtrl() &&
+            inst->pc->instAddr() == backwardBranchPC &&
+            !in_execute_target_word)
+        {
+            Fetch2ThreadInfo &thread = fetchInfo[inst->id.threadId];
+            inst->predictedTaken = true;
+            set(inst->predictedTarget, static_inst->branchTarget(*inst->pc));
+            thread.expectedStreamSeqNum = inst->id.streamSeqNum;
+            branch = BranchData(BranchData::BranchPrediction,
+                inst->id.threadId,
+                inst->id.streamSeqNum, thread.predictionSeqNum + 1,
+                *inst->predictedTarget, inst);
+            thread.predictionSeqNum++;
+            if (branchSpeculation)
+                lastBranch = inst;
+            DPRINTF(Fetch, "SF2: predict backward branch pc=%#x"
+                " target=%#x\n", backwardBranchPC,
+                inst->predictedTarget->instAddr());
+            return;
+        }
 
         /* Nothing more of this stream is fetched once a branch sure to be
          *  taken has been decoded, and what is fetched behind any other
@@ -984,6 +1014,9 @@ SingleStageFetch2::reactToExecuteBranch(const BranchData &executeBranch)
      * SingleStageFetch1, NOT the latched branchInp.outputWire which is
      * 1 cycle old.  The latched wire is still used for updateBranchPrediction
      * (which needs the previous cycle's result for history management). */
+    if (predictLastBackwardBranch)
+        updateBackwardBranch(executeBranch);
+
     BranchData &latched_branch = *branchInp.outputWire;
     if (!latched_branch.isBubble() && latched_branch.inst)
         updateBranchPrediction(latched_branch);
@@ -1016,6 +1049,65 @@ SingleStageFetch2::reactToExecuteBranch(const BranchData &executeBranch)
             latched_branch.newPredictionSeqNum;
         fetchInfo[latched_branch.threadId].expectedStreamSeqNum =
             latched_branch.newStreamSeqNum;
+    }
+}
+
+void
+SingleStageFetch2::updateBackwardBranch(const BranchData &executeBranch)
+{
+    const MinorDynInstPtr &inst = executeBranch.inst;
+
+    if (executeBranch.isStreamChange()) {
+        executeTargetWord = executeBranch.target->instAddr() & ~Addr(3);
+        executeTargetStreamSeqNum = executeBranch.newStreamSeqNum;
+        executeTargetPredictionSeqNum = executeBranch.newPredictionSeqNum;
+    }
+
+    switch (executeBranch.reason) {
+      case BranchData::UnpredictedBranch:
+        /* A PC event's branch has no instruction */
+        if (!inst || inst->isBubble())
+            break;
+
+        if (inst->isFault()) {
+            /* A fetch fault's trap */
+            backwardBranchValid = false;
+        } else if (inst->staticInst->isDirectCtrl() &&
+            inst->staticInst->isCondCtrl())
+        {
+            /* Taken backward: predicted from now on */
+            if (executeBranch.target->instAddr() < inst->pc->instAddr()) {
+                backwardBranchValid = true;
+                backwardBranchPC = inst->pc->instAddr();
+            }
+        } else if (!inst->staticInst->isControl()) {
+            /* A trap leaves for its handler, where the forced branch of
+             *  any other serialize-after instruction (a CSR write, mret
+             *  aside) goes on to the next instruction.  fence.i (squash
+             *  after, and no wfi) clears it too */
+            std::unique_ptr<PCStateBase> next(inst->pc->clone());
+            inst->staticInst->advancePC(*next);
+            if (*next != *executeBranch.target ||
+                (inst->staticInst->isSquashAfter() &&
+                 !inst->staticInst->isQuiesce()))
+            {
+                backwardBranchValid = false;
+            }
+        }
+        break;
+      case BranchData::BadlyPredictedBranch:
+      case BranchData::BadlyPredictedBranchTarget:
+        if (inst && !inst->isBubble() &&
+            inst->pc->instAddr() == backwardBranchPC)
+        {
+            backwardBranchValid = false;
+        }
+        break;
+      case BranchData::Interrupt:
+        backwardBranchValid = false;
+        break;
+      default:
+        break;
     }
 }
 
