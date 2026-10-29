@@ -277,6 +277,20 @@ class SingleStageFetch2 : public Fetch2
     bool branchSpeculation;
 
   public:
+    /** See fetchPredictLastBackwardBranch in BaseMinorCPU.py */
+    bool predictLastBackwardBranch;
+
+    /** The last conditional branch taken backward, its target, and
+     *  whether it is 32-bit and ends in the word after its first;
+     *  predicted taken by Fetch1 while valid */
+    bool backwardBranchValid = false;
+    Addr backwardBranchPC = 0;
+    std::unique_ptr<PCStateBase> backwardBranchTarget;
+    bool backwardBranchOverhangs = false;
+
+    /** Has decode gone past the prediction of a line with this id? */
+    bool predictionPassed(const InstId &id) const;
+
     /** See fetchRegisterTargetAtDecode in BaseMinorCPU.py */
     bool registerTargetAtDecode;
 
@@ -334,6 +348,12 @@ class SingleStageFetch2 : public Fetch2
      *  fall-through is in the same 4-byte fetch line — no re-fetch needed.
      *  Uses same-cycle execute branch (not the 1-cycle delayed latch). */
     void reactToExecuteBranch(const BranchData &executeBranch);
+
+    /** Learn the last conditional branch taken backward from Execute's
+     *  branch this cycle, as Hazard3's one-entry predictor: set on an
+     *  unpredicted one, cleared on a mispredicted one, a fence.i or a
+     *  trap */
+    void updateBackwardBranch(const BranchData &executeBranch);
 
     /** Peek at the next instruction in the current input line without
      *  advancing decode state. Returns true if it is a control-flow
