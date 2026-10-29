@@ -311,24 +311,126 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     return board
 
 
+def _hazard3_cpu(board, kind, zfinx, accessible, switched_out=False):
+    """A Hazard3 core of the kind given (atomic or minor) for the board."""
+    from m5.objects.RiscvCPU import RiscvAtomicSimpleCPU, RiscvMinorCPU
+    from m5.objects.RiscvISA import RiscvISA
+    from m5.objects.BaseMinorCPU import (
+        MinorDefaultFUPool, MinorDefaultIntDivFU, MinorDefaultIntFU,
+        MinorDefaultIntMulFU, MinorDefaultMemFU, MinorDefaultMiscFU,
+        MinorFUTiming, minorMakeOpClassSet,
+    )
+    if kind == "atomic":
+        core = RiscvAtomicSimpleCPU(cpu_id=0, switched_out=switched_out)
+    else:
+        core = RiscvMinorCPU(cpu_id=0, switched_out=switched_out)
+    # Peripheral space is device memory: accesses go in order and a load reads the
+    # device, never a store still in the store buffer (APB and AHB peripherals, the
+    # testbench IO block and SIO).
+    core.mmu.pma_checker.uncacheable = [
+        AddrRange(0x40000000, 0x60000000),
+        AddrRange(0xC0000000, 0xE0000000),
+    ]
+    core.clk_domain = board.clk_domain
+    core.isa = [RiscvISA(
+        # M and U modes, as Hazard3 on the RP2350 and in arcsim-soc
+        # (U_MODE = 1 in config_rp2350_default.vh).
+        riscv_type="RV32", enable_rvv=False, privilege_mode_set="MU",
+        enable_Zicbom_fs=False, enable_Zicboz_fs=False,
+        # Hazard3 has Zcmp (cm.push/cm.pop) and no FPU; gem5 decodes Zcmp only
+        # with Zcd, whose encodings it reuses, turned off.
+        enable_Zcd=False,
+        # Hazard3's bit extract multiple, which the Pico SDK's float
+        # routines use.
+        enable_Xh3bextm=True,
+        # Single-precision FP in the x registers instead of F and D
+        enable_Zfinx=zfinx,
+    )]
+    core.mmu.pma_checker.accessible = accessible
+    core.isa[0].xh3irq = board.xh3irq
+    if kind == "minor":
+        core.decodeInputWidth = 1
+        core.executeInputWidth = 1
+        core.executeIssueLimit = 1
+        core.executeCommitLimit = 1
+        # Fetch and decode as one stage, as Hazard3's frontend: one aligned
+        # 32-bit fetch a cycle into its 2-word FIFO (FIFO_DEPTH = 2), two
+        # fetches on their way at once.
+        core.singleFetchStage = True
+        core.fetch1LineWidth = 4
+        core.fetch1LineSnapWidth = 4
+        core.fetch1FetchLimit = 2
+        core.fetch1ToFetch2ForwardDelay = 0  # bypassed with singleFetchStage
+        core.fetch1ToFetch2BackwardDelay = 0
+        core.fetchReadAheadLimit = 8
+        core.executeBranchDelay = 1
+        # A taken branch or jump costs 2 cycles, as Hazard3's X to F loop
+        # (instruction_timings.adoc): a branch redirects fetch in its
+        # issue cycle, and a direct target, or jalr's from its register, is
+        # fetched while the branch is in Decode. This makes up for Minor's
+        # Decode stage, which Hazard3 does not have.
+        core.executeBranchAtIssue = True
+        core.fetchBranchTargetAtDecode = True
+        core.fetchRegisterTargetAtDecode = True
+        # Those target fetches, and what is fetched behind a branch not yet
+        # resolved, are made on speculation: RP2350XIP reads no line from
+        # flash for one, so a branch that is not taken starts no flash read
+        # Hazard3 would not make. A fall-through miss behind such a branch
+        # waits the cycle or two until it resolves.
+        core.fetchBranchSpeculation = True
+        # Hazard3's branch predictor (BRANCH_PREDICTOR = 1): the last
+        # conditional branch taken backward is predicted taken as it is
+        # fetched, unless it starts in the word a branch from X went to.
+        core.fetchPredictLastBackwardBranch = True
+        # A load's address phase is its X cycle, and the instruction after
+        # it is in X during the load's data phase.
+        core.executeLoadAccessAtIssue = True
+        units = MinorDefaultFUPool()
+        for unit in units.funcUnits:
+            if isinstance(unit, (MinorDefaultIntFU, MinorDefaultIntMulFU,
+                                 MinorDefaultIntDivFU, MinorDefaultMiscFU)):
+                # Results are forwarded to the next instruction in X, and
+                # one with a result delay (a load's) holds it back by that
+                # delay exactly
+                unit.timings = [
+                    MinorFUTiming(description="Hazard3Int",
+                                  srcRegsRelativeLats=[1])
+                ]
+            if isinstance(unit, (MinorDefaultIntFU, MinorDefaultIntMulFU)):
+                unit.opLat = 1
+            elif isinstance(unit, MinorDefaultMemFU):
+                # A loaded register is ready a cycle after the load's data
+                # phase: an instruction in X that reads it waits a cycle,
+                # but a store's data is read in M, so a store of it does
+                # not (instruction_timings.adoc, data_dependency).
+                unit.timings = [
+                    MinorFUTiming(
+                        description="Hazard3Store",
+                        srcRegsRelativeLats=[1, 2],
+                        opClasses=minorMakeOpClassSet(
+                            ["MemWrite", "FloatMemWrite"]),
+                    ),
+                    MinorFUTiming(
+                        description="Hazard3Load",
+                        srcRegsRelativeLats=[1],
+                        resultUsePenalty=1,
+                    ),
+                ]
+            elif isinstance(unit, MinorDefaultIntDivFU):
+                unit.opLat = 19
+                unit.issueLat = 19
+        core.executeFuncUnits = units
+    core.createThreads()
+    core.createInterruptController()
+    return core
+
+
 def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
                 scratch_bank_bandwidth, sram_model, dma, xip_model, cpu,
-                hwpe, zfinx):
+                hwpe, zfinx, switch_cpu=None):
     from m5.objects import RiscvSystem
-    from m5.objects.RiscvCPU import RiscvAtomicSimpleCPU, RiscvMinorCPU
     from m5.objects.RiscvFsWorkload import RiscvBareMetal
-    from m5.objects.RiscvISA import RiscvISA
     from m5.objects.RiscvSemihosting import RiscvSemihosting
-    from m5.objects.BaseMinorCPU import (
-        MinorDefaultFUPool,
-        MinorDefaultIntDivFU,
-        MinorDefaultIntFU,
-        MinorDefaultIntMulFU,
-        MinorDefaultMemFU,
-        MinorDefaultMiscFU,
-        MinorFUTiming,
-        minorMakeOpClassSet,
-    )
 
     board = RiscvSystem()
     _attach_memory(board, xip_miss_ns=xip_miss_ns,
@@ -390,33 +492,6 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         board.hwpe.tcdm_port = board.tcdm.hwpe_port
     if board._banked_sram:
         board.icode_router.mem_side_ports = board.sram.port
-    if cpu == "atomic":
-        board.cpu = RiscvAtomicSimpleCPU(cpu_id=0)
-    else:
-        board.cpu = RiscvMinorCPU(cpu_id=0)
-    board.mem_mode = board.cpu.memory_mode()
-    # Peripheral space is device memory: accesses go in order and a load reads the
-    # device, never a store still in the store buffer (APB and AHB peripherals, the
-    # testbench IO block and SIO).
-    board.cpu.mmu.pma_checker.uncacheable = [
-        AddrRange(0x40000000, 0x60000000),
-        AddrRange(0xC0000000, 0xE0000000),
-    ]
-    board.cpu.clk_domain = board.clk_domain
-    board.cpu.isa = [RiscvISA(
-        # M and U modes, as Hazard3 on the RP2350 and in arcsim-soc
-        # (U_MODE = 1 in config_rp2350_default.vh).
-        riscv_type="RV32", enable_rvv=False, privilege_mode_set="MU",
-        enable_Zicbom_fs=False, enable_Zicboz_fs=False,
-        # Hazard3 has Zcmp (cm.push/cm.pop) and no FPU; gem5 decodes Zcmp only
-        # with Zcd, whose encodings it reuses, turned off.
-        enable_Zcd=False,
-        # Hazard3's bit extract multiple, which the Pico SDK's float
-        # routines use.
-        enable_Xh3bextm=True,
-        # Single-precision FP in the x registers instead of F and D
-        enable_Zfinx=zfinx,
-    )]
     # Loads, stores and fetches outside what this board has are access
     # faults, as rtl-sim's bus errors are; the core raises them before the
     # access leaves it, so they are precise.
@@ -432,13 +507,17 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     if hasattr(board, "xip_ctrl"):
         accessible.append(AddrRange(int(board.xip_ctrl.pio_addr),
                                     size=int(board.xip_ctrl.pio_size)))
-    board.cpu.mmu.pma_checker.accessible = accessible
     # Hazard3's interrupt controller, with the RP2350's 52 IRQs and 4 priority
     # bits (arcsim-soc's config_rp2350_default.vh). Devices reach it through
     # Xh3irqLine.
     from m5.objects.Xh3irq import Xh3irq
     board.xh3irq = Xh3irq(num_irqs=52, priority_bits=4)
-    board.cpu.isa[0].xh3irq = board.xh3irq
+    board.cpu = _hazard3_cpu(board, cpu, zfinx, accessible)
+    board.mem_mode = board.cpu.memory_mode()
+    if switch_cpu:
+        # Switched out until m5.switchCpus hands it the core's place
+        board.switch_cpu = _hazard3_cpu(board, switch_cpu, zfinx,
+                                        accessible, switched_out=True)
     # The testbench IO block's interrupts, wired as rtl-sim wires them:
     # SET_IRQ's 32 bits to IRQs 0 to 31, its soft IRQ to mip.msip and its
     # timer to mip.mtip.
@@ -462,80 +541,6 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     board.tb_io.soft_irq = board.tb_soft_irq_line.pin
     board.tb_timer_irq_line = RiscvIntLine(int_num=7)
     board.tb_io.timer_irq = board.tb_timer_irq_line.pin
-    if cpu == "minor":
-        board.cpu.decodeInputWidth = 1
-        board.cpu.executeInputWidth = 1
-        board.cpu.executeIssueLimit = 1
-        board.cpu.executeCommitLimit = 1
-        # Fetch and decode as one stage, as Hazard3's frontend: one aligned
-        # 32-bit fetch a cycle into its 2-word FIFO (FIFO_DEPTH = 2), two
-        # fetches on their way at once.
-        board.cpu.singleFetchStage = True
-        board.cpu.fetch1LineWidth = 4
-        board.cpu.fetch1LineSnapWidth = 4
-        board.cpu.fetch1FetchLimit = 2
-        board.cpu.fetch1ToFetch2ForwardDelay = 0  # bypassed with singleFetchStage
-        board.cpu.fetch1ToFetch2BackwardDelay = 0
-        board.cpu.fetchReadAheadLimit = 8
-        board.cpu.executeBranchDelay = 1
-        # A taken branch or jump costs 2 cycles, as Hazard3's X to F loop
-        # (instruction_timings.adoc): a branch redirects fetch in its
-        # issue cycle, and a direct target, or jalr's from its register, is
-        # fetched while the branch is in Decode. This makes up for Minor's
-        # Decode stage, which Hazard3 does not have.
-        board.cpu.executeBranchAtIssue = True
-        board.cpu.fetchBranchTargetAtDecode = True
-        board.cpu.fetchRegisterTargetAtDecode = True
-        # Those target fetches, and what is fetched behind a branch not yet
-        # resolved, are made on speculation: RP2350XIP reads no line from
-        # flash for one, so a branch that is not taken starts no flash read
-        # Hazard3 would not make. A fall-through miss behind such a branch
-        # waits the cycle or two until it resolves.
-        board.cpu.fetchBranchSpeculation = True
-        # Hazard3's branch predictor (BRANCH_PREDICTOR = 1): the last
-        # conditional branch taken backward is predicted taken as it is
-        # fetched, unless it starts in the word a branch from X went to.
-        board.cpu.fetchPredictLastBackwardBranch = True
-        # A load's address phase is its X cycle, and the instruction after
-        # it is in X during the load's data phase.
-        board.cpu.executeLoadAccessAtIssue = True
-        units = MinorDefaultFUPool()
-        for unit in units.funcUnits:
-            if isinstance(unit, (MinorDefaultIntFU, MinorDefaultIntMulFU,
-                                 MinorDefaultIntDivFU, MinorDefaultMiscFU)):
-                # Results are forwarded to the next instruction in X, and
-                # one with a result delay (a load's) holds it back by that
-                # delay exactly
-                unit.timings = [
-                    MinorFUTiming(description="Hazard3Int",
-                                  srcRegsRelativeLats=[1])
-                ]
-            if isinstance(unit, (MinorDefaultIntFU, MinorDefaultIntMulFU)):
-                unit.opLat = 1
-            elif isinstance(unit, MinorDefaultMemFU):
-                # A loaded register is ready a cycle after the load's data
-                # phase: an instruction in X that reads it waits a cycle,
-                # but a store's data is read in M, so a store of it does
-                # not (instruction_timings.adoc, data_dependency).
-                unit.timings = [
-                    MinorFUTiming(
-                        description="Hazard3Store",
-                        srcRegsRelativeLats=[1, 2],
-                        opClasses=minorMakeOpClassSet(
-                            ["MemWrite", "FloatMemWrite"]),
-                    ),
-                    MinorFUTiming(
-                        description="Hazard3Load",
-                        srcRegsRelativeLats=[1],
-                        resultUsePenalty=1,
-                    ),
-                ]
-            elif isinstance(unit, MinorDefaultIntDivFU):
-                unit.opLat = 19
-                unit.issueLat = 19
-        board.cpu.executeFuncUnits = units
-    board.cpu.createThreads()
-    board.cpu.createInterruptController()
     board.cpu.icache_port = board.icode_router.cpu_side_ports
     board.cpu.dcache_port = board.dcode_router.cpu_side_ports
     board.workload = RiscvBareMetal(
@@ -564,7 +569,7 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                arm_predictor="m4", arm_divider="rp2350-m33",
                sram_model=None, arm_timing="tuned", dma=None,
                xip_model=None, model="legacy", cpu="minor", hwpe="vvadd",
-               zfinx=False):
+               zfinx=False, switch_cpu=None):
     """Return exactly one active core with the RP2350 memory baseline.
 
     cpu is "minor", the timed core (CortexM33CPU, or the Hazard3 proxy, a
@@ -580,7 +585,9 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     Hazard3 proxy its interrupt outputs are left unconnected. xip_model
     "qmi" replaces the generic cache and fixed miss delay in front of flash
     with RP2350XIP. hwpe names the Hazard3 board's HWPE (HWPES). zfinx gives
-    the Hazard3 proxy Zfinx (floats in the x registers) instead of F and D."""
+    the Hazard3 proxy Zfinx (floats in the x registers) instead of F and D.
+    switch_cpu ("minor" or "atomic", Hazard3 proxy only) adds board.switch_cpu,
+    a core of that kind switched out, for m5.switchCpus."""
     sram_model, dma, xip_model = memory_models(model, sram_model, dma,
                                                 xip_model)
     if sram_model not in ("legacy", "banked"):
@@ -593,6 +600,9 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
         raise ValueError(f"Unknown HWPE: {hwpe}")
     if zfinx and core != "hazard3-proxy":
         raise ValueError("Zfinx is only for the hazard3-proxy")
+    if switch_cpu and (core != "hazard3-proxy" or
+                       switch_cpu not in ("minor", "atomic")):
+        raise ValueError("switch_cpu is minor or atomic, on the hazard3-proxy")
     if core == "arm-m4-proxy":
         return _make_arm(firmware, xip_miss_ns=xip_miss_ns,
                          sram_latency_ns=sram_latency_ns,
@@ -607,5 +617,5 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                            scratch_bank_bandwidth=scratch_bank_bandwidth,
                            sram_model=sram_model, dma=dma,
                            xip_model=xip_model, cpu=cpu, hwpe=hwpe,
-                           zfinx=zfinx)
+                           zfinx=zfinx, switch_cpu=switch_cpu)
     raise ValueError(f"Unknown RP2350 core selector: {core}")  
