@@ -235,6 +235,7 @@ RP2350XIP::startMiss(unsigned index, const AccessPtr &access, Addr line)
 {
     Bank &bank = banks[index];
     ++xipStats.misses;
+    access->missed = true;
     markWaited(access);
     bank.busy = true;
     bank.owner = access;
@@ -347,10 +348,15 @@ RP2350XIP::respond(const AccessPtr &access)
 {
     PacketPtr pkt = access->pkt;
     const bool needs_response = pkt->needsResponse();
-    if (access->maintenance)
+    if (access->maintenance) {
         maintain(pkt);
-    else
+    } else {
         this->access(pkt);
+        if (ctrAcc != UINT32_MAX)
+            ++ctrAcc;
+        if (!access->missed && ctrHit != UINT32_MAX)
+            ++ctrHit;
+    }
     // A hit that has not waited is answered in the cycle it is asked.
     if (needs_response)
         port.schedTimingResp(pkt, curTick());
@@ -513,6 +519,8 @@ RP2350XIP::serialize(CheckpointOut &cp) const
     SERIALIZE_CONTAINER(lines);
     SERIALIZE_SCALAR(qmiLastEnd);
     SERIALIZE_SCALAR(qmiNextLine);
+    SERIALIZE_SCALAR(ctrHit);
+    SERIALIZE_SCALAR(ctrAcc);
 }
 
 void
@@ -535,6 +543,8 @@ RP2350XIP::unserialize(CheckpointIn &cp)
     }
     UNSERIALIZE_SCALAR(qmiLastEnd);
     UNSERIALIZE_SCALAR(qmiNextLine);
+    UNSERIALIZE_OPT_SCALAR(ctrHit);
+    UNSERIALIZE_OPT_SCALAR(ctrAcc);
 }
 
 } // namespace gem5::memory

@@ -38,6 +38,8 @@ class RP2350XIP : public AbstractMemory
         RequestorID requestor = 0;
         // It has had to wait for a bank or for flash
         bool waited = false;
+        // A line it needed was read from flash
+        bool missed = false;
         // Words of its present line still to come from a bank that is
         // serving those that waited; 0 before its first
         unsigned beatsLeft = 0;
@@ -168,8 +170,17 @@ class RP2350XIP : public AbstractMemory
     Tick thisCycle() const;
     void serve(unsigned bank);
 
+    // XIP_CTRL's CTR_HIT and CTR_ACC (RP2350XipCtrl): saturating, one
+    // count per access answered, and per one that read no line from flash
+    uint32_t ctrHit = 0;
+    uint32_t ctrAcc = 0;
+
   public:
     explicit RP2350XIP(const RP2350XIPParams &p);
+    uint32_t counterHit() const { return ctrHit; }
+    uint32_t counterAcc() const { return ctrAcc; }
+    void clearCounterHit() { ctrHit = 0; }
+    void clearCounterAcc() { ctrAcc = 0; }
     Port &getPort(const std::string &name, PortID id = InvalidPortID) override;
     void init() override;
     DrainState drain() override;

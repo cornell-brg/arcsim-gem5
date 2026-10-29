@@ -14,3 +14,6 @@ SimObject('Hazard3TbIO.py', sim_objects=['Hazard3TbIO'])
 Source('hazard3_tb_io.cc')
 
 DebugFlag('Hazard3TbIO')
+
+SimObject('RP2350XipCtrl.py', sim_objects=['RP2350XipCtrl'])
+Source('rp2350_xip_ctrl.cc')
