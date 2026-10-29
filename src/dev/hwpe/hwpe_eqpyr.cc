@@ -59,12 +59,14 @@ HWPEEqpyr::HWPEEqpyr(const Params &p)
       outCycles(p.out_cycles),
       pyrCycles(p.pyr_cycles),
       histLatency(p.hist_latency),
+      frameCycles(p.frame_cycles),
       words(streamer.addSource("words", p.buffer_depth)),
       l0Out(streamer.addSink("l0", p.buffer_depth)),
       l1Out(streamer.addSink("l1", p.buffer_depth)),
       l2Out(streamer.addSink("l2", p.buffer_depth)),
       histOut(streamer.addSink("hist", p.buffer_depth)),
-      computeEvent([this] { compute(); }, name() + ".compute")
+      computeEvent([this] { compute(); }, name() + ".compute"),
+      frameEvent([this] { loadTable(); }, name() + ".frame")
 {
     fatal_if(width % beatBytes || width % 64 || height % stripeRows,
              "%s: a %dx%d frame in %d-row stripes, %d-byte words", name(),
@@ -167,13 +169,12 @@ HWPEEqpyr::startJob(const std::vector<uint32_t> &io)
             w = 0;
         histWritten = false;
         startStores();
-        config.base = tablePtr;
-        config.totLen = 256 / beatBytes;
-        words.start(config, beatBytes);
         total = 256 / 4;
         phase = Phase::Table;
         DPRINTF(HWPE, "eqpyr: new frame, table %#x, ring %#x of %d\n",
                 tablePtr, ringPtr, ringStripes);
+        schedule(frameEvent, clockEdge(frameCycles));
+        return;
     } else {
         const uint32_t slot_bytes = stripeRows * width;
         if (ringStripes) {
@@ -193,12 +194,25 @@ HWPEEqpyr::startJob(const std::vector<uint32_t> &io)
 }
 
 void
+HWPEEqpyr::loadTable()
+{
+    AddressGenConfig config;
+    config.d0Stride = beatBytes;
+    config.base = tablePtr;
+    config.totLen = 256 / beatBytes;
+    words.start(config, beatBytes);
+    compute();
+}
+
+void
 HWPEEqpyr::clearJob()
 {
     phase = Phase::Idle;
     for (auto &p : pack)
         p.clear();
     due.clear();
+    if (frameEvent.scheduled())
+        deschedule(frameEvent);
     if (computeEvent.scheduled())
         deschedule(computeEvent);
 }
@@ -313,7 +327,8 @@ HWPEEqpyr::compute()
 DrainState
 HWPEEqpyr::drain()
 {
-    if (phase != Phase::Idle || computeEvent.scheduled())
+    if (phase != Phase::Idle || computeEvent.scheduled() ||
+        frameEvent.scheduled())
         return DrainState::Draining;
     return HWPEBase::drain();
 }

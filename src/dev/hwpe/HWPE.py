@@ -237,8 +237,8 @@ class HWPEEqpyr(HWPEBase):
     reads the rows of each level written (level 0 in bits 8:0, level 1 in
     16:9, level 2 in 23:17) and in bit 31 the histogram written.
 
-    Timing: the NEW_FRAME job loads the table (8 words, one 32-bit table
-    word each table_cycles) and starts the three level stores, which run
+    Timing: the NEW_FRAME job loads the table from frame_cycles after its
+    start (8 words, one 32-bit table word each table_cycles) and starts the three level stores, which run
     for the frame (level 2 in 16-byte words). A stripe job reads its slot
     and takes one pixel each pixel_cycles; a word of level l goes to its
     store out_cycles + l * pyr_cycles after its last pixel. The job ends
@@ -271,3 +271,5 @@ class HWPEEqpyr(HWPEBase):
         3, "Added to out_cycles for each level above level 0")
     hist_latency = Param.Cycles(
         11, "From the last stripe's last store to the first histogram beat")
+    frame_cycles = Param.Cycles(
+        1, "From a NEW_FRAME job's start to its table load")

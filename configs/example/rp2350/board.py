@@ -35,12 +35,11 @@ SRAM_REGIONS = (
 # which is about 572 MiB/s.
 SCRATCH_BANK_BANDWIDTH = "572MiB/s"
 
-# optical-flow's engines: name, class, parameters, window offset. The LK
-# engine is HWPEEmpty until its model exists.
+# optical-flow's engines: name, class, parameters, window offset
 OPTICAL_FLOW = (
     ("fast", "HWPEFastCellBestK", {"n": 9, "cycles": 1, "threshold": 20}, 0x0000),
     ("stripe", "HWPEEqpyr", {}, 0x1000),
-    ("lk", "HWPEEmpty", {"num_io_regs": 19}, 0x2000),
+    ("lk", "HWPELk", {}, 0x2000),
 )
 
 # The HWPEs for the Hazard3 board, keyed by arcsim-soc's CONFIG_HWPE names:

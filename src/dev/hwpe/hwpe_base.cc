@@ -26,11 +26,17 @@ HWPEBase::TcdmPort::send(PacketPtr pkt)
 {
     const Addr addr = pkt->getAddr();
     const bool read = pkt->isRead();
+    std::string data;
+    if (!read && debug::HWPETrace) {
+        for (unsigned i = pkt->getSize(); i-- > 0;)
+            data += csprintf("%02x", pkt->getConstPtr<uint8_t>()[i]);
+    }
     if (!sendTimingReq(pkt))
         held = pkt;
+    else if (read)
+        DPRINTF(HWPETrace, "%d read %08x\n", hwpe.curCycle(), addr);
     else
-        DPRINTF(HWPETrace, "%d %s %08x\n", hwpe.curCycle(),
-                read ? "read" : "write", addr);
+        DPRINTF(HWPETrace, "%d write %08x %s\n", hwpe.curCycle(), addr, data);
 }
 
 PacketPtr

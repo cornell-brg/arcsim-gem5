@@ -1,9 +1,12 @@
+import os
+
 Import('*')
 
 SimObject('HWPE.py', sim_objects=['HWPEBase', 'HWPEEmpty', 'HWPEVvaddWide',
                                   'HWPEFastCellBestK', 'HWPESelect', 'HWPEEqpyr'])
 SimObject('HCITcdm.py', sim_objects=['HCITcdm'])
 SimObject('HCIMux.py', sim_objects=['HCIMux'])
+SimObject('HWPEReplay.py', sim_objects=['HWPEReplay'])
 Source('hci_mux.cc')
 Source('hci_tcdm.cc')
 Source('hwpe_base.cc')
@@ -13,6 +16,16 @@ Source('hwpe_fast_cell_best_k.cc')
 Source('hwpe_select.cc')
 Source('hwpe_streamer.cc')
 Source('hwpe_vvadd_wide.cc')
+Source('hwpe_replay.cc')
+
+# The LK engine computes with arcsim-kernels' klt/lk.h, which needs C++20
+kernels = os.environ.get('ARCSIM_KERNELS_HOME')
+if kernels:
+    SimObject('HWPELk.py', sim_objects=['HWPELk'])
+    Source('hwpe_lk.cc')
+    Source('of_reference.cc', append={
+        'CXXFLAGS': ['-std=c++20'],
+        'CPPPATH': [Dir(os.path.join(kernels, 'include'))]})
 
 DebugFlag('HWPE')
 DebugFlag('HWPETrace')

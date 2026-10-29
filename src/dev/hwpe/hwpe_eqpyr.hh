@@ -51,6 +51,7 @@ class HWPEEqpyr : public HWPEBase
     const Cycles outCycles;     // a word's last pixel to its store
     const Cycles pyrCycles;     // added for each level above 0
     const Cycles histLatency;   // the last store to the histogram
+    const Cycles frameCycles;   // a NEW_FRAME job's start to its table load
 
     Source &words;
     Sink &l0Out;
@@ -94,6 +95,7 @@ class HWPEEqpyr : public HWPEBase
     std::vector<std::vector<unsigned>> completesRow[2], completesCol[2];
 
     EventFunctionWrapper computeEvent;
+    EventFunctionWrapper frameEvent;
 
     unsigned levelWidth(unsigned l) const { return width >> l; }
     unsigned levelHeight(unsigned l) const { return height >> l; }
@@ -104,6 +106,7 @@ class HWPEEqpyr : public HWPEBase
     // Push the words due; false if a store has no room for one
     bool flush();
     void startStores();
+    void loadTable();
     void compute();
 };
 
