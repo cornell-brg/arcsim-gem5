@@ -220,3 +220,54 @@ class HWPESelect(BasicPioDevice):
 
     pio_addr = 0x50803000
     pio_size = Param.Addr(0x1000, "Size of the register window")
+
+
+class HWPEEqpyr(HWPEBase):
+    """
+    arcsim-xcel's eqpyrTop, the optical-flow accelerator's stripe engine: a
+    frame is a NEW_FRAME job and one job a stripe_rows-row stripe. Values are
+    eqpyrTop's: each raw pixel equalized through the frame's table as level
+    0, its histogram counted, and the pixels of levels 1 and 2 (cv::pyrDown,
+    1 4 6 4 1 both ways, reflected at the borders, + 128, >> 8) made as the
+    rows and columns they need arrive.
+
+    Job registers: 0x40 L0_PTR, 0x44 L1_PTR, 0x48 L2_PTR, 0x4C TABLE_PTR
+    (256 bytes), 0x50 HIST_PTR (256 32-bit counts), 0x54 NEW_FRAME, 0x58
+    RING_PTR, 0x5C RING_STRIPES (0: each stripe in place in level 0). 0x18
+    reads the rows of each level written (level 0 in bits 8:0, level 1 in
+    16:9, level 2 in 23:17) and in bit 31 the histogram written.
+
+    Timing: the NEW_FRAME job loads the table (8 words, one 32-bit table
+    word each table_cycles) and starts the three level stores, which run
+    for the frame (level 2 in 16-byte words). A stripe job reads its slot
+    and takes one pixel each pixel_cycles; a word of level l goes to its
+    store out_cycles + l * pyr_cycles after its last pixel. The job ends
+    tail_cycles after its last element or store. After the frame's last
+    stripe the histogram goes out, from hist_latency after the last store,
+    a beat each hist_cycles, and the job ends when it is written.
+    """
+
+    type = "HWPEEqpyr"
+    cxx_class = "gem5::HWPEEqpyr"
+    cxx_header = "dev/hwpe/hwpe_eqpyr.hh"
+
+    num_io_regs = 8
+    # words, l0, l1, l2, hist on channels 0 to 4
+    mux_channels = 8
+    start_latency = 6
+    done_latency = 2
+    width = Param.Unsigned(320, "Pixels in a row of level 0")
+    height = Param.Unsigned(320, "Rows of level 0")
+    stripe_rows = Param.Unsigned(16, "Rows of a stripe")
+    words = Param.Unsigned(8, "32-bit words per TCDM access")
+    buffer_depth = Param.Unsigned(2, "Words buffered in each stream")
+    pixel_cycles = Param.Cycles(1, "Cycles a pixel takes")
+    table_cycles = Param.Cycles(1, "Cycles a 32-bit table word takes")
+    hist_cycles = Param.Cycles(8, "Cycles between histogram words")
+    tail_cycles = Param.Cycles(
+        1, "From the last element or store to the engine idle")
+    out_cycles = Param.Cycles(3, "From a word's last pixel to its store")
+    pyr_cycles = Param.Cycles(
+        3, "Added to out_cycles for each level above level 0")
+    hist_latency = Param.Cycles(
+        11, "From the last stripe's last store to the first histogram beat")

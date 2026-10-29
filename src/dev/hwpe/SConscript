@@ -1,18 +1,20 @@
 Import('*')
 
 SimObject('HWPE.py', sim_objects=['HWPEBase', 'HWPEEmpty', 'HWPEVvaddWide',
-                                  'HWPEFastCellBestK', 'HWPESelect'])
+                                  'HWPEFastCellBestK', 'HWPESelect', 'HWPEEqpyr'])
 SimObject('HCITcdm.py', sim_objects=['HCITcdm'])
 SimObject('HCIMux.py', sim_objects=['HCIMux'])
 Source('hci_mux.cc')
 Source('hci_tcdm.cc')
 Source('hwpe_base.cc')
 Source('hwpe_empty.cc')
+Source('hwpe_eqpyr.cc')
 Source('hwpe_fast_cell_best_k.cc')
 Source('hwpe_select.cc')
 Source('hwpe_streamer.cc')
 Source('hwpe_vvadd_wide.cc')
 
 DebugFlag('HWPE')
+DebugFlag('HWPETrace')
 DebugFlag('HCITcdm')
 DebugFlag('HCIMux')

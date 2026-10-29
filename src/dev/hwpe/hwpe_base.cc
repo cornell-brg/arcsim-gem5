@@ -6,6 +6,7 @@
 #include "base/logging.hh"
 #include "base/trace.hh"
 #include "debug/HWPE.hh"
+#include "debug/HWPETrace.hh"
 #include "mem/packet_access.hh"
 #include "sim/serialize.hh"
 #include "sim/system.hh"
@@ -23,8 +24,13 @@ HWPEBase::TcdmPort::TcdmPort(const std::string &name, HWPEBase &_hwpe)
 void
 HWPEBase::TcdmPort::send(PacketPtr pkt)
 {
+    const Addr addr = pkt->getAddr();
+    const bool read = pkt->isRead();
     if (!sendTimingReq(pkt))
         held = pkt;
+    else
+        DPRINTF(HWPETrace, "%d %s %08x\n", hwpe.curCycle(),
+                read ? "read" : "write", addr);
 }
 
 PacketPtr
@@ -264,6 +270,7 @@ HWPEBase::trigger()
         return;
     }
     DPRINTF(HWPE, "Triggered: context %d\n", pointerContext);
+    DPRINTF(HWPETrace, "%d trigger\n", curCycle());
     acquired = false;
     pointerContext = (pointerContext + 1) % numContexts;
     ++pending;
@@ -291,6 +298,7 @@ void
 HWPEBase::finish()
 {
     DPRINTF(HWPE, "Job done: context %d\n", runningContext);
+    DPRINTF(HWPETrace, "%d done\n", curCycle());
     running = false;
     runningContext = (runningContext + 1) % numContexts;
     --pending;
