@@ -327,7 +327,7 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     from m5.objects import Hazard3TbIO
     board.tb_io = Hazard3TbIO(pio_latency="1ns")
     board.tb_io.pio = board.sram_bus.mem_side_ports
-    # The HWPE's 128 KiB TCDM at 0x60000000 (soc.v): 16 banks shared by the
+    # The HWPE's 256 KiB TCDM at 0x60000000 (soc.v): 16 banks shared by the
     # core side, through the SRAM bus, and the HWPE.
     from m5.objects import HCITcdm
     board.tcdm = HCITcdm(clk_domain=board.clk_domain)

@@ -104,7 +104,7 @@ if args.sram_model == "banked":
 else:
     print(f"SRAM model=legacy; scratch bank effective bandwidth={args.scratch_bank_bandwidth}")
 if args.core == "hazard3-proxy":
-    print(f"HWPE={args.hwpe} at 0x50800000, TCDM=0x60000000+128KiB")
+    print(f"HWPE={args.hwpe} at 0x50800000, TCDM=0x60000000+256KiB")
     print(f"FPU={'zfinx' if args.zfinx else 'f+d'}")
 roi_start = None
 roi_number = 0

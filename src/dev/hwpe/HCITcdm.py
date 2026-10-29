@@ -5,7 +5,8 @@ from m5.params import *
 class HCITcdm(AbstractMemory):
     """
     The HWPE's TCDM as arcsim-soc's soc.v builds it: word-interleaved SRAM
-    banks shared by the core side and the HWPE.
+    banks shared by the core side and the HWPE. soc.v's is 256 KiB at
+    0x60000000, 16 banks of 4096 words (TCDM_BANK_WORDS).
 
     Banks: num_banks banks of 32-bit words; bank = word address modulo
     num_banks. A bank serves one access per cycle and always accepts it
@@ -51,7 +52,7 @@ class HCITcdm(AbstractMemory):
     cxx_class = "gem5::HCITcdm"
     cxx_header = "dev/hwpe/hci_tcdm.hh"
 
-    range = AddrRange(0x60000000, size="128KiB")
+    range = AddrRange(0x60000000, size="256KiB")
     core_port = VectorResponsePort("Core side (ahbl_to_hci bridges)")
     hwpe_port = ResponsePort("The HWPE's TCDM port")
 
