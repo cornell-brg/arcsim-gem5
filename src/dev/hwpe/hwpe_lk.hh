@@ -34,13 +34,10 @@ class HWPELk : public HWPEBase
     enum
     {
         LIST_PTR, N_POINTS, PATCH_BASE, MIN_EIG, EPS2, MAX_ITER,
-        L0_BASE, L0_SIZE, L0_HI
+        L0_BASE, L0_SIZE, L0_HI, MAP_A = 16, MAP_B, B_SHIFT
     };
     static constexpr unsigned Levels = 3;
-    static constexpr unsigned SlotBytes = 3 * of_reference::lkBlock *
-                                          of_reference::lkBlock;
-    static constexpr unsigned PatchWords = of_reference::lkBlock *
-                                           of_reference::lkBlock / 4;
+    static constexpr unsigned MaxSide = of_reference::lkRotSide;
     static constexpr unsigned WindowPx = of_reference::lkWindow *
                                          of_reference::lkWindow;
     static constexpr int32_t Half = (of_reference::lkWin - 1) << 13;
@@ -50,7 +47,9 @@ class HWPELk : public HWPEBase
         Converged, Backoff, MaxIter, Left, TemplateOutside, Rejected, Beyond
     };
 
-    const int bShift;
+    const bool rotated;
+    const unsigned side;          // of a patch
+    const int bShiftParam;
     const Cycles pointCycles;     // the last record word to LEVEL_START
     const Cycles templateCycles;  // the last patch word to ITER_START
     const Cycles rejectCycles;    // the last patch word to LEVEL_END
@@ -61,6 +60,8 @@ class HWPELk : public HWPEBase
     uint32_t listPtr = 0, nPoints = 0, patchBase = 0;
     int64_t minEig = 0, eps2 = 0;
     unsigned maxIter = 0;
+    int bShift = 0;
+    int32_t map[4] = {};
     uint32_t levBase[Levels] = {}, levW[Levels] = {}, levH[Levels] = {},
              levHi[Levels] = {};
     unsigned record = 0;          // of the job
@@ -74,7 +75,7 @@ class HWPELk : public HWPEBase
     unsigned j = 0;
     bool st = true, done = true;
     uint32_t iters[Levels] = {}, stops[Levels] = {};
-    uint8_t block[of_reference::lkBlock * of_reference::lkBlock] = {};
+    uint8_t block[MaxSide * MaxSide] = {};
     uint8_t window[WindowPx] = {};
     unsigned word = 0, pix = 0;
     uint32_t cacheAddr = 0, cacheData = 0;

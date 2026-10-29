@@ -49,3 +49,10 @@ class HWPELk(HWPEBase):
         228, "The window's last pixel to the next ITER_START or LEVEL_END"
     )
     end_cycles = Param.Cycles(1, "The last result write to the job's end")
+    rotated = Param.Bool(
+        False,
+        "lkTopRotated: 22-pixel patches (1452-byte slots), each template "
+        "through the map at 0x80 (m11 in 15:0, m12 in 31:16) and 0x84 (m21, "
+        "m22), Q14, and the mismatch sums' shift at 0x88 in place of b_shift; "
+        "num_io_regs 19",
+    )

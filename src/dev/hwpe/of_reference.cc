@@ -60,6 +60,40 @@ LkTemplate::make(const uint8_t *block, int32_t px, int32_t py, int width,
     return true;
 }
 
+bool
+LkTemplate::makeMapped(const uint8_t *block, int32_t pcx, int32_t pcy,
+                       const int32_t m[4], int width, int height,
+                       int64_t min_eig, int b_shift)
+{
+    const klt::Config c = config();
+    klt::TemplateMap map;
+    map.m11 = m[0];
+    map.m12 = m[1];
+    map.m21 = m[2];
+    map.m22 = m[3];
+    const int h = (c.win - 1) / 2;
+    const int bx = (pcx >> kd::kQBits) - lkRotReach - 1;
+    const int by = (pcy >> kd::kQBits) - lkRotReach - 1;
+    const int32_t x0 = pcx - h * (map.m11 + map.m12);
+    const int32_t y0 = pcy - h * (map.m21 + map.m22);
+    const auto at = [&](int i, int j, int &fx, int &fy, kd::Weights &w) {
+        const int32_t X = x0 + i * map.m11 + j * map.m12;
+        const int32_t Y = y0 + i * map.m21 + j * map.m22;
+        fx = X >> kd::kQBits;
+        fy = Y >> kd::kQBits;
+        w = kd::weights_q(X & (kd::kQOne - 1), Y & (kd::kQOne - 1));
+    };
+    int64_t a11, a12, a22;
+    kd::template_block_mapped(c, {block, lkRotSide}, bx, by, lkRotSide,
+                              width, height, map, at, state->scratch, a11,
+                              a12, a22);
+    kd::SolveQ q;
+    if (!kd::solve_fixed(min_eig, b_shift, a11, a12, a22, q))
+        return false;
+    state->g = q.g;
+    return true;
+}
+
 void
 LkTemplate::mismatch(const uint8_t *window, int32_t qx, int32_t qy,
                      int64_t &b1, int64_t &b2) const

@@ -35,12 +35,14 @@ SRAM_REGIONS = (
 # which is about 572 MiB/s.
 SCRATCH_BANK_BANDWIDTH = "572MiB/s"
 
-# optical-flow's engines: name, class, parameters, window offset
+# optical-flow's engines: name, class, parameters, window offset.
+# optical-flow-rotated's LK engine is lkTopRotated.
 OPTICAL_FLOW = (
     ("fast", "HWPEFastCellBestK", {"n": 9, "cycles": 1, "threshold": 20}, 0x0000),
     ("stripe", "HWPEEqpyr", {}, 0x1000),
     ("lk", "HWPELk", {}, 0x2000),
 )
+OPTICAL_FLOW_ROTATED_LK = {"rotated": True, "num_io_regs": 19}
 
 # The HWPEs for the Hazard3 board, keyed by arcsim-soc's CONFIG_HWPE names:
 # the class and its parameters. vvadd is vvadd-wide with one element per beat.
@@ -56,6 +58,7 @@ HWPES = {
     # arcsim-xcel's hwpe-optical-flow.v: three engines and SELECT in 4 KiB
     # windows, the engines on HCIMux channels 0 to 2 (OPTICAL_FLOW)
     "optical-flow": None,
+    "optical-flow-rotated": None,
 }
 
 
@@ -354,12 +357,14 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     # data port on the TCDM. Its done event (irq) stays unconnected, as in
     # soc.v.
     import m5.objects
-    if hwpe == "optical-flow":
+    if hwpe in ("optical-flow", "optical-flow-rotated"):
         from m5.objects import HCIMux, HWPESelect
         board.hwpe_mux = HCIMux(clk_domain=board.clk_domain, num_channels=4)
         board.hwpe_mux.mem_side_port = board.tcdm.hwpe_port
         engines = []
         for name, cls, params, offset in OPTICAL_FLOW:
+            if name == "lk" and hwpe == "optical-flow-rotated":
+                params = OPTICAL_FLOW_ROTATED_LK
             engine = getattr(m5.objects, cls)(pio_latency="1ns",
                                               pio_addr=0x50800000 + offset,
                                               pio_size=0x1000, **params)

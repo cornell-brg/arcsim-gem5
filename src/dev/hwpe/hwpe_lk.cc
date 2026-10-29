@@ -15,7 +15,9 @@ using of_reference::lkWindow;
 
 HWPELk::HWPELk(const Params &p)
     : HWPEBase(p),
-      bShift(p.b_shift),
+      rotated(p.rotated),
+      side(p.rotated ? of_reference::lkRotSide : of_reference::lkBlock),
+      bShiftParam(p.b_shift),
       pointCycles(p.point_cycles),
       templateCycles(p.template_cycles),
       rejectCycles(p.reject_cycles),
@@ -109,6 +111,16 @@ HWPELk::startJob(const std::vector<uint32_t> &r)
     minEig = r[MIN_EIG];
     eps2 = r[EPS2];
     maxIter = r[MAX_ITER] & 0x3f;
+    bShift = bShiftParam;
+    if (rotated) {
+        fatal_if(r.size() <= B_SHIFT, "%s: rotated needs num_io_regs 19",
+                 name());
+        map[0] = int16_t(r[MAP_A] & 0xffff);
+        map[1] = int16_t(r[MAP_A] >> 16);
+        map[2] = int16_t(r[MAP_B] & 0xffff);
+        map[3] = int16_t(r[MAP_B] >> 16);
+        bShift = r[B_SHIFT] & 3;
+    }
     for (unsigned l = 0; l < Levels; ++l) {
         levBase[l] = r[L0_BASE + 3 * l];
         levW[l] = r[L0_SIZE + 3 * l] & 0xffff;
@@ -185,16 +197,20 @@ void
 HWPELk::readPatch()
 {
     const uint32_t slot = rec[0] & 0xff;
-    const Addr base = patchBase + slot * SlotBytes +
-                      level * of_reference::lkBlock * of_reference::lkBlock;
+    const Addr base = patchBase + (slot * 3 + level) * side * side;
     readWord(base + 4 * word, [this] {
         std::memcpy(&block[4 * word], &readData, 4);
-        if (++word < PatchWords) {
+        if (++word < side * side / 4) {
             at(Cycles(1), [this] { readPatch(); });
             return;
         }
-        if (!tmpl.make(block, px, py, levW[level], levH[level], minEig,
-                       bShift)) {
+        const int32_t px0 = rec[1], py0 = rec[2];
+        const bool accept = rotated ?
+            tmpl.makeMapped(block, px0 >> level, py0 >> level, map,
+                            levW[level], levH[level], minEig, bShift) :
+            tmpl.make(block, px, py, levW[level], levH[level], minEig,
+                      bShift);
+        if (!accept) {
             stops[level] = Rejected;
             if (level == 0)
                 st = false;

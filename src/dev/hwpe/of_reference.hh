@@ -18,6 +18,9 @@ constexpr int lkWin = 15;
 // The template's block side and the window's
 constexpr int lkBlock = lkWin + 3;
 constexpr int lkWindow = lkWin + 1;
+// The rotated LK engine's patch side (lkPackage's ROT_SIDE) and its reach
+constexpr int lkRotSide = 22;
+constexpr int lkRotReach = (lkRotSide - 4) / 2;
 
 // lkTemplate's output: the template of a level and its solve
 class LkTemplate
@@ -31,6 +34,14 @@ class LkTemplate
     // ((px >> 14) - 1, (py >> 14) - 1); false if the solve rejects it.
     bool make(const uint8_t *block, int32_t px, int32_t py, int width,
               int height, int64_t min_eig, int b_shift);
+
+    // lkTemplateRotated: the template through the map m (Q14, row-major)
+    // around the point (pcx, pcy) (level coordinates, Q14) from its
+    // lkRotSide x lkRotSide block at ((pcx >> 14) - lkRotReach - 1,
+    // (pcy >> 14) - lkRotReach - 1)
+    bool makeMapped(const uint8_t *block, int32_t pcx, int32_t pcy,
+                    const int32_t m[4], int width, int height,
+                    int64_t min_eig, int b_shift);
 
     // lkMismatch: the sums of the lkWindow x lkWindow window at the
     // window position (qx, qy) (Q14) against the template
