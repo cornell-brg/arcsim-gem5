@@ -152,6 +152,17 @@ class Fetch1 : public Named
          *  sent again once it is sure to be wanted */
         bool declined = false;
 
+        /** The next request went to the target of the branch at
+         *  predictedBranchPC, whose last bytes this line holds
+         *  (fetchPredictLastBackwardBranch) */
+        bool predictedBranch = false;
+        Addr predictedBranchPC = 0;
+
+        /** The thread's PC as the request was made, for the line's PC
+         *  where the PC may move on before the response; null to take
+         *  the thread's PC then */
+        std::unique_ptr<PCStateBase> streamPC;
+
         /** Make a packet to use with the memory transaction */
         void makePacket();
 
@@ -359,6 +370,13 @@ class Fetch1 : public Named
      *  line. */
     void fetchLine(ThreadID tid);
 
+    /** Called with each line request fetchLine makes, once the thread's
+     *  fetch address has stepped past it */
+    virtual void lineRequested(FetchRequestPtr request) {}
+
+    /** Is a line with this id for a stream or prediction since left? */
+    virtual bool isStale(const InstId &id) const;
+
     /** Try and issue a fetch for a translated request at the
      *  head of the requests queue.  Also tries to move the request
      *  between queues */
@@ -504,6 +522,24 @@ class SingleStageFetch1 : public Fetch1
     /** Is the stream fetched as far ahead of decode as readAheadLimit
      *  allows? */
     bool readAheadFull();
+
+    /** The next line request is the first after a branch from Execute,
+     *  made without the predictor's compare (Hazard3's jump_target
+     *  bypass) */
+    bool executeRedirected = false;
+
+    /** The line just requested holds the start of the predicted 32-bit
+     *  branch, which ends in the next: that one's request is followed by
+     *  the target's (btb_prev_start_of_overhanging) */
+    bool predictAfterThis = false;
+
+    /** Hazard3's predictor compares the word just requested with its
+     *  branch: the next request is the branch's target */
+    void lineRequested(FetchRequestPtr request) override;
+
+    /** With fetchPredictLastBackwardBranch, lines of predictions Fetch2
+     *  has yet to reach are kept */
+    bool isStale(const InstId &id) const override;
 
     /** Fetch the line holding target_addr, the target of branch, beside
      *  the sequential stream */

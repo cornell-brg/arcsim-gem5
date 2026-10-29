@@ -311,6 +311,10 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         MinorDefaultIntDivFU,
         MinorDefaultIntFU,
         MinorDefaultIntMulFU,
+        MinorDefaultMemFU,
+        MinorDefaultMiscFU,
+        MinorFUTiming,
+        minorMakeOpClassSet,
     )
 
     board = RiscvSystem()
@@ -418,16 +422,69 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         board.cpu.executeInputWidth = 1
         board.cpu.executeIssueLimit = 1
         board.cpu.executeCommitLimit = 1
-        board.cpu.fetch1LineWidth = 8
-        board.cpu.fetch1LineSnapWidth = 8
+        # Fetch and decode as one stage, as Hazard3's frontend: one aligned
+        # 32-bit fetch a cycle into its 2-word FIFO (FIFO_DEPTH = 2), two
+        # fetches on their way at once.
+        board.cpu.singleFetchStage = True
+        board.cpu.fetch1LineWidth = 4
+        board.cpu.fetch1LineSnapWidth = 4
         board.cpu.fetch1FetchLimit = 2
-        board.cpu.fetch1ToFetch2ForwardDelay = 1
+        board.cpu.fetch1ToFetch2ForwardDelay = 0  # bypassed with singleFetchStage
         board.cpu.fetch1ToFetch2BackwardDelay = 0
+        board.cpu.fetchReadAheadLimit = 8
         board.cpu.executeBranchDelay = 1
+        # A taken branch or jump costs 2 cycles, as Hazard3's X to F loop
+        # (instruction_timings.adoc): a branch redirects fetch in its
+        # issue cycle, and a direct target, or jalr's from its register, is
+        # fetched while the branch is in Decode. This makes up for Minor's
+        # Decode stage, which Hazard3 does not have.
+        board.cpu.executeBranchAtIssue = True
+        board.cpu.fetchBranchTargetAtDecode = True
+        board.cpu.fetchRegisterTargetAtDecode = True
+        # Those target fetches, and what is fetched behind a branch not yet
+        # resolved, are made on speculation: RP2350XIP reads no line from
+        # flash for one, so a branch that is not taken starts no flash read
+        # Hazard3 would not make. A fall-through miss behind such a branch
+        # waits the cycle or two until it resolves.
+        board.cpu.fetchBranchSpeculation = True
+        # Hazard3's branch predictor (BRANCH_PREDICTOR = 1): the last
+        # conditional branch taken backward is predicted taken as it is
+        # fetched, unless it starts in the word a branch from X went to.
+        board.cpu.fetchPredictLastBackwardBranch = True
+        # A load's address phase is its X cycle, and the instruction after
+        # it is in X during the load's data phase.
+        board.cpu.executeLoadAccessAtIssue = True
         units = MinorDefaultFUPool()
         for unit in units.funcUnits:
+            if isinstance(unit, (MinorDefaultIntFU, MinorDefaultIntMulFU,
+                                 MinorDefaultIntDivFU, MinorDefaultMiscFU)):
+                # Results are forwarded to the next instruction in X, and
+                # one with a result delay (a load's) holds it back by that
+                # delay exactly
+                unit.timings = [
+                    MinorFUTiming(description="Hazard3Int",
+                                  srcRegsRelativeLats=[1])
+                ]
             if isinstance(unit, (MinorDefaultIntFU, MinorDefaultIntMulFU)):
                 unit.opLat = 1
+            elif isinstance(unit, MinorDefaultMemFU):
+                # A loaded register is ready a cycle after the load's data
+                # phase: an instruction in X that reads it waits a cycle,
+                # but a store's data is read in M, so a store of it does
+                # not (instruction_timings.adoc, data_dependency).
+                unit.timings = [
+                    MinorFUTiming(
+                        description="Hazard3Store",
+                        srcRegsRelativeLats=[1, 2],
+                        opClasses=minorMakeOpClassSet(
+                            ["MemWrite", "FloatMemWrite"]),
+                    ),
+                    MinorFUTiming(
+                        description="Hazard3Load",
+                        srcRegsRelativeLats=[1],
+                        resultUsePenalty=1,
+                    ),
+                ]
             elif isinstance(unit, MinorDefaultIntDivFU):
                 unit.opLat = 19
                 unit.issueLat = 19

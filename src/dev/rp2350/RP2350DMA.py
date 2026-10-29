@@ -31,12 +31,17 @@ class RP2350DMA(BasicPioDevice):
     the channel makes no further access and its registers end up showing the
     transfers written (a faulting write counted); an abort lets the transfers
     already generated complete, the addresses reading as those written until
-    they have.
+    they have; a channel counts the pulses on its line while it waits, and
+    starting it (any trigger, or a write to its DBG_CTDREQ) clears the count,
+    so a channel chained after another on the same line starts at the
+    peripheral's pace. A peripheral model registered with addDreqSource() is
+    told when that happens, to send again what it holds. DBG_CTDREQ and
+    DBG_TCR are modelled.
 
     Not modelled: the CRC sniffer, the pacing timers, byte swapping,
-    decrementing addresses, channel priority, the security and MPU registers
-    and the debug registers. Their registers read 0 and ignore writes, with a
-    warning the first time one is touched.
+    decrementing addresses, channel priority, and the security and MPU
+    registers. Their registers read 0 and ignore writes, with a warning the
+    first time one is touched.
 
     Reference: RP2350 datasheet, section 12.6 (DMA).
     """

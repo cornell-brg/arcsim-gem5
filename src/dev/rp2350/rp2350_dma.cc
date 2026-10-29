@@ -235,6 +235,16 @@ RP2350DMA::readRegister(Addr offset)
           default: return (intr & inte[n]) | intf[n];
         }
     }
+    if (offset >= DBG_START && offset < DBG_END) {
+        const Channel &c = channels[(offset - DBG_START) / 0x40];
+        switch (offset % 0x40) {
+          case DBG_CTDREQ: return c.credit;
+          case DBG_TCR: return c.countReload;
+          default:
+            unmodelled(offset, false);
+            return 0;
+        }
+    }
     switch (offset) {
       case INTR:
         return intr;
@@ -322,6 +332,15 @@ RP2350DMA::writeRegister(Addr offset, uint32_t value, Op op)
             updateIrqs();
             break;
         }
+        return;
+    }
+    if (offset >= DBG_START && offset < DBG_END) {
+        // DBG_CTDREQ: any write clears the counter and starts the DREQ
+        // handshake again; DBG_TCR is read-only.
+        if (offset % 0x40 == DBG_CTDREQ)
+            restartDreq((offset - DBG_START) / 0x40);
+        else if (offset % 0x40 != DBG_TCR)
+            unmodelled(offset, true);
         return;
     }
     switch (offset) {
@@ -422,12 +441,35 @@ RP2350DMA::dreq(unsigned line, unsigned count)
 }
 
 void
+RP2350DMA::addDreqSource(unsigned line, DreqSource *source)
+{
+    dreqSources.emplace_back(line, source);
+}
+
+// Clears a channel's DREQ counter and tells the peripherals on its line,
+// which send again what they hold.
+void
+RP2350DMA::restartDreq(unsigned index)
+{
+    Channel &c = channels[index];
+    c.credit = 0;
+    const unsigned line = c.treq();
+    if (line >= TreqTimer0)
+        return;
+    for (const auto &[source_line, source] : dreqSources) {
+        if (source_line == line)
+            source->dreqRestart(line);
+    }
+}
+
+void
 RP2350DMA::trigger(unsigned index)
 {
     Channel &c = channels[index];
     // A disabled, running or failed channel ignores triggers.
     if (!(c.ctrl & CTRL_EN) || c.busy || c.failed())
         return;
+    restartDreq(index);
     c.count = c.countReload & CountMask;
     c.busy = true;
     // A count of 0 runs one null transfer, which takes the pipeline's time

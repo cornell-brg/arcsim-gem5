@@ -876,6 +876,7 @@ SingleStageFetch2::SingleStageFetch2(const std::string &name,
         next_stage_input_buffer),
     branchTargetAtDecode(params.fetchBranchTargetAtDecode),
     branchSpeculation(params.fetchBranchSpeculation),
+    predictLastBackwardBranch(params.fetchPredictLastBackwardBranch),
     registerTargetAtDecode(params.fetchRegisterTargetAtDecode),
     decodedBranchTid(InvalidThreadID)
 {
@@ -895,6 +896,40 @@ SingleStageFetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
         /* No dynamic prediction: a direct branch's target is fetched from
          *  Decode, anything else waits for Execute */
         const StaticInstPtr &static_inst = inst->staticInst;
+
+        /* Except the branch Fetch1 predicted taken as its word was
+         *  requested, and went on to the target of: the target's lines
+         *  follow under the next prediction number.  No stream change,
+         *  and the target is fetched as any other line, not on
+         *  speculation */
+        const ForwardLineData *line_in = getInput(inst->id.threadId);
+        if (predictLastBackwardBranch && line_in &&
+            line_in->predictedBranch &&
+            inst->pc->instAddr() == line_in->predictedBranchPC)
+        {
+            panic_if(!static_inst->isDirectCtrl(),
+                "Predicted branch at %#x is %s\n", inst->pc->instAddr(),
+                static_inst->disassemble(inst->pc->instAddr()));
+            Fetch2ThreadInfo &thread = fetchInfo[inst->id.threadId];
+            inst->predictedTaken = true;
+            set(inst->predictedTarget, static_inst->branchTarget(*inst->pc));
+            thread.expectedStreamSeqNum = inst->id.streamSeqNum;
+            thread.predictionSeqNum++;
+            /* Decode starts again at the target's line, not after the
+             *  branch should its line end with it */
+            thread.havePC = false;
+            /* The fall-through line is fetched from Decode as a direct
+             *  branch's target is, to start from should Execute not take
+             *  the branch: Hazard3 sends that address from X */
+            set(decodedBranchTarget, *inst->pc);
+            static_inst->advancePC(*decodedBranchTarget);
+            decodedBranchTid = inst->id.threadId;
+            decodedBranch = inst;
+            DPRINTF(Fetch, "SF2: predicted backward branch pc=%#x"
+                " target=%#x\n", line_in->predictedBranchPC,
+                inst->predictedTarget->instAddr());
+            return;
+        }
 
         /* Nothing more of this stream is fetched once a branch sure to be
          *  taken has been decoded, and what is fetched behind any other
@@ -984,6 +1019,9 @@ SingleStageFetch2::reactToExecuteBranch(const BranchData &executeBranch)
      * SingleStageFetch1, NOT the latched branchInp.outputWire which is
      * 1 cycle old.  The latched wire is still used for updateBranchPrediction
      * (which needs the previous cycle's result for history management). */
+    if (predictLastBackwardBranch)
+        updateBackwardBranch(executeBranch);
+
     BranchData &latched_branch = *branchInp.outputWire;
     if (!latched_branch.isBubble() && latched_branch.inst)
         updateBranchPrediction(latched_branch);
@@ -1016,6 +1054,74 @@ SingleStageFetch2::reactToExecuteBranch(const BranchData &executeBranch)
             latched_branch.newPredictionSeqNum;
         fetchInfo[latched_branch.threadId].expectedStreamSeqNum =
             latched_branch.newStreamSeqNum;
+    }
+}
+
+bool
+SingleStageFetch2::predictionPassed(const InstId &id) const
+{
+    const Fetch2ThreadInfo &thread = fetchInfo[id.threadId];
+
+    return thread.expectedStreamSeqNum == id.streamSeqNum &&
+        id.predictionSeqNum < thread.predictionSeqNum;
+}
+
+void
+SingleStageFetch2::updateBackwardBranch(const BranchData &executeBranch)
+{
+    const MinorDynInstPtr &inst = executeBranch.inst;
+
+    switch (executeBranch.reason) {
+      case BranchData::UnpredictedBranch:
+        /* A PC event's branch has no instruction */
+        if (!inst || inst->isBubble())
+            break;
+
+        if (inst->isFault()) {
+            /* A fetch fault's trap */
+            backwardBranchValid = false;
+        } else if (inst->staticInst->isDirectCtrl() &&
+            inst->staticInst->isCondCtrl())
+        {
+            /* Taken backward: predicted from now on */
+            Addr pc = inst->pc->instAddr();
+            if (executeBranch.target->instAddr() < pc) {
+                std::unique_ptr<PCStateBase> next(inst->pc->clone());
+                inst->staticInst->advancePC(*next);
+                backwardBranchValid = true;
+                backwardBranchPC = pc;
+                set(backwardBranchTarget, executeBranch.target);
+                backwardBranchOverhangs =
+                    next->instAddr() - pc == 4 && (pc & 2);
+            }
+        } else if (!inst->staticInst->isControl()) {
+            /* A trap leaves for its handler, where the forced branch of
+             *  any other serialize-after instruction (a CSR write, mret
+             *  aside) goes on to the next instruction.  fence.i (squash
+             *  after, and no wfi) clears it too */
+            std::unique_ptr<PCStateBase> next(inst->pc->clone());
+            inst->staticInst->advancePC(*next);
+            if (*next != *executeBranch.target ||
+                (inst->staticInst->isSquashAfter() &&
+                 !inst->staticInst->isQuiesce()))
+            {
+                backwardBranchValid = false;
+            }
+        }
+        break;
+      case BranchData::BadlyPredictedBranch:
+      case BranchData::BadlyPredictedBranchTarget:
+        if (inst && !inst->isBubble() &&
+            inst->pc->instAddr() == backwardBranchPC)
+        {
+            backwardBranchValid = false;
+        }
+        break;
+      case BranchData::Interrupt:
+        backwardBranchValid = false;
+        break;
+      default:
+        break;
     }
 }
 
@@ -1091,7 +1197,10 @@ SingleStageFetch2::scanNextForBranch()
     bool found_branch = false;
     if (decoder->instReady()) {
         StaticInstPtr static_inst = decoder->decode(*fetch_info.pc);
-        found_branch = static_inst->isControl();
+        /* Fetch has gone on to a predicted branch's target already */
+        found_branch = static_inst->isControl() &&
+            !(line_in->predictedBranch &&
+              fetch_info.pc->instAddr() == line_in->predictedBranchPC);
 
         DPRINTF(Fetch, "Branch lookahead: %s at PC %s -> %s\n",
                 static_inst->disassemble(fetch_info.pc->instAddr()),

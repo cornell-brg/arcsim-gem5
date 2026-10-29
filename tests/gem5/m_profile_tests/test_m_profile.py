@@ -341,6 +341,10 @@ for sram_model in ("legacy", "banked"):
         "rp2350_dma_dreq", "test_rp2350_dma_dreq.elf",
         r"RP2350_DMA_DREQ_OK", "run_rp2350_dma_dreq.py", sram_model,
     )
+    m_profile_rp2350_dma_test(
+        "rp2350_dma_chain", "test_rp2350_dma_chain.elf",
+        r"RP2350_DMA_CHAIN_OK", "run_rp2350_dma_chain.py", sram_model,
+    )
     # Flash timing and the DMA beside it, with the values a Pico 2 gives
     m_profile_rp2350_dma_test(
         "rp2350_xip", "test_rp2350_xip.elf", r"RP2350_XIP_OK",

@@ -31,6 +31,19 @@ class RP2350DMA : public BasicPioDevice
     // the line make one transfer.
     void dreq(unsigned line, unsigned count = 1);
 
+    // A peripheral on a data request line. Starting a channel (any trigger,
+    // or a write to its DBG_CTDREQ) clears the channel's counter, as on a
+    // Pico 2, and the DREQ handshake starts again: the peripherals on the
+    // channel's line are told, so that one holding data (or room) sends its
+    // pulses again.
+    class DreqSource
+    {
+      public:
+        virtual ~DreqSource() = default;
+        virtual void dreqRestart(unsigned line) = 0;
+    };
+    void addDreqSource(unsigned line, DreqSource *source);
+
     Port &getPort(const std::string &if_name,
                   PortID idx = InvalidPortID) override;
     void init() override;
@@ -63,6 +76,10 @@ class RP2350DMA : public BasicPioDevice
         FIFO_LEVELS = 0x460,
         CHAN_ABORT = 0x464,
         N_CHANNELS = 0x468,
+        DBG_START = 0x800,     // per channel at 0x40 * n: CTDREQ, then TCR
+        DBG_CTDREQ = 0x0,
+        DBG_TCR = 0x4,
+        DBG_END = 0xC00,
         BLOCK_SIZE = 0x1000,
     };
 
@@ -192,6 +209,8 @@ class RP2350DMA : public BasicPioDevice
     // Channels chained to, to trigger at the next clock edge.
     uint32_t pendingTriggers = 0;
     unsigned nextChannel = 0;               // round-robin position
+    // Peripherals by line, told when a channel on their line starts
+    std::vector<std::pair<unsigned, DreqSource *>> dreqSources;
 
     std::deque<Transfer *> raf;             // oldest first
     std::deque<Transfer *> waf;
@@ -229,6 +248,7 @@ class RP2350DMA : public BasicPioDevice
     Cycles nowCycle() const;
 
     void trigger(unsigned index);
+    void restartDreq(unsigned index);
     void abort(unsigned index);
     void finish(unsigned index);
     void checkFinish(unsigned index);
