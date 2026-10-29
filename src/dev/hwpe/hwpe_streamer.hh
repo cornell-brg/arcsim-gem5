@@ -191,13 +191,14 @@ class Sink : public StreamUnit
 };
 
 // The HWPE's streamer (like hci_core_mux_dynamic): all stream units share
-// the HWPE's one TCDM port. It sends at most one access per cycle, chosen
-// round robin among the units that want one. If the TCDM refuses an
-// access, nothing else is sent until the TCDM has accepted it.
+// the HWPE's one TCDM port, unit n on the mux's channel n. It sends at most
+// one access per cycle, chosen among the units that want one by the mux's
+// rotating priority (see tick()). If the TCDM refuses an access, nothing
+// else is sent until the TCDM has accepted it.
 class Streamer : public statistics::Group, public Serializable
 {
   public:
-    Streamer(HWPEBase &hwpe);
+    Streamer(HWPEBase &hwpe, unsigned mux_channels);
 
     // Only called in the HWPE subclass's constructor.
     Source &addSource(const std::string &name, unsigned depth);
@@ -248,7 +249,8 @@ class Streamer : public statistics::Group, public Serializable
 
     HWPEBase &hwpe;
     std::vector<std::unique_ptr<StreamUnit>> units;
-    unsigned nextUnit = 0;        // unit the round robin checks first
+    const unsigned muxChannels;
+    unsigned rrCounter = 0;       // the mux's priority counter
     Tick lastSend = MaxTick;      // start of the cycle of the last access
     EventFunctionWrapper tickEvent;
 

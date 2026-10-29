@@ -4,6 +4,7 @@
 
 #include "base/bitfield.hh"
 #include "base/cast.hh"
+#include "base/intmath.hh"
 #include "base/logging.hh"
 #include "base/trace.hh"
 #include "debug/HWPE.hh"
@@ -323,20 +324,27 @@ Sink::unserialize(CheckpointIn &cp)
 
 // ---- streamer ---------------------------------------------------------
 
-Streamer::Streamer(HWPEBase &_hwpe)
+Streamer::Streamer(HWPEBase &_hwpe, unsigned mux_channels)
     : statistics::Group(&_hwpe, "streamer"),
       hwpe(_hwpe),
+      muxChannels(mux_channels),
       tickEvent([this] { tick(); }, _hwpe.name() + ".streamer.tick"),
       ADD_STAT(refusals, statistics::units::Count::get(),
                "Accesses the TCDM refused at first"),
       ADD_STAT(conflicts, statistics::units::Count::get(),
                "Accesses that waited a cycle for another unit's")
 {
+    // The RTL's counter is $clog2(NB_IN_CHAN) bits wide, so it only wraps
+    // at NB_IN_CHAN if that is a power of two
+    fatal_if(!isPowerOf2(muxChannels), "%s: %d mux channels; a power of two",
+             hwpe.name(), muxChannels);
 }
 
 Source &
 Streamer::addSource(const std::string &name, unsigned depth)
 {
+    fatal_if(units.size() >= muxChannels, "%s: more streams than the %d mux "
+             "channels", hwpe.name(), muxChannels);
     auto *source = new Source(*this, name, depth);
     units.emplace_back(source);
     return *source;
@@ -345,6 +353,8 @@ Streamer::addSource(const std::string &name, unsigned depth)
 Sink &
 Streamer::addSink(const std::string &name, unsigned depth)
 {
+    fatal_if(units.size() >= muxChannels, "%s: more streams than the %d mux "
+             "channels", hwpe.name(), muxChannels);
     auto *sink = new Sink(*this, name, depth);
     units.emplace_back(sink);
     return *sink;
@@ -392,23 +402,24 @@ Streamer::tick()
     // wakes us again) or while draining (drainResume() wakes us again)
     if (!hwpe.canSendTcdm())
         return;
-    // Pick the first unit that wants an access, starting at nextUnit;
-    // count the others that want one too (conflicts)
+    // hci_core_mux_dynamic: of the units that want an access, the last in
+    // the order rrCounter, rrCounter + 1, ... wins; the counter steps once
+    // per access, whichever unit made it, and only a soft clear resets it.
+    // Count the others that want one too (conflicts)
     StreamUnit *chosen = nullptr;
     unsigned waiting = 0;
-    for (unsigned n = 0; n < units.size(); ++n) {
-        const unsigned index = (nextUnit + n) % units.size();
-        if (!units[index]->wantsAccess())
+    for (unsigned n = muxChannels; n-- > 0;) {
+        const unsigned index = (rrCounter + n) % muxChannels;
+        if (index >= units.size() || !units[index]->wantsAccess())
             continue;
-        if (!chosen) {
+        if (!chosen)
             chosen = units[index].get();
-            nextUnit = (index + 1) % units.size();
-        } else {
+        else
             ++waiting;
-        }
     }
     if (!chosen)
         return;
+    rrCounter = (rrCounter + 1) % muxChannels;
     conflicts += waiting;
     lastSend = cycleStart();
     PacketPtr pkt = chosen->makeAccess();
@@ -461,13 +472,13 @@ Streamer::clear()
         unit->clear();
     if (tickEvent.scheduled())
         hwpe.deschedule(tickEvent);
-    nextUnit = 0;
+    rrCounter = 0;
 }
 
 void
 Streamer::serialize(CheckpointOut &cp) const
 {
-    SERIALIZE_SCALAR(nextUnit);
+    SERIALIZE_SCALAR(rrCounter);
     SERIALIZE_SCALAR(lastSend);
     const Tick tick_tick =
         tickEvent.scheduled() ? tickEvent.when() : MaxTick;
@@ -479,7 +490,7 @@ Streamer::serialize(CheckpointOut &cp) const
 void
 Streamer::unserialize(CheckpointIn &cp)
 {
-    UNSERIALIZE_SCALAR(nextUnit);
+    UNSERIALIZE_SCALAR(rrCounter);
     UNSERIALIZE_SCALAR(lastSend);
     Tick tick_tick;
     UNSERIALIZE_SCALAR(tick_tick);

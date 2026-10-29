@@ -60,7 +60,7 @@ HWPEBase::TcdmPort::recvReqRetry()
 HWPEBase::HWPEBase(const Params &p)
     : BasicPioDevice(p, p.pio_size),
       requestorId(p.system->getRequestorId(this)),
-      streamer(*this),
+      streamer(*this, p.mux_channels),
       tcdmPort(name() + ".tcdm_port", *this),
       numContexts(p.num_contexts),
       startLatency(p.start_latency),
