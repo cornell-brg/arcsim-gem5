@@ -327,8 +327,7 @@ HWPEEqpyr::compute()
 DrainState
 HWPEEqpyr::drain()
 {
-    if (phase != Phase::Idle || computeEvent.scheduled() ||
-        frameEvent.scheduled())
+    if (phase != Phase::Idle)
         return DrainState::Draining;
     return HWPEBase::drain();
 }

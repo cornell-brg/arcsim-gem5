@@ -313,6 +313,7 @@ HWPEBase::finish()
     pulseIrq();
     if (pending)
         schedule(startEvent, clockEdge(startLatency));
+    checkDrained();
 }
 
 void
@@ -334,8 +335,7 @@ HWPEBase::softClear(bool registers)
         delete pkt->popSenderState();
         --outstanding;
         clearedTcdmResp(pkt);
-        if (drainState() == DrainState::Draining && outstanding == 0)
-            signalDrainDone();
+        checkDrained();
     }
     pointerContext = 0;
     runningContext = 0;
@@ -368,7 +368,7 @@ HWPEBase::pulseIrq()
 bool
 HWPEBase::canSendTcdm() const
 {
-    return !tcdmPort.waiting() && drainState() != DrainState::Draining;
+    return !tcdmPort.waiting();
 }
 
 void
@@ -410,8 +410,7 @@ HWPEBase::recvTcdmRespFromPort(PacketPtr pkt)
         clearedTcdmResp(pkt);
     else
         recvTcdmResp(pkt);
-    if (drainState() == DrainState::Draining && outstanding == 0)
-        signalDrainDone();
+    checkDrained();
 }
 
 void
@@ -425,7 +424,19 @@ HWPEBase::tcdmRetriedFromPort()
 DrainState
 HWPEBase::drain()
 {
-    return outstanding == 0 ? DrainState::Drained : DrainState::Draining;
+    // Jobs triggered run to their end, sending what they need
+    if (pending || outstanding || startEvent.scheduled() ||
+        doneEvent.scheduled())
+        return DrainState::Draining;
+    return DrainState::Drained;
+}
+
+void
+HWPEBase::checkDrained()
+{
+    if (drainState() == DrainState::Draining &&
+        drain() == DrainState::Drained)
+        signalDrainDone();
 }
 
 void

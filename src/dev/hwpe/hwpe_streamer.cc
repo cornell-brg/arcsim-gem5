@@ -399,7 +399,7 @@ void
 Streamer::tick()
 {
     // Send nothing while a refused access waits to be resent (retried()
-    // wakes us again) or while draining (drainResume() wakes us again)
+    // wakes us again)
     if (!hwpe.canSendTcdm())
         return;
     // hci_core_mux_dynamic: of the units that want an access, the last in
