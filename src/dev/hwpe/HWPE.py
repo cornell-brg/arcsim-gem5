@@ -204,3 +204,19 @@ class HWPEFastCellBestK(HWPEBase):
     buffer_depth = Param.Unsigned(
         2, "Pixel beats buffered (the engine's pixel FIFO depth)"
     )
+
+
+class HWPESelect(BasicPioDevice):
+    """
+    The optical-flow wrapper's SELECT register (hwpe-optical-flow.v, at its
+    window's 0x3000): bits 1:0 read back what was written; the engines
+    share the TCDM port through HCIMux whatever it holds. Every other
+    offset reads 0 and ignores writes.
+    """
+
+    type = "HWPESelect"
+    cxx_class = "gem5::HWPESelect"
+    cxx_header = "dev/hwpe/hwpe_select.hh"
+
+    pio_addr = 0x50803000
+    pio_size = Param.Addr(0x1000, "Size of the register window")

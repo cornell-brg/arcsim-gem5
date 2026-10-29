@@ -35,6 +35,14 @@ SRAM_REGIONS = (
 # which is about 572 MiB/s.
 SCRATCH_BANK_BANDWIDTH = "572MiB/s"
 
+# optical-flow's engines: name, class, parameters, window offset. The stripe
+# and LK engines are HWPEEmpty until their models exist.
+OPTICAL_FLOW = (
+    ("fast", "HWPEFastCellBestK", {"n": 9, "cycles": 1, "threshold": 20}, 0x0000),
+    ("stripe", "HWPEEmpty", {"num_io_regs": 8}, 0x1000),
+    ("lk", "HWPEEmpty", {"num_io_regs": 19}, 0x2000),
+)
+
 # The HWPEs for the Hazard3 board, keyed by arcsim-soc's CONFIG_HWPE names:
 # the class and its parameters. vvadd is vvadd-wide with one element per beat.
 HWPES = {
@@ -46,6 +54,9 @@ HWPES = {
     "vvadd-wide-8": ("HWPEVvaddWide", {"elems": 8}),
     # Its wrapper's parameters are HWPEFastCellBestK's defaults
     "fast-with-scoring-wide-multicycle-cell-best-k": ("HWPEFastCellBestK", {}),
+    # arcsim-xcel's hwpe-optical-flow.v: three engines and SELECT in 4 KiB
+    # windows, the engines on HCIMux channels 0 to 2 (OPTICAL_FLOW)
+    "optical-flow": None,
 }
 
 
@@ -327,6 +338,13 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     from m5.objects import Hazard3TbIO
     board.tb_io = Hazard3TbIO(pio_latency="1ns")
     board.tb_io.pio = board.sram_bus.mem_side_ports
+    # XIP_CTRL's cache counters at 0x400c8000 (arcsim-soc rtl/xip/xipCtrl.sv),
+    # counting the QMI model's accesses; 0 with the legacy XIP cache
+    from m5.objects import RP2350XipCtrl
+    board.xip_ctrl = RP2350XipCtrl(pio_latency="1ns")
+    if xip_model == "qmi":
+        board.xip_ctrl.xip = board.flash
+    board.xip_ctrl.pio = board.sram_bus.mem_side_ports
     # The HWPE's 256 KiB TCDM at 0x60000000 (soc.v): 16 banks shared by the
     # core side, through the SRAM bus, and the HWPE.
     from m5.objects import HCITcdm
@@ -337,15 +355,35 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     # data port on the TCDM. Its done event (irq) stays unconnected, as in
     # soc.v.
     import m5.objects
-    hwpe_class, hwpe_params = HWPES[hwpe]
-    board.hwpe = getattr(m5.objects, hwpe_class)(pio_latency="1ns",
-                                                 **hwpe_params)
-    board.hwpe.pio = board.sram_bus.mem_side_ports
-    # Its registers are in mem_ranges, as the placeholder memory there was, so
-    # runners that place stand-ins outside mem_ranges leave them alone.
-    board.mem_ranges.append(AddrRange(int(board.hwpe.pio_addr),
-                                      size=int(board.hwpe.pio_size)))
-    board.hwpe.tcdm_port = board.tcdm.hwpe_port
+    if hwpe == "optical-flow":
+        from m5.objects import HCIMux, HWPESelect
+        board.hwpe_mux = HCIMux(clk_domain=board.clk_domain, num_channels=4)
+        board.hwpe_mux.mem_side_port = board.tcdm.hwpe_port
+        engines = []
+        for name, cls, params, offset in OPTICAL_FLOW:
+            engine = getattr(m5.objects, cls)(pio_latency="1ns",
+                                              pio_addr=0x50800000 + offset,
+                                              pio_size=0x1000, **params)
+            setattr(board, f"hwpe_{name}", engine)
+            engines.append(engine)
+        board.hwpe_select = HWPESelect(pio_latency="1ns")
+        engines.append(board.hwpe_select)
+        for engine in engines:
+            engine.pio = board.sram_bus.mem_side_ports
+            board.mem_ranges.append(AddrRange(int(engine.pio_addr),
+                                              size=int(engine.pio_size)))
+        board.hwpe_mux.cpu_side_ports = [e.tcdm_port for e in engines[:-1]]
+    else:
+        hwpe_class, hwpe_params = HWPES[hwpe]
+        board.hwpe = getattr(m5.objects, hwpe_class)(pio_latency="1ns",
+                                                     **hwpe_params)
+        board.hwpe.pio = board.sram_bus.mem_side_ports
+        # Its registers are in mem_ranges, as the placeholder memory there
+        # was, so runners that place stand-ins outside mem_ranges leave them
+        # alone.
+        board.mem_ranges.append(AddrRange(int(board.hwpe.pio_addr),
+                                          size=int(board.hwpe.pio_size)))
+        board.hwpe.tcdm_port = board.tcdm.hwpe_port
     if board._banked_sram:
         board.icode_router.mem_side_ports = board.sram.port
     if cpu == "atomic":
@@ -387,6 +425,9 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         accessible.append(AddrRange(int(board.dma.pio_addr), size=0x4000))
     accessible.append(AddrRange(int(board.sio.pio_addr), size=0x10000))
     accessible.append(AddrRange(int(board.tb_io.pio_addr), size=0x200))
+    if hasattr(board, "xip_ctrl"):
+        accessible.append(AddrRange(int(board.xip_ctrl.pio_addr),
+                                    size=int(board.xip_ctrl.pio_size)))
     board.cpu.mmu.pma_checker.accessible = accessible
     # Hazard3's interrupt controller, with the RP2350's 52 IRQs and 4 priority
     # bits (arcsim-soc's config_rp2350_default.vh). Devices reach it through
