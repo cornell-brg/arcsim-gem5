@@ -107,6 +107,7 @@ class RP2350XIP : public AbstractMemory
     const Cycles reselectCycles;
     const Cycles cooldownCycles;
     const Addr pageBreak;
+    const bool trackTags;
 
     std::array<std::array<Way, NumWays>, NumSets> sets;
     std::array<Bank, NumBanks> banks;
@@ -169,6 +170,8 @@ class RP2350XIP : public AbstractMemory
     Tick nextCycle() const;
     Tick thisCycle() const;
     void serve(unsigned bank);
+    // Atomic mode: the tags follow an access, with no timing
+    void track(PacketPtr pkt);
 
     // XIP_CTRL's CTR_HIT and CTR_ACC (RP2350XipCtrl): saturating, one
     // count per access answered, and per one that read no line from flash

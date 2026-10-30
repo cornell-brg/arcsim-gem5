@@ -37,6 +37,11 @@ class RP2350XIP(AbstractMemory):
 
     Cache maintenance writes (the window at `maintenance_base`) invalidate
     lines; pinning and cleaning are not modelled.
+
+    In atomic mode accesses take no cache or flash time. With `track_tags`
+    the cache's tags still follow them, each line looked up and filled on a
+    miss as in timing mode (and XIP_CTRL's counters count them), so that a
+    switch to a timing CPU finds the cache as the accesses so far left it.
     """
 
     type = "RP2350XIP"
@@ -57,6 +62,9 @@ class RP2350XIP(AbstractMemory):
     )
     cooldown_cycles = Param.Cycles(
         64, "How long the chip select is held after a transfer"
+    )
+    track_tags = Param.Bool(
+        False, "In atomic mode, look up and fill the cache's tags"
     )
     page_break = Param.MemorySize(
         "1KiB", "Boundary at which a transfer ends and the chip select is"

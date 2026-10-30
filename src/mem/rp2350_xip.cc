@@ -44,10 +44,13 @@ Tick
 RP2350XIP::XipPort::recvAtomic(PacketPtr pkt)
 {
     // Atomic mode has no cache or flash timing.
-    if (xip.maintenanceRange.contains(pkt->getAddr()))
+    if (xip.maintenanceRange.contains(pkt->getAddr())) {
         xip.maintain(pkt);
-    else
+    } else {
+        if (xip.trackTags)
+            xip.track(pkt);
         xip.access(pkt);
+    }
     return xip.clockPeriod();
 }
 
@@ -71,7 +74,7 @@ RP2350XIP::RP2350XIP(const RP2350XIPParams &p)
                        p.maintenance_base + p.range.size()),
       missCycles(p.miss_cycles), chainedCycles(p.chained_cycles),
       reselectCycles(p.reselect_cycles), cooldownCycles(p.cooldown_cycles),
-      pageBreak(p.page_break),
+      pageBreak(p.page_break), trackTags(p.track_tags),
       qmiEvent([this] { finishQmi(); }, name() + ".qmi"),
       releaseEvent([this] { release(); }, name() + ".release"),
       grantEvent([this] { grant(); }, name() + ".grant"),
@@ -132,6 +135,38 @@ RP2350XIP::fill(Addr line)
     Way &way = sets[setOf(line)][rng->random<unsigned>(0, NumWays - 1)];
     way.valid = true;
     way.line = line;
+}
+
+// As receive(), grant() and respond() do in timing mode: a read made on
+// speculation that misses leaves the tags and counters alone; any other
+// access looks up each line it covers, fills those that miss, and counts.
+void
+RP2350XIP::track(PacketPtr pkt)
+{
+    const Addr first = lineOf(pkt->getAddr());
+    const Addr last = lineOf(pkt->getAddr() + pkt->getSize() - 1);
+    if (pkt->req->isPrefetch()) {
+        for (Addr line = first; line <= last; line += LineBytes) {
+            if (!lookup(line)) {
+                ++xipStats.declined;
+                return;
+            }
+        }
+    }
+    bool missed = false;
+    for (Addr line = first; line <= last; line += LineBytes) {
+        if (lookup(line)) {
+            ++xipStats.hits;
+        } else {
+            ++xipStats.misses;
+            missed = true;
+            fill(line);
+        }
+    }
+    if (ctrAcc != UINT32_MAX)
+        ++ctrAcc;
+    if (!missed && ctrHit != UINT32_MAX)
+        ++ctrHit;
 }
 
 void
