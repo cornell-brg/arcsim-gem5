@@ -183,7 +183,7 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
 
 def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
               scratch_bank_bandwidth, arm_predictor, arm_divider, sram_model,
-              arm_timing, dma, xip_model, cpu):
+              arm_timing, dma, xip_model, cpu, switch_cpu=None):
     from m5.objects import ArmMSystem, ArmSemihosting
     from m5.objects.ArmMSystem import ArmMReleaseCortexM33
     from m5.objects.ArmMFsWorkload import ArmMFsWorkload
@@ -234,54 +234,74 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
 
     board.cpuid = 0x410FC241
 
-    # The CortexM33CPU timing, tuned against a Pico 2 (the default), or the
-    # CortexM4CPU's as it was before its tuning against the STM32G474; or the
-    # atomic CPU, with no core timing.
-    if cpu == "atomic":
-        from m5.objects.ArmMCPU import ArmMAtomicSimpleCPU
-        board.cpu = ArmMAtomicSimpleCPU(cpu_id=0)
-    elif arm_timing == "tuned":
-        from gem5.prebuilt.cortexm.cpu.cortex_m33 import CortexM33CPU
-        board.cpu = CortexM33CPU(cpu_id=0)
-    elif arm_timing == "pre-tuning":
-        from gem5.prebuilt.cortexm.cpu.cortex_m4 import (
-            CortexM4CPU,
-            use_pre_tuning_timing,
-        )
-        board.cpu = CortexM4CPU(cpu_id=0)
-        use_pre_tuning_timing(board.cpu)
-    else:
-        raise ValueError(f"Unknown Arm timing: {arm_timing}")
-
-    if cpu == "minor":
-        # For playing around with different branch predictors and dividers
-        for unit in board.cpu.executeFuncUnits.funcUnits:
-            if isinstance(unit, DynamicLatencyIntDivFU):
-                unit.rp2350_m33_timing = arm_divider == "rp2350-m33"
-        if arm_predictor in ("local", "local-small"):
-            board.cpu.branchPred.conditionalBranchPred = LocalBP(
-                localPredictorSize=2048, localCtrBits=2
+    def arm_cpu(kind, switched_out=False):
+        """A Cortex-M33 core of the kind given (atomic or minor)."""
+        # The CortexM33CPU timing, tuned against a Pico 2 (the default), or
+        # the CortexM4CPU's as it was before its tuning against the
+        # STM32G474; or the atomic CPU, with no core timing.
+        if kind == "atomic":
+            from m5.objects.ArmMCPU import ArmMAtomicSimpleCPU
+            core = ArmMAtomicSimpleCPU(cpu_id=0, switched_out=switched_out)
+        elif arm_timing == "tuned":
+            from gem5.prebuilt.cortexm.cpu.cortex_m33 import CortexM33CPU
+            core = CortexM33CPU(cpu_id=0, switched_out=switched_out)
+        elif arm_timing == "pre-tuning":
+            from gem5.prebuilt.cortexm.cpu.cortex_m4 import (
+                CortexM4CPU,
+                use_pre_tuning_timing,
             )
-        if arm_predictor in ("local", "large-btb"):
-            board.cpu.branchPred.btb = SimpleBTB(
-                numEntries=1024, tagBits=16, instShiftAmt=1
-            )
+            core = CortexM4CPU(cpu_id=0, switched_out=switched_out)
+            use_pre_tuning_timing(core)
+        else:
+            raise ValueError(f"Unknown Arm timing: {arm_timing}")
 
-        # The Cortex-M33 has no write buffer: a store that the bus makes wait
-        # holds the instructions behind it. Only the banked SRAM has banks to
-        # lose; the legacy memories keep the store buffer's timing.
-        board.cpu.executeWaitedStoreHoldsInsts = board._banked_sram
+        if kind == "minor":
+            # For playing around with different branch predictors and dividers
+            for unit in core.executeFuncUnits.funcUnits:
+                if isinstance(unit, DynamicLatencyIntDivFU):
+                    unit.rp2350_m33_timing = arm_divider == "rp2350-m33"
+            if arm_predictor in ("local", "local-small"):
+                core.branchPred.conditionalBranchPred = LocalBP(
+                    localPredictorSize=2048, localCtrBits=2
+                )
+            if arm_predictor in ("local", "large-btb"):
+                core.branchPred.btb = SimpleBTB(
+                    numEntries=1024, tagBits=16, instShiftAmt=1
+                )
 
-    board.cpu.clk_domain = board.clk_domain
+            # The Cortex-M33 has no write buffer: a store that the bus makes
+            # wait holds the instructions behind it. Only the banked SRAM has
+            # banks to lose; the legacy memories keep the store buffer's
+            # timing.
+            core.executeWaitedStoreHoldsInsts = board._banked_sram
+
+        core.clk_domain = board.clk_domain
+        core.createThreads()
+        core.createInterruptController()
+        return core
+
+    board.cpu = arm_cpu(cpu)
     board.mem_mode = board.cpu.memory_mode()
-    board.cpu.createThreads()
-    board.cpu.createInterruptController()
     board.cpu.icache_port = board.cpu.mmu.stacking_barrier.cpu_side_port
-    board.cpu.mmu.stacking_barrier.mem_side_port = (
-        board.icode_router.cpu_side_ports
-    )
     board.cpu.dcache_port = board.dcode_router.cpu_side_ports
     board.cpu.mmu.stacking_port = board.sram_bus.cpu_side_ports
+    if switch_cpu:
+        # Switched out until m5.switchCpus hands it the core's place, which
+        # moves its fetch and data ports but not its MMU's: the stacking port
+        # gets its own, and its stacking barrier, which holds fetch while an
+        # exception stacks, goes in the fetch path after the core's.
+        board.switch_cpu = arm_cpu(switch_cpu, switched_out=True)
+        board.switch_cpu.mmu.stacking_port = board.sram_bus.cpu_side_ports
+        board.cpu.mmu.stacking_barrier.mem_side_port = (
+            board.switch_cpu.mmu.stacking_barrier.cpu_side_port
+        )
+        board.switch_cpu.mmu.stacking_barrier.mem_side_port = (
+            board.icode_router.cpu_side_ports
+        )
+    else:
+        board.cpu.mmu.stacking_barrier.mem_side_port = (
+            board.icode_router.cpu_side_ports
+        )
     board.platform.scs.pio = board.sram_bus.mem_side_ports
     # The DWT (cycle counter) on the same bus, counting core clock cycles.
     board.platform.dwt.pio = board.sram_bus.mem_side_ports
@@ -586,7 +606,7 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     "qmi" replaces the generic cache and fixed miss delay in front of flash
     with RP2350XIP. hwpe names the Hazard3 board's HWPE (HWPES). zfinx gives
     the Hazard3 proxy Zfinx (floats in the x registers) instead of F and D.
-    switch_cpu ("minor" or "atomic", Hazard3 proxy only) adds board.switch_cpu,
+    switch_cpu ("minor" or "atomic", either proxy) adds board.switch_cpu,
     a core of that kind switched out, for m5.switchCpus."""
     sram_model, dma, xip_model = memory_models(model, sram_model, dma,
                                                 xip_model)
@@ -600,9 +620,10 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
         raise ValueError(f"Unknown HWPE: {hwpe}")
     if zfinx and core != "hazard3-proxy":
         raise ValueError("Zfinx is only for the hazard3-proxy")
-    if switch_cpu and (core != "hazard3-proxy" or
+    if switch_cpu and (core not in ("arm-m4-proxy", "hazard3-proxy") or
                        switch_cpu not in ("minor", "atomic")):
-        raise ValueError("switch_cpu is minor or atomic, on the hazard3-proxy")
+        raise ValueError("switch_cpu is minor or atomic, on the arm-m4-proxy "
+                         "or the hazard3-proxy")
     if core == "arm-m4-proxy":
         return _make_arm(firmware, xip_miss_ns=xip_miss_ns,
                          sram_latency_ns=sram_latency_ns,
@@ -610,7 +631,8 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                          arm_predictor=arm_predictor,
                          arm_divider=arm_divider, sram_model=sram_model,
                          arm_timing=arm_timing, dma=dma,
-                         xip_model=xip_model, cpu=cpu)
+                         xip_model=xip_model, cpu=cpu,
+                         switch_cpu=switch_cpu)
     if core == "hazard3-proxy":
         return _make_riscv(firmware, xip_miss_ns=xip_miss_ns,
                            sram_latency_ns=sram_latency_ns,
