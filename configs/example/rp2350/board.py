@@ -17,6 +17,8 @@ from m5.objects import (
 )
 
 
+# The core clock (board.clk_domain): the CPU, its cycle counter, RP2350XIP and
+# the banked SRAM. make_board(clock=) sets another.
 CLOCK = "150MHz"
 XIP_BASE = 0x10000000
 XIP_SIZE = "16MiB"  # flash
@@ -75,7 +77,8 @@ def _router(clock_domain):
 
 
 def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
-                   scratch_bank_bandwidth, sram_model, dma, xip_model):
+                   scratch_bank_bandwidth, sram_model, dma, xip_model,
+                   clock=CLOCK):
     """Wire both CPU ports to one shared XIP cache or the SRAM bus.
 
     The legacy path uses lumped SimpleMemory windows. The banked path uses
@@ -84,7 +87,7 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
     board.cache_line_size = 8
     board.voltage_domain = VoltageDomain(voltage="1.0V")
     board.clk_domain = SrcClockDomain(
-        clock=CLOCK, voltage_domain=board.voltage_domain
+        clock=clock, voltage_domain=board.voltage_domain
     )
     board.fast_clock = SrcClockDomain(
         clock="10GHz", voltage_domain=board.voltage_domain
@@ -183,7 +186,8 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
 
 def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
               scratch_bank_bandwidth, arm_predictor, arm_divider, sram_model,
-              arm_timing, dma, xip_model, cpu, switch_cpu=None):
+              arm_timing, dma, xip_model, cpu, switch_cpu=None,
+              clock=CLOCK):
     from m5.objects import ArmMSystem, ArmSemihosting
     from m5.objects.ArmMSystem import ArmMReleaseCortexM33
     from m5.objects.ArmMFsWorkload import ArmMFsWorkload
@@ -210,7 +214,8 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     _attach_memory(board, xip_miss_ns=xip_miss_ns,
                    sram_latency_ns=sram_latency_ns,
                    scratch_bank_bandwidth=scratch_bank_bandwidth,
-                   sram_model=sram_model, dma=dma, xip_model=xip_model)
+                   sram_model=sram_model, dma=dma, xip_model=xip_model,
+                   clock=clock)
 
     # Decouple in-flight ICode responses on SRAM branch redirects. Direct
     # xbar-to-memory fetch crashes this gem5 branch; this adds no SRAM cache.
@@ -447,7 +452,7 @@ def _hazard3_cpu(board, kind, zfinx, accessible, switched_out=False):
 
 def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
                 scratch_bank_bandwidth, sram_model, dma, xip_model, cpu,
-                hwpe, zfinx, switch_cpu=None):
+                hwpe, zfinx, switch_cpu=None, clock=CLOCK):
     from m5.objects import RiscvSystem
     from m5.objects.RiscvFsWorkload import RiscvBareMetal
     from m5.objects.RiscvSemihosting import RiscvSemihosting
@@ -456,7 +461,8 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     _attach_memory(board, xip_miss_ns=xip_miss_ns,
                    sram_latency_ns=sram_latency_ns,
                    scratch_bank_bandwidth=scratch_bank_bandwidth,
-                   sram_model=sram_model, dma=dma, xip_model=xip_model)
+                   sram_model=sram_model, dma=dma, xip_model=xip_model,
+                   clock=clock)
     # Hazard3 testbench IO registers (print, exit, IRQs, timer) at 0xc0000000
     # (tb_cxxrtl_io.h), so firmware built for rtl-sim runs unchanged.
     from m5.objects import Hazard3TbIO
@@ -589,7 +595,7 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                arm_predictor="m4", arm_divider="rp2350-m33",
                sram_model=None, arm_timing="tuned", dma=None,
                xip_model=None, model="legacy", cpu="minor", hwpe="vvadd",
-               zfinx=False, switch_cpu=None):
+               zfinx=False, switch_cpu=None, clock=CLOCK):
     """Return exactly one active core with the RP2350 memory baseline.
 
     cpu is "minor", the timed core (CortexM33CPU, or the Hazard3 proxy, a
@@ -607,7 +613,10 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     with RP2350XIP. hwpe names the Hazard3 board's HWPE (HWPES). zfinx gives
     the Hazard3 proxy Zfinx (floats in the x registers) instead of F and D.
     switch_cpu ("minor" or "atomic", either proxy) adds board.switch_cpu,
-    a core of that kind switched out, for m5.switchCpus."""
+    a core of that kind switched out, for m5.switchCpus. clock is the core
+    clock (CLOCK, a Pico 2's default), for firmware built for another.
+    RP2350XIP and the banked SRAM count in its cycles; the legacy flash
+    delay (xip_miss_ns) and SRAM latency (sram_latency_ns) are in ns."""
     sram_model, dma, xip_model = memory_models(model, sram_model, dma,
                                                 xip_model)
     if sram_model not in ("legacy", "banked"):
@@ -632,12 +641,13 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                          arm_divider=arm_divider, sram_model=sram_model,
                          arm_timing=arm_timing, dma=dma,
                          xip_model=xip_model, cpu=cpu,
-                         switch_cpu=switch_cpu)
+                         switch_cpu=switch_cpu, clock=clock)
     if core == "hazard3-proxy":
         return _make_riscv(firmware, xip_miss_ns=xip_miss_ns,
                            sram_latency_ns=sram_latency_ns,
                            scratch_bank_bandwidth=scratch_bank_bandwidth,
                            sram_model=sram_model, dma=dma,
                            xip_model=xip_model, cpu=cpu, hwpe=hwpe,
-                           zfinx=zfinx, switch_cpu=switch_cpu)
+                           zfinx=zfinx, switch_cpu=switch_cpu,
+                           clock=clock)
     raise ValueError(f"Unknown RP2350 core selector: {core}")  
