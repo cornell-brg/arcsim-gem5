@@ -1106,8 +1106,11 @@ bool
 SingleStageFetch1::takeTargetLine(FetchRequestPtr &target_request,
     const BranchData &execute_branch, ForwardLineData &line_out)
 {
+    /* A suspend (wfi) stops fetch: no line goes on to Fetch2 until the
+     *  wakeup restarts it */
     if (!target_request || !target_request->isComplete() ||
         !execute_branch.isStreamChange() || !execute_branch.target ||
+        execute_branch.reason == BranchData::SuspendThread ||
         !execute_branch.inst || execute_branch.inst->isBubble() ||
         execute_branch.inst->isFault() ||
         !(execute_branch.inst->staticInst->isDirectCtrl() ||
