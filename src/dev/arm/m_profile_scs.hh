@@ -297,6 +297,8 @@ class MProfileSCS : public BasicPioDevice
 
     void init() override;
     void startup() override;
+    // A CPU swap (m5.switchCpus) replaces thread 0: take it again on resume.
+    void drainResume() override;
     void serialize(CheckpointOut &cp) const override;
     void unserialize(CheckpointIn &cp) override;
 

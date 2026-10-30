@@ -249,6 +249,13 @@ MProfileSCS::init()
 }
 
 void
+MProfileSCS::drainResume()
+{
+    BasicPioDevice::drainResume();
+    tc = sys->threads[0];
+}
+
+void
 MProfileSCS::startup()
 {
     BasicPioDevice::startup();
