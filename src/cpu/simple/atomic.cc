@@ -78,6 +78,7 @@ AtomicSimpleCPU::AtomicSimpleCPU(const BaseAtomicSimpleCPUParams &p)
       width(p.width), locked(false),
       simulate_data_stalls(p.simulate_data_stalls),
       simulate_inst_stalls(p.simulate_inst_stalls),
+      instLatency(p.inst_latency),
       icachePort(name() + ".icache_port"),
       dcachePort(name() + ".dcache_port", this),
       dcache_access(false), dcache_latency(0),
@@ -88,6 +89,7 @@ AtomicSimpleCPU::AtomicSimpleCPU(const BaseAtomicSimpleCPUParams &p)
     data_read_req = std::make_shared<Request>();
     data_write_req = std::make_shared<Request>();
     data_amo_req = std::make_shared<Request>();
+    ahead_req = std::make_shared<Request>();
 }
 
 
@@ -271,7 +273,13 @@ AtomicSimpleCPU::suspendContext(ThreadID thread_num)
 Tick
 AtomicSimpleCPU::sendPacket(RequestPort &port, const PacketPtr &pkt)
 {
-    return port.sendAtomic(pkt);
+    const Tick latency = port.sendAtomic(pkt);
+    if (instLatency) {
+        instLatency->access(pkt->getAddr(), pkt->getSize(),
+                            Cycles(divCeil(latency, clockPeriod())),
+                            &port == &icachePort);
+    }
+    return latency;
 }
 
 Tick
@@ -618,6 +626,11 @@ AtomicSimpleCPU::tick()
     // Change thread if multi-threaded
     swapActiveThread();
 
+    if (instLatency) {
+        tickWithLatency();
+        return;
+    }
+
     // Set memory request ids to current thread
     if (numThreads > 1) {
         ContextID cid = threadContexts[curThread]->contextId();
@@ -738,6 +751,145 @@ AtomicSimpleCPU::tick()
 
     if (_status != Idle)
         reschedule(tickEvent, curTick() + latency, true);
+}
+
+void
+AtomicSimpleCPU::tickWithLatency()
+{
+    // Set memory request ids to current thread
+    if (numThreads > 1) {
+        ContextID cid = threadContexts[curThread]->contextId();
+
+        ifetch_req->setContext(cid);
+        data_read_req->setContext(cid);
+        data_write_req->setContext(cid);
+        data_amo_req->setContext(cid);
+    }
+
+    SimpleExecContext &t_info = *threadInfo[curThread];
+    SimpleThread *thread = t_info.thread;
+    ThreadContext *tc = thread->getTC();
+
+    // What takes no cycles (an instruction the core folds into its
+    // neighbour, a micro-op before an instruction's last, a fetch the
+    // decoder needs more of) runs on in the same cycle, up to a bound
+    // that keeps a run of them from holding time still.
+    constexpr int max_ops = 64;
+    Cycles cycles(0);
+    for (int ops = 0; ops < max_ops && (cycles == 0 || locked); ++ops) {
+        if (!curStaticInst || !curStaticInst->isDelayedCommit()) {
+            const Addr was = thread->pcState().instAddr();
+            checkForInterrupts();
+            if (thread->pcState().instAddr() != was)
+                cycles += instLatency->exceptionEntry(tc);
+            checkPcEventQueue();
+        }
+
+        // We must have just got suspended by a PC event
+        if (_status == Idle) {
+            tryCompleteDrain();
+            return;
+        }
+
+        serviceInstCountEvents();
+
+        Fault fault = NoFault;
+
+        const PCStateBase &pc = thread->pcState();
+
+        bool needToFetch = !isRomMicroPC(pc.microPC()) && !curMacroStaticInst;
+        if (needToFetch) {
+            ifetch_req->taskId(taskId());
+            setupFetchRequest(ifetch_req);
+            fault = thread->mmu->translateAtomic(ifetch_req, tc,
+                                                 BaseMMU::Execute);
+        }
+
+        bool whole = false;
+        StaticInstPtr whole_inst;
+        if (fault == NoFault) {
+            dcache_access = false;
+            // The fetch's latency reaches instLatency through sendPacket.
+            if (needToFetch)
+                fetchInstMem();
+
+            preExecute();
+
+            if (curStaticInst) {
+                instLatency->beforeOp(curStaticInst, curMacroStaticInst, tc);
+                fault = curStaticInst->execute(&t_info, traceData);
+
+                if (fault == NoFault) {
+                    postExecute();
+                    countInst();
+                    ppCommit->notify(std::make_pair(thread, curStaticInst));
+                    instLatency->afterOp(curStaticInst, curMacroStaticInst,
+                                         tc);
+                    whole = !curStaticInst->isMicroop() ||
+                        curStaticInst->isLastMicroop();
+                    whole_inst = curMacroStaticInst ? curMacroStaticInst
+                                                    : curStaticInst;
+                } else if (traceData) {
+                    traceFault();
+                }
+
+                if (!curStaticInst->isMicroop() ||
+                        curStaticInst->isFirstMicroop()) {
+                    instCnt++;
+                }
+            }
+        }
+
+        if (whole)
+            set(latencyPC, thread->pcState());
+        if (fault != NoFault || !t_info.stayAtPC)
+            advancePC(fault);
+        if (fault != NoFault) {
+            cycles += instLatency->faultTaken(fault, tc);
+        } else if (whole) {
+            cycles += instLatency->retire(whole_inst, *latencyPC,
+                                          thread->pcState(),
+                                          curCycle() + cycles, tc);
+            Addr ahead;
+            if (instLatency->fetchedAhead(ahead))
+                fetchAhead(ahead);
+        }
+    }
+
+    baseStats.numCycles += cycles;
+    updateCycleCounters(BaseCPU::CPU_STATE_ON);
+
+    if (tryCompleteDrain())
+        return;
+
+    // Something takes at least a cycle.
+    if (cycles == 0)
+        cycles = Cycles(1);
+
+    if (_status != Idle)
+        reschedule(tickEvent, curTick() + clockPeriod() * cycles, true);
+}
+
+void
+AtomicSimpleCPU::fetchAhead(Addr addr)
+{
+    // Read as a fetch would, for the memory's sake (an XIP cache's tags,
+    // a flash transfer); the word is not decoded. An address with nothing
+    // there is not read.
+    ThreadContext *tc = threadInfo[curThread]->thread->getTC();
+    ahead_req->taskId(taskId());
+    ahead_req->setVirt(addr, sizeof(uint32_t), Request::INST_FETCH,
+                       instRequestorId(), addr);
+    const Fault fault = threadInfo[curThread]->thread->mmu->translateAtomic(
+        ahead_req, tc, BaseMMU::Execute);
+    if (fault != NoFault || ahead_req->getFlags().isSet(Request::NO_ACCESS))
+        return;
+    if (!system->isMemAddr(ahead_req->getPaddr()))
+        return;
+    uint32_t word;
+    Packet pkt(ahead_req, MemCmd::ReadReq);
+    pkt.dataStatic(&word);
+    sendPacket(icachePort, &pkt);
 }
 
 Tick

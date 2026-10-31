@@ -108,6 +108,7 @@ class RP2350XIP : public AbstractMemory
     const Cycles cooldownCycles;
     const Addr pageBreak;
     const bool trackTags;
+    const bool atomicLatency;
 
     std::array<std::array<Way, NumWays>, NumSets> sets;
     std::array<Bank, NumBanks> banks;
@@ -165,13 +166,17 @@ class RP2350XIP : public AbstractMemory
     void respond(const AccessPtr &access);
     void release();
     void startQmi(Tick start);
+    // A miss's cycles when its transfer starts at `start`, by the last
+    // transfer's end and line (counting a chained one)
+    Cycles missCost(Tick start, Addr line);
     void finishQmi();
     // The clock edge after now, and the one the present cycle began at
     Tick nextCycle() const;
     Tick thisCycle() const;
     void serve(unsigned bank);
-    // Atomic mode: the tags follow an access, with no timing
-    void track(PacketPtr pkt);
+    // Atomic mode: the tags follow an access; with atomicLatency, returns
+    // the ticks its misses take from flash, else none
+    Tick track(PacketPtr pkt);
 
     // XIP_CTRL's CTR_HIT and CTR_ACC (RP2350XipCtrl): saturating, one
     // count per access answered, and per one that read no line from flash

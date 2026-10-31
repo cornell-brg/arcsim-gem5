@@ -43,15 +43,17 @@ RP2350XIP::XipPort::getAddrRanges() const
 Tick
 RP2350XIP::XipPort::recvAtomic(PacketPtr pkt)
 {
-    // Atomic mode has no cache or flash timing.
+    // Atomic mode has no cache or flash timing, unless atomicLatency
+    // returns the misses'.
+    Tick latency = 0;
     if (xip.maintenanceRange.contains(pkt->getAddr())) {
         xip.maintain(pkt);
     } else {
         if (xip.trackTags)
-            xip.track(pkt);
+            latency = xip.track(pkt);
         xip.access(pkt);
     }
-    return xip.clockPeriod();
+    return xip.atomicLatency ? latency : xip.clockPeriod();
 }
 
 void
@@ -75,6 +77,7 @@ RP2350XIP::RP2350XIP(const RP2350XIPParams &p)
       missCycles(p.miss_cycles), chainedCycles(p.chained_cycles),
       reselectCycles(p.reselect_cycles), cooldownCycles(p.cooldown_cycles),
       pageBreak(p.page_break), trackTags(p.track_tags),
+      atomicLatency(p.atomic_latency),
       qmiEvent([this] { finishQmi(); }, name() + ".qmi"),
       releaseEvent([this] { release(); }, name() + ".release"),
       grantEvent([this] { grant(); }, name() + ".grant"),
@@ -84,6 +87,8 @@ RP2350XIP::RP2350XIP(const RP2350XIPParams &p)
 {
     fatal_if(pageBreak % LineBytes != 0,
              "RP2350XIP: page_break must be a whole number of lines");
+    fatal_if(atomicLatency && !trackTags,
+             "RP2350XIP: atomic_latency needs track_tags");
 }
 
 Port &
@@ -140,7 +145,7 @@ RP2350XIP::fill(Addr line)
 // As receive(), grant() and respond() do in timing mode: a read made on
 // speculation that misses leaves the tags and counters alone; any other
 // access looks up each line it covers, fills those that miss, and counts.
-void
+Tick
 RP2350XIP::track(PacketPtr pkt)
 {
     const Addr first = lineOf(pkt->getAddr());
@@ -149,11 +154,12 @@ RP2350XIP::track(PacketPtr pkt)
         for (Addr line = first; line <= last; line += LineBytes) {
             if (!lookup(line)) {
                 ++xipStats.declined;
-                return;
+                return 0;
             }
         }
     }
     bool missed = false;
+    Tick latency = 0;
     for (Addr line = first; line <= last; line += LineBytes) {
         if (lookup(line)) {
             ++xipStats.hits;
@@ -161,12 +167,20 @@ RP2350XIP::track(PacketPtr pkt)
             ++xipStats.misses;
             missed = true;
             fill(line);
+            if (atomicLatency) {
+                // One transfer after another, as the QMI reads them
+                const Tick start = curTick() + latency;
+                latency += missCost(start, line) * clockPeriod();
+                qmiLastEnd = curTick() + latency;
+                qmiNextLine = line + LineBytes;
+            }
         }
     }
     if (ctrAcc != UINT32_MAX)
         ++ctrAcc;
     if (!missed && ctrHit != UINT32_MAX)
         ++ctrHit;
+    return latency;
 }
 
 void
@@ -435,10 +449,9 @@ RP2350XIP::release()
 }
 
 // The front of the queue goes out on the serial interface from `start`.
-void
-RP2350XIP::startQmi(Tick start)
+Cycles
+RP2350XIP::missCost(Tick start, Addr line)
 {
-    const Addr line = banks[qmiQueue.front()].missLine;
     // The chip select stays low for the cooldown after a transfer, unless
     // the transfer ended at a page break.
     Cycles cost = missCycles;
@@ -459,6 +472,14 @@ RP2350XIP::startQmi(Tick start)
     }
     DPRINTF(RP2350XIP, "line %#x from flash, %d cycles\n", line,
             static_cast<uint64_t>(cost));
+    return cost;
+}
+
+void
+RP2350XIP::startQmi(Tick start)
+{
+    const Addr line = banks[qmiQueue.front()].missLine;
+    const Cycles cost = missCost(start, line);
     qmiBusy = true;
     schedule(qmiEvent, start + cost * clockPeriod());
 }

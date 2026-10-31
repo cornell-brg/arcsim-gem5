@@ -187,7 +187,7 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
 def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
               scratch_bank_bandwidth, arm_predictor, arm_divider, sram_model,
               arm_timing, dma, xip_model, cpu, switch_cpu=None,
-              clock=CLOCK):
+              clock=CLOCK, inst_latency=False):
     from m5.objects import ArmMSystem, ArmSemihosting
     from m5.objects.ArmMSystem import ArmMReleaseCortexM33
     from m5.objects.ArmMFsWorkload import ArmMFsWorkload
@@ -280,11 +280,29 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
             # timing.
             core.executeWaitedStoreHoldsInsts = board._banked_sram
 
+        if kind == "atomic" and inst_latency:
+            # Each instruction's cycles from the Cortex-M33's table (the
+            # classes CortexM33CPU times by) and its flash misses' from
+            # RP2350XIP, in place of a cycle a micro-op. An APB register
+            # read takes at least 3 cycles and a write 4 [RP2350 datasheet
+            # 2.1.4]: 2 and 3 over the instruction's own.
+            from gem5.prebuilt.cortexm.cpu.cortex_m33_latency import (
+                cortex_m33_inst_latency,
+            )
+            core.inst_latency = cortex_m33_inst_latency(
+                timed_ranges=[board.flash.range],
+                wait_ranges=[AddrRange(0x40000000, 0x50000000)],
+                wait_cycles=[2],
+                wait_write_cycles=[3],
+            )
         core.clk_domain = board.clk_domain
         core.createThreads()
         core.createInterruptController()
         return core
 
+    if inst_latency:
+        board.flash.track_tags = True
+        board.flash.atomic_latency = True
     board.cpu = arm_cpu(cpu)
     board.mem_mode = board.cpu.memory_mode()
     board.cpu.icache_port = board.cpu.mmu.stacking_barrier.cpu_side_port
@@ -595,7 +613,8 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                arm_predictor="m4", arm_divider="rp2350-m33",
                sram_model=None, arm_timing="tuned", dma=None,
                xip_model=None, model="legacy", cpu="minor", hwpe="vvadd",
-               zfinx=False, switch_cpu=None, clock=CLOCK):
+               zfinx=False, switch_cpu=None, clock=CLOCK,
+               inst_latency=False):
     """Return exactly one active core with the RP2350 memory baseline.
 
     cpu is "minor", the timed core (CortexM33CPU, or the Hazard3 proxy, a
@@ -616,7 +635,12 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     a core of that kind switched out, for m5.switchCpus. clock is the core
     clock (CLOCK, a Pico 2's default), for firmware built for another.
     RP2350XIP and the banked SRAM count in its cycles; the legacy flash
-    delay (xip_miss_ns) and SRAM latency (sram_latency_ns) are in ns."""
+    delay (xip_miss_ns) and SRAM latency (sram_latency_ns) are in ns.
+    inst_latency gives the M33's atomic CPU (cpu or switch_cpu "atomic")
+    time: each instruction's cycles from the Cortex-M33's latency table
+    (cortex_m33_latency.py) and its flash misses' from RP2350XIP, which
+    then tracks its tags, in place of a cycle a micro-op; it needs
+    xip_model "qmi"."""
     sram_model, dma, xip_model = memory_models(model, sram_model, dma,
                                                 xip_model)
     if sram_model not in ("legacy", "banked"):
@@ -633,6 +657,9 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                        switch_cpu not in ("minor", "atomic")):
         raise ValueError("switch_cpu is minor or atomic, on the arm-m4-proxy "
                          "or the hazard3-proxy")
+    if inst_latency and (core != "arm-m4-proxy" or xip_model != "qmi"):
+        raise ValueError("inst_latency is for the arm-m4-proxy, with "
+                         "xip_model qmi")
     if core == "arm-m4-proxy":
         return _make_arm(firmware, xip_miss_ns=xip_miss_ns,
                          sram_latency_ns=sram_latency_ns,
@@ -641,7 +668,8 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                          arm_divider=arm_divider, sram_model=sram_model,
                          arm_timing=arm_timing, dma=dma,
                          xip_model=xip_model, cpu=cpu,
-                         switch_cpu=switch_cpu, clock=clock)
+                         switch_cpu=switch_cpu, clock=clock,
+                         inst_latency=inst_latency)
     if core == "hazard3-proxy":
         return _make_riscv(firmware, xip_miss_ns=xip_miss_ns,
                            sram_latency_ns=sram_latency_ns,

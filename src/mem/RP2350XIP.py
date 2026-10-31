@@ -42,6 +42,9 @@ class RP2350XIP(AbstractMemory):
     the cache's tags still follow them, each line looked up and filled on a
     miss as in timing mode (and XIP_CTRL's counters count them), so that a
     switch to a timing CPU finds the cache as the accesses so far left it.
+    With `atomic_latency` too, an atomic access returns the cycles its
+    misses take from flash, by the timing mode's rules for the transfer
+    before it, and a hit none (an atomic CPU's inst_latency charges them).
     """
 
     type = "RP2350XIP"
@@ -65,6 +68,12 @@ class RP2350XIP(AbstractMemory):
     )
     track_tags = Param.Bool(
         False, "In atomic mode, look up and fill the cache's tags"
+    )
+    atomic_latency = Param.Bool(
+        False,
+        "With track_tags, an atomic access returns the cycles its misses "
+        "take from flash (as in timing mode: fresh, chained or after a "
+        "reselect), none for a hit, in place of one cycle for any",
     )
     page_break = Param.MemorySize(
         "1KiB", "Boundary at which a transfer ends and the chip select is"
