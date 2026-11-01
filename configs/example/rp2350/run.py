@@ -57,6 +57,12 @@ parser.add_argument("--hwpe", choices=tuple(HWPES), default="vvadd",
 parser.add_argument("--zfinx", action="store_true",
                     help="Zfinx on the hazard3-proxy: floats in the x "
                     "registers instead of F and D")
+parser.add_argument("--cpu", choices=("minor", "atomic"), default="minor",
+                    help="minor: the timed core; atomic: gem5's atomic CPU, "
+                    "no core timing")
+parser.add_argument("--cores", type=int, choices=(1, 2), default=1,
+                    help="2 adds the second M33, which starts from the "
+                    "firmware's arcsim_core1_launch (arm-m4-proxy only)")
 parser.add_argument("--tick-limit", type=int, default=100_000_000_000)
 args = parser.parse_args()
 if not args.firmware.is_file():
@@ -80,6 +86,8 @@ board = make_board(
     xip_model=args.xip_model,
     hwpe=args.hwpe,
     zfinx=args.zfinx,
+    cpu=args.cpu,
+    cores=args.cores,
 )
 if args.xip_model == "legacy":
     board.xip_cache.tag_latency = args.xip_hit_latency_cycles

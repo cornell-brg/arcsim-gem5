@@ -1,4 +1,4 @@
-"""Single-core Pico 2 / RP2350 timing baseline.
+"""Pico 2 / RP2350 timing baseline: one core, or the Arm board's two M33s.
 
 Select the Arm M4 timing proxy or the calibrated RV32 MinorCPU proxy at
 configuration time. Both use the same physically addressed XIP and SRAM
@@ -187,7 +187,7 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
 def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
               scratch_bank_bandwidth, arm_predictor, arm_divider, sram_model,
               arm_timing, dma, xip_model, cpu, switch_cpu=None,
-              clock=CLOCK, inst_latency=False):
+              clock=CLOCK, inst_latency=False, cores=1):
     from m5.objects import ArmMSystem, ArmSemihosting
     from m5.objects.ArmMSystem import ArmMReleaseCortexM33
     from m5.objects.ArmMFsWorkload import ArmMFsWorkload
@@ -197,14 +197,18 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     from m5.objects.BaseMinorCPU import DynamicLatencyIntDivFU
     from m5.objects.BranchPredictor import LocalBP, SimpleBTB
 
+    def m33_scs(core):
+        """A core's NVIC, SCB and SysTick (each M33 has its own)."""
+        return MProfileSCS(
+            num_irqs=52, priority_bits=4, num_systick=1,
+            has_basepri=True, systick_calib=0, pio_latency="1ns", core=core,
+        )
+
     class RP2350M4ProxyPlatform(ArmMPlatform):
         code_ranges = [AddrRange(XIP_BASE, size=XIP_SIZE)]
         sram_ranges = [AddrRange(base, size=size)
                        for _, base, size in SRAM_REGIONS]
-        scs = MProfileSCS(
-            num_irqs=52, priority_bits=4, num_systick=1,
-            has_basepri=True, systick_calib=0, pio_latency="1ns",
-        )
+        scs = m33_scs(0)
         # The cycle counter answers within the core's cycle, like the SCS
         # (BasicPioDevice's default is 100ns, 15 core cycles).
         dwt = MProfileDWT(pio_latency="1ns")
@@ -239,23 +243,23 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
 
     board.cpuid = 0x410FC241
 
-    def arm_cpu(kind, switched_out=False):
+    def arm_cpu(kind, switched_out=False, cpu_id=0):
         """A Cortex-M33 core of the kind given (atomic or minor)."""
         # The CortexM33CPU timing, tuned against a Pico 2 (the default), or
         # the CortexM4CPU's as it was before its tuning against the
         # STM32G474; or the atomic CPU, with no core timing.
         if kind == "atomic":
             from m5.objects.ArmMCPU import ArmMAtomicSimpleCPU
-            core = ArmMAtomicSimpleCPU(cpu_id=0, switched_out=switched_out)
+            core = ArmMAtomicSimpleCPU(cpu_id=cpu_id, switched_out=switched_out)
         elif arm_timing == "tuned":
             from gem5.prebuilt.cortexm.cpu.cortex_m33 import CortexM33CPU
-            core = CortexM33CPU(cpu_id=0, switched_out=switched_out)
+            core = CortexM33CPU(cpu_id=cpu_id, switched_out=switched_out)
         elif arm_timing == "pre-tuning":
             from gem5.prebuilt.cortexm.cpu.cortex_m4 import (
                 CortexM4CPU,
                 use_pre_tuning_timing,
             )
-            core = CortexM4CPU(cpu_id=0, switched_out=switched_out)
+            core = CortexM4CPU(cpu_id=cpu_id, switched_out=switched_out)
             use_pre_tuning_timing(core)
         else:
             raise ValueError(f"Unknown Arm timing: {arm_timing}")
@@ -351,7 +355,57 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
     board.rcp = MProfileCoprocessor(numbers=[7])
     board.semihosting = ArmSemihosting(mem_reserve="0B", stack_size="0B")
     board.workload = ArmMFsWorkload(object_file=firmware)
+    if cores == 2:
+        _add_second_m33(board, arm_cpu(cpu, cpu_id=1), m33_scs(1))
     return board
+
+
+# The firmware's {stack pointer, entry} pair that the second M33 starts
+# from (ArmMFsWorkload secondary_launch), in place of the boot ROM's launch
+# of core 1 (multicore_launch_core1_raw).
+CORE1_LAUNCH_SYMBOL = "arcsim_core1_launch"
+
+
+def _add_second_m33(board, core, scs):
+    """The RP2350's second M33 (board.cpu1), sharing the first's memory and
+    peripherals, with paths of its own as the RP2350's bus fabric gives each
+    core: its own ICode and DCode routers to the XIP cache and the SRAM
+    banks, and its own private peripheral bus, where its SCS (NVIC, SCB,
+    SysTick) and DWT answer at the same addresses as the first core's. It
+    starts from the firmware's CORE1_LAUNCH_SYMBOL. Peripheral interrupts
+    stay on the first core's NVIC."""
+    from m5.objects.MProfileDWT import MProfileDWT
+    board.scs1 = scs
+    board.dwt1 = MProfileDWT(pio_latency="1ns", scs=scs,
+                             clk_domain=board.clk_domain)
+    board.icode1_router = _router(board.fast_clock)
+    board.dcode1_router = _router(board.fast_clock)
+    for router in (board.icode1_router, board.dcode1_router):
+        router.default = board.sram_bus.cpu_side_ports
+        router.mem_side_ports = board.xip_front.cpu_side_ports
+    if board._banked_sram:
+        board.dcode1_router.mem_side_ports = board.sram.port
+    # The same simulator workaround as the first core's fetch path.
+    board.sram_fetch1_bridge = Bridge(
+        delay="0ns",
+        ranges=[AddrRange(base, size=size) for _, base, size in SRAM_REGIONS],
+    )
+    board.sram_fetch1_bridge.mem_side_port = (
+        board.sram.port if board._banked_sram else board.sram_bus.cpu_side_ports
+    )
+    board.icode1_router.mem_side_ports = board.sram_fetch1_bridge.cpu_side_port
+    # Its private peripheral bus: its own SCS and DWT, the rest on to its
+    # DCode router.
+    board.ppb1_router = _router(board.fast_clock)
+    board.ppb1_router.default = board.dcode1_router.cpu_side_ports
+    board.scs1.pio = board.ppb1_router.mem_side_ports
+    board.dwt1.pio = board.ppb1_router.mem_side_ports
+    board.cpu1 = core
+    core.icache_port = core.mmu.stacking_barrier.cpu_side_port
+    core.mmu.stacking_barrier.mem_side_port = board.icode1_router.cpu_side_ports
+    core.dcache_port = board.ppb1_router.cpu_side_ports
+    core.mmu.stacking_port = board.sram_bus.cpu_side_ports
+    board.workload.secondary_launch = CORE1_LAUNCH_SYMBOL
 
 
 def _hazard3_cpu(board, kind, zfinx, accessible, switched_out=False):
@@ -614,8 +668,9 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                sram_model=None, arm_timing="tuned", dma=None,
                xip_model=None, model="legacy", cpu="minor", hwpe="vvadd",
                zfinx=False, switch_cpu=None, clock=CLOCK,
-               inst_latency=False):
-    """Return exactly one active core with the RP2350 memory baseline.
+               inst_latency=False, cores=1):
+    """Return a board with one active core (two M33s with cores=2) and the RP2350
+    memory baseline.
 
     cpu is "minor", the timed core (CortexM33CPU, or the Hazard3 proxy, a
     RISC-V MinorCPU), or "atomic", gem5's atomic CPU as an instruction-level
@@ -640,7 +695,10 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     time: each instruction's cycles from the Cortex-M33's latency table
     (cortex_m33_latency.py) and its flash misses' from RP2350XIP, which
     then tracks its tags, in place of a cycle a micro-op; it needs
-    xip_model "qmi"."""
+    xip_model "qmi". cores 2 adds the RP2350's second M33 (board.cpu1, of
+    the same kind as cpu), which starts from the firmware's
+    CORE1_LAUNCH_SYMBOL; not yet with switch_cpu, or on the Hazard3
+    proxy."""
     sram_model, dma, xip_model = memory_models(model, sram_model, dma,
                                                 xip_model)
     if sram_model not in ("legacy", "banked"):
@@ -657,6 +715,11 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                        switch_cpu not in ("minor", "atomic")):
         raise ValueError("switch_cpu is minor or atomic, on the arm-m4-proxy "
                          "or the hazard3-proxy")
+    if cores not in (1, 2):
+        raise ValueError("cores is 1 or 2")
+    if cores == 2 and (core != "arm-m4-proxy" or switch_cpu):
+        raise ValueError("cores 2 is for the arm-m4-proxy, without "
+                         "switch_cpu")
     if inst_latency and (core != "arm-m4-proxy" or xip_model != "qmi"):
         raise ValueError("inst_latency is for the arm-m4-proxy, with "
                          "xip_model qmi")
@@ -669,7 +732,7 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                          arm_timing=arm_timing, dma=dma,
                          xip_model=xip_model, cpu=cpu,
                          switch_cpu=switch_cpu, clock=clock,
-                         inst_latency=inst_latency)
+                         inst_latency=inst_latency, cores=cores)
     if core == "hazard3-proxy":
         return _make_riscv(firmware, xip_miss_ns=xip_miss_ns,
                            sram_latency_ns=sram_latency_ns,
