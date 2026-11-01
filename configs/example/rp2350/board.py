@@ -221,23 +221,10 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
                    sram_model=sram_model, dma=dma, xip_model=xip_model,
                    clock=clock)
 
-    # Decouple in-flight ICode responses on SRAM branch redirects. Direct
-    # xbar-to-memory fetch crashes this gem5 branch; this adds no SRAM cache.
-    # The fork's single-stage M4 Fetch2 handles an Execute redirect immediately,
-    # then its latched-branch fallback flushes the input again one cycle later.
-    # Direct SRAM can return the target line between those flushes, so Fetch2
-    # discards it and pairs the target PC with the next line; its unsigned line
-    # offset then underflows and gem5 exits with SIGBUS. This zero-delay bridge
-    # buffers the response until after the duplicate flush. It is a simulator
-    # workaround, not an RP2350 hardware component.
-    board.sram_fetch_bridge = Bridge(
-        delay="0ns",
-        ranges=[AddrRange(base, size=size) for _, base, size in SRAM_REGIONS],
-    )
-    board.sram_fetch_bridge.mem_side_port = (
-        board.sram.port if board._banked_sram else board.sram_bus.cpu_side_ports
-    )
-    board.icode_router.mem_side_ports = board.sram_fetch_bridge.cpu_side_port
+    # ICode on its own SRAM port, as DCode: each keeps its one word a cycle
+    # at the banks.
+    if board._banked_sram:
+        board.icode_router.mem_side_ports = board.sram.port
     board.platform = RP2350M4ProxyPlatform()
 
 
@@ -384,16 +371,8 @@ def _add_second_m33(board, core, scs):
         router.default = board.sram_bus.cpu_side_ports
         router.mem_side_ports = board.xip_front.cpu_side_ports
     if board._banked_sram:
+        board.icode1_router.mem_side_ports = board.sram.port
         board.dcode1_router.mem_side_ports = board.sram.port
-    # The same simulator workaround as the first core's fetch path.
-    board.sram_fetch1_bridge = Bridge(
-        delay="0ns",
-        ranges=[AddrRange(base, size=size) for _, base, size in SRAM_REGIONS],
-    )
-    board.sram_fetch1_bridge.mem_side_port = (
-        board.sram.port if board._banked_sram else board.sram_bus.cpu_side_ports
-    )
-    board.icode1_router.mem_side_ports = board.sram_fetch1_bridge.cpu_side_port
     # Its private peripheral bus: its own SCS and DWT, the rest on to its
     # DCode router.
     board.ppb1_router = _router(board.fast_clock)
