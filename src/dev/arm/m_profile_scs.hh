@@ -133,6 +133,8 @@ class MProfileSCS : public BasicPioDevice
     uint8_t priorityBits;
     uint8_t irqpriorityMask;
     uint8_t numSysticks;
+    /** The context id of the core this SCS belongs to. */
+    const unsigned core;
     bool hasBasePri;
 
     // -- Exception masking state --

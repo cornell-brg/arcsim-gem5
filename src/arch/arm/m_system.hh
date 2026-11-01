@@ -60,8 +60,9 @@ class ArmMSystem : public System
   protected:
     const ArmRelease *release;
 
-    /** SCS/NVIC device pointer, set by MProfileSCS::init(). */
-    MProfileSCS *_scs = nullptr;
+    /** Each core's SCS/NVIC device, by context id, set by its
+     *  MProfileSCS's constructor (its core parameter). */
+    std::array<MProfileSCS *, 2> scs{};
 
     /** Coprocessors on the coprocessor port, by number (p0-p7); nullptr
      *  where none is attached. */
@@ -95,11 +96,23 @@ class ArmMSystem : public System
     /** M-profile physical address mask (32-bit). */
     Addr physAddrMask() const { return mask(32); }
 
-    /** Called by MProfileSCS::init() to register the SCS device. */
-    void setSCS(MProfileSCS *scs) { _scs = scs; }
+    /** Called by each MProfileSCS's constructor to register it as its
+     *  core's SCS device. */
+    void
+    setSCS(unsigned core, MProfileSCS *s)
+    {
+        fatal_if(core >= scs.size(), "an SCS for core %u: at most %u cores",
+                 core, (unsigned)scs.size());
+        fatal_if(scs[core], "two SCS devices for core %u", core);
+        scs[core] = s;
+    }
 
-    /** Used by MProfileInterrupts to discover the SCS device. */
-    MProfileSCS *getSCS() const { return _scs; }
+    /** The SCS device of the core with context id `core`, or nullptr. */
+    MProfileSCS *
+    getSCS(unsigned core) const
+    {
+        return core < scs.size() ? scs[core] : nullptr;
+    }
 
     /** Called by each MProfileCoprocessor for the numbers it answers. */
     void

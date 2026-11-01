@@ -68,6 +68,8 @@
 
 #include "arch/arm/m_interrupts.hh"
 
+#include "arch/arm/interrupts.hh"
+
 #include "arch/arm/m_faults.hh"
 #include "arch/arm/m_fp_insts.hh"
 #include "arch/arm/m_mmu.hh"
@@ -108,7 +110,7 @@ MProfileInterrupts::setThreadContext(ThreadContext *_tc)
     // SCS via ArmMSystem, which registers the SCS during init().
     auto *msys = dynamic_cast<ArmMSystem *>(_tc->getSystemPtr());
     if (msys)
-        scs = msys->getSCS();
+        scs = msys->getSCS(_tc->contextId());
 }
 
 // =========================================================================
@@ -122,6 +124,13 @@ MProfileInterrupts::setThreadContext(ThreadContext *_tc)
 void
 MProfileInterrupts::post(int int_num, int index)
 {
+    // Another core's SEV: an event, not an exception. It sets this core's
+    // event register, which its next WFE consumes, and BaseCPU wakes the
+    // core if it sleeps in one.
+    if (int_num == INT_SEV) {
+        tc->setMiscReg(MISCREG_SEV_MAILBOX, 1);
+        return;
+    }
     pendingSignal = true;
 }
 

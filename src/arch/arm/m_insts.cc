@@ -276,8 +276,8 @@ MsrMProfile::execute(ExecContext *xc,
             reg == MISCREG_M_BASEPRI_MAX || reg == MISCREG_M_FAULTMASK) {
             auto *msys = dynamic_cast<ArmMSystem *>(
                 tc->getSystemPtr());
-            if (msys && msys->getSCS())
-                msys->getSCS()->setupMask(reg, (int16_t)val);
+            if (msys && msys->getSCS(tc->contextId()))
+                msys->getSCS(tc->contextId())->setupMask(reg, (int16_t)val);
         }
     }
 
@@ -312,7 +312,7 @@ CpsMProfile::execute(ExecContext *xc,
     if (!mProfilePredicateHolds(tc, condCode)) return NoFault;
 
     auto *msys = dynamic_cast<ArmMSystem *>(tc->getSystemPtr());
-    MProfileSCS *scs = (msys) ? msys->getSCS() : nullptr;
+    MProfileSCS *scs = (msys) ? msys->getSCS(tc->contextId()) : nullptr;
 
     if (affectI) {
         // PRIMASK: 1 = disable all configurable-priority exceptions
@@ -501,7 +501,8 @@ WfiMProfile::execute(ExecContext *xc,
     // (Armv8-M): quiescing anyway would sleep through it, since no new post
     // comes to wake the thread.
     auto *msys = dynamic_cast<ArmMSystem *>(tc->getSystemPtr());
-    if (msys && msys->getSCS() && msys->getSCS()->hasPendingEnabledIRQ())
+    MProfileSCS *scs = msys ? msys->getSCS(tc->contextId()) : nullptr;
+    if (scs && scs->hasPendingEnabledIRQ())
         return NoFault;
     tc->quiesce();
     return NoFault;
@@ -522,16 +523,25 @@ Fault
 WfeMProfile::execute(ExecContext *xc,
                      trace::InstRecord *traceData) const
 {
-    // M-profile WFE: check event register.
-    // For MVP, treat as hint-NOP (sleep for 1 cycle).
-    // Full event register tracking deferred.
+    // M-profile WFE: a set event register is cleared and WFE returns;
+    // otherwise the core sleeps until an event (SEV from another core,
+    // which sets this core's event register as it wakes it) or an
+    // interrupt (DDI0553 B11.2, the event register).
     ThreadContext *tc = xc->tcBase();
     // ITSTATE predication: skip everything below if the IT condition
     // is false. ARM ARM A6.1.4: a predicated-false instruction has
     // no effect. ITSTATE advancement still happens via pc.advance().
     if (!mProfilePredicateHolds(tc, condCode)) return NoFault;
-    Tick next_cycle = tc->getCpuPtr()->nextCycle();
-    tc->quiesceTick(next_cycle + 1);
+    if (tc->readMiscReg(MISCREG_SEV_MAILBOX)) {
+        tc->setMiscReg(MISCREG_SEV_MAILBOX, 0);
+        return NoFault;
+    }
+    // An exception already pending wakes it at once, as it does WFI.
+    auto *msys = dynamic_cast<ArmMSystem *>(tc->getSystemPtr());
+    MProfileSCS *scs = msys ? msys->getSCS(tc->contextId()) : nullptr;
+    if (scs && scs->hasPendingEnabledIRQ())
+        return NoFault;
+    tc->quiesce();
     return NoFault;
 }
 

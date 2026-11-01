@@ -89,8 +89,20 @@ MFsWorkload::initState()
     // Step 3: Perform M-profile reset for each thread context.
     // MProfileReset(vtor_addr) sets VTOR after clearing arch regs,
     // then reads initial SP from VTOR+0 and PC from VTOR+4.
+    // Every core after the first starts from the launch pair, if the
+    // workload names one, as a boot ROM that launches it would.
+    Addr launch_addr = 0;
+    const std::string &launch = params().secondary_launch;
+    if (!launch.empty()) {
+        auto it = kernelSymtab.find(launch);
+        fatal_if(it == kernelSymtab.end(),
+                 "the firmware has no symbol %s (secondary_launch)",
+                 launch);
+        launch_addr = it->address();
+    }
     for (auto *tc : system->threads) {
-        MProfileReset(vtor_addr).invoke(tc);
+        MProfileReset(vtor_addr,
+                      tc->contextId() > 0 ? launch_addr : 0).invoke(tc);
         tc->activate();
     }
 }
