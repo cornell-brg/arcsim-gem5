@@ -294,7 +294,7 @@ Xh3irq::unserialize(CheckpointIn &cp)
 }
 
 Xh3irqLine::Xh3irqLine(const Params &p)
-    : ClockedObject(p), controller(p.controller), irqNum(p.irq_num),
+    : ClockedObject(p), controllers(p.controllers), irqNum(p.irq_num),
       delay(p.delay), pin(name() + ".pin", 0, this),
       deliverEvent([this] { deliver(); }, name() + ".deliver")
 {
@@ -329,14 +329,15 @@ Xh3irqLine::deliver()
         schedule(deliverEvent, inFlight.front().first);
 }
 
-// A device may raise a raised pin again; the controller hears only changes.
+// A device may raise a raised pin again; the controllers hear only changes.
 void
 Xh3irqLine::apply(bool high)
 {
     if (high == delivered)
         return;
     delivered = high;
-    controller->setLevel(irqNum, high);
+    for (auto *controller : controllers)
+        controller->setLevel(irqNum, high);
 }
 
 Port &
@@ -351,9 +352,12 @@ void
 Xh3irqLine::init()
 {
     ClockedObject::init();
-    fatal_if(irqNum >= controller->numIrqs(),
-             "Xh3irqLine: irq_num=%u is out of range (num_irqs=%u)",
-             irqNum, controller->numIrqs());
+    fatal_if(controllers.empty(), "Xh3irqLine: no controllers");
+    for (auto *controller : controllers) {
+        fatal_if(irqNum >= controller->numIrqs(),
+                 "Xh3irqLine: irq_num=%u is out of range (num_irqs=%u)",
+                 irqNum, controller->numIrqs());
+    }
 }
 
 void

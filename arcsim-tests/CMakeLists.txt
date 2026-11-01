@@ -43,6 +43,8 @@ endfunction()
 
 hazard3_test(test_memory)
 hazard3_test(test_interconnect)
+# Both cores, as soc.v
+hazard3_test(test_multicore --cores 2)
 hazard3_test(test_dma)
 # The HWPEs' test programs (0x50800000), each on its HWPE
 hazard3_test(test_vvadd --hwpe vvadd)
