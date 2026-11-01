@@ -236,7 +236,12 @@ void
 WindowInstCounter::activityAccess(const BaseCPU::CommittedOp &op,
                                   const StaticInst &whole)
 {
-    if (!activityOpen || !op.effAddr)
+    if (!activityOpen)
+        return;
+    fatal_if(op.inst->isMemRef() && !op.effAddr,
+             "%s: the CPU does not report data addresses, which the "
+             "activity file needs; use the atomic CPU", name());
+    if (!op.effAddr)
         return;
     const Addr region = *op.effAddr >> 28;
     const bool write = encoded(whole).traits.write;

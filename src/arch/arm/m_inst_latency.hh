@@ -75,6 +75,11 @@ class MProfileInstLatency : public BaseInstLatency
                   ThreadContext *tc) override;
     bool fetchedAhead(Addr &addr) override;
 
+    std::vector<std::string> classNames() const override;
+    int classOf(const StaticInst &whole, OpClass mem_class) const override;
+    /** xPSR's IPSR: the exception number, 0 in Thread mode. */
+    int activeException(ThreadContext *tc) const override;
+
   private:
     /** A register: its class and flat index in one key. */
     using Reg = uint32_t;

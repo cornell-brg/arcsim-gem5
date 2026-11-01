@@ -4,6 +4,8 @@
 #include <map>
 
 #include "arch/arm/m_faults.hh"
+#include "arch/arm/regs/misc.hh"
+#include "arch/arm/regs/misc_types.hh"
 #include "base/bitfield.hh"
 #include "base/logging.hh"
 #include "base/trace.hh"
@@ -217,6 +219,30 @@ MProfileInstLatency::classify(OpClass op_class, uint64_t emi) const
             return i;
     }
     return -1;
+}
+
+std::vector<std::string>
+MProfileInstLatency::classNames() const
+{
+    std::vector<std::string> names;
+    for (const MProfileLatencyClass *c : classes)
+        names.push_back(c->description);
+    return names;
+}
+
+int
+MProfileInstLatency::classOf(const StaticInst &whole, OpClass mem_class) const
+{
+    // As retire() classes it.
+    return classify(mem_class != No_OpClass ? mem_class : whole.opClass(),
+                    whole.getEMI());
+}
+
+int
+MProfileInstLatency::activeException(ThreadContext *tc) const
+{
+    const ArmMISA::XPSR xpsr = tc->readMiscRegNoEffect(MISCREG_M_XPSR);
+    return xpsr.exception;
 }
 
 unsigned

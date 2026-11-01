@@ -21,7 +21,7 @@ class WindowInstCounter(ProbeListenerObject):
     classes_file = Param.String(
         "",
         "the file each window's instructions and micro-ops by OpClass are "
-        "written to (empty: none); needs the atomic CPU",
+        "written to (empty: none); needs the atomic or Minor CPU",
     )
     stats = VectorParam.String(
         [], "full names of scalar statistics whose growth over each window the "
@@ -42,7 +42,7 @@ class WindowInstCounter(ProbeListenerObject):
         "",
         "the file each window's instructions, and the micro-ops of the "
         "split ones, by name are written to (empty: none); needs the atomic "
-        "CPU",
+        "or Minor CPU",
     )
     activity_file = Param.String(
         "",

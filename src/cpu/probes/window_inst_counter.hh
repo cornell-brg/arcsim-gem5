@@ -55,8 +55,9 @@
 //
 // It listens to the CPU's CommittedOps probe point, which the CPU models notify for
 // every committed instruction and micro-op; a whole instruction ends at its last
-// micro-op, as for the RetiredInstsPC probe point. Only the atomic CPU reports the
-// macro-op of a micro-op, so the classes and names need it.
+// micro-op, as for the RetiredInstsPC probe point. The atomic and Minor CPUs report the
+// macro-op of a micro-op, which the classes and names need; only the atomic CPU reports
+// data addresses, which the activity file needs.
 
 #ifndef __CPU_PROBES_WINDOW_INST_COUNTER_HH__
 #define __CPU_PROBES_WINDOW_INST_COUNTER_HH__

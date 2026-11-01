@@ -1,7 +1,11 @@
 #ifndef __CPU_SIMPLE_INST_LATENCY_HH__
 #define __CPU_SIMPLE_INST_LATENCY_HH__
 
+#include <string>
+#include <vector>
+
 #include "base/types.hh"
+#include "cpu/op_class.hh"
 #include "cpu/static_inst_fwd.hh"
 #include "params/BaseInstLatency.hh"
 #include "sim/faults.hh"
@@ -70,6 +74,23 @@ class BaseInstLatency : public SimObject
      *  address of a word it read. The CPU reads that word, and the read's
      *  latency comes to access() as a fetch's. */
     virtual bool fetchedAhead(Addr &addr) { return false; }
+
+    // Classification only, for probes that count by the same classes on
+    // any CPU model (TaskInstCounter); none of it changes the state above.
+
+    /** Each class's name, by class number; classes may share a name. */
+    virtual std::vector<std::string> classNames() const { return {}; }
+
+    /** The class of the whole instruction whole, whose first memory
+     *  micro-op has mem_class (No_OpClass for none); -1 for none. */
+    virtual int
+    classOf(const StaticInst &whole, OpClass mem_class) const
+    {
+        return -1;
+    }
+
+    /** The exception the core is in now, 0 for none. */
+    virtual int activeException(ThreadContext *tc) const { return 0; }
 };
 
 } // namespace gem5

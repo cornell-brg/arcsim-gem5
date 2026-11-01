@@ -169,6 +169,11 @@ class MinorDynInst : public RefCounted
   public:
     const StaticInstPtr staticInst;
 
+    /** The macro-op a micro-op came from, null for an instruction that is
+     *  not split; for the CommittedOps probe point, as the atomic CPU
+     *  reports it. */
+    StaticInstPtr staticInstMacro;
+
     InstId id;
 
     /** Trace information for this instruction's execution */
