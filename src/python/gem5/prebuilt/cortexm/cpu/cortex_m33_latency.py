@@ -106,6 +106,39 @@ def cortex_m33_latency_classes(overrides=None):
             busy=int(fu.issueLat),
             divide=divide,
         )
+    # Branches counted apart from the other integer instructions, for the
+    # energy model, with M33Int's timing (a branch's own cycles come from
+    # the branch rules): B<cond> (not UDF or SVC), B, BX, CBZ and CBNZ,
+    # and the 32-bit B<cond> (not the miscellaneous controls), B and BL.
+    # BLX to a register keeps M33BlxReg.
+    t16 = lambda mask, match: dict(mask=_T32 | mask, match=_T16 | match)
+    t32 = lambda mask, match: dict(mask=_T32 | mask, match=_T32 | match)
+    branches = [
+        t16(0xF800, 0xD000), t16(0xFC00, 0xD800), t16(0xFE00, 0xDC00),
+        t16(0xF800, 0xE000), t16(0xFF87, 0x4700), t16(0xF500, 0xB100),
+        t32(0xFA00D000, 0xF0008000), t32(0xFB00D000, 0xF2008000),
+        t32(0xFB80D000, 0xF3008000), t32(0xF800D000, 0xF0009000),
+        t32(0xF800D000, 0xF000D000),
+    ]
+    alu = next(c for c in classes if c.description == "M33Int")
+    first_fu = next(
+        i for i, c in enumerate(classes)
+        if c.description not in ("M33Isb", "M33BlxReg")
+    )
+    params = overrides.get("M33Branch", {})
+    classes[first_fu:first_fu] = [
+        MProfileLatencyClass(
+            description="M33Branch",
+            op_classes=list(alu.op_classes),
+            cycles=params.get("cycles", alu.cycles),
+            result_delay=params.get("result_delay", alu.result_delay),
+            src_lats=list(params.get("src_lats", alu.src_lats)),
+            unit=alu.unit,
+            busy=alu.busy,
+            **pattern,
+        )
+        for pattern in branches
+    ]
     unknown = set(overrides) - {c.description for c in classes}
     if unknown:
         raise ValueError(f"no Cortex-M33 latency class {sorted(unknown)}")
