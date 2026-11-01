@@ -28,6 +28,13 @@ class TaskInstCounter(ProbeListenerObject):
         "(activeException); it need not be the CPU's own inst_latency. "
         "Without one, no class counts and no exceptions",
     )
+    activity = Param.Bool(
+        False,
+        "each line also gets the instruction activity the energy model "
+        "reads (inst_activity.hh): a.<count> for the ten counts and "
+        "fs.<class>, fd.<class> for the operand bit changes by the "
+        "classifier's classes; needs the atomic CPU, for data addresses",
+    )
     stats = VectorParam.String(
         [],
         "full names of scalar statistics whose growth each line gets (e.g. "

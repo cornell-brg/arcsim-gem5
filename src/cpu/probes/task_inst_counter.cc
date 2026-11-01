@@ -21,7 +21,9 @@ TaskInstCounter::TaskInstCounter(const TaskInstCounterParams &p)
       markPC(p.mark_pc & ~Addr(1)),
       out(p.file, std::ios::out | std::ios::trunc),
       classifier(p.classifier),
-      statNames(p.stats)
+      statNames(p.stats),
+      activity(p.activity),
+      activityState(p.cpu)
 {
     fatal_if(!cpu, "%s: needs the cpu", name());
     fatal_if(!out, "%s: cannot write %s", name(), p.file);
@@ -71,13 +73,22 @@ TaskInstCounter::Counts &
 TaskInstCounter::other(const std::string &name)
 {
     auto it = others.find(name);
-    if (it == others.end()) {
-        Counts c;
-        c.classes.assign(columns.size(), 0);
-        c.stats.assign(statInfos.size(), 0.0);
-        it = others.emplace(name, std::move(c)).first;
-    }
+    if (it == others.end())
+        it = others.emplace(name, fresh()).first;
     return it->second;
+}
+
+TaskInstCounter::Counts
+TaskInstCounter::fresh() const
+{
+    Counts c;
+    c.classes.assign(columns.size(), 0);
+    c.stats.assign(statInfos.size(), 0.0);
+    if (activity) {
+        c.flipsSrc.assign(columns.size(), 0);
+        c.flipsDest.assign(columns.size(), 0);
+    }
+    return c;
 }
 
 TaskInstCounter::Counts &
@@ -114,6 +125,28 @@ TaskInstCounter::committed(const BaseCPU::CommittedOp &op)
     const StaticInst &inst = *op.inst;
     if (inst.isMemRef() && memClass == No_OpClass)
         memClass = inst.opClass();
+    if (activity) {
+        fatal_if(inst.isMicroop() && !op.macro,
+                 "%s: the CPU does not report the macro-op of a micro-op, "
+                 "which the activity needs; use the atomic CPU", name());
+        const StaticInst &whole = op.macro ? *op.macro : inst;
+        if (!copied) {
+            activityState.copyRegisters();
+            copied = true;
+        }
+        Counts &c = context();
+        // In the order the execution trace shows them, as the window
+        // probe's activity file: an instruction with its access, or a
+        // split one's macro-op before its first micro-op's access.
+        if (!inst.isMicroop() || inst.isFirstMicroop())
+            activityState.inst(whole, op.pc, &c.activity);
+        fatal_if(!activityState.access(op, whole, c.activity),
+                 "%s: the CPU does not report data addresses, which the "
+                 "activity needs; use the atomic CPU", name());
+        const auto [s, d] = activityState.flips(inst);
+        pendingSrc += s;
+        pendingDest += d;
+    }
     if (inst.isMicroop() && !inst.isLastMicroop())
         return;
 
@@ -142,8 +175,17 @@ TaskInstCounter::committed(const BaseCPU::CommittedOp &op)
         const StaticInst &whole = op.macro ? *op.macro : inst;
         const int ci = classifier->classOf(whole, memClass);
         ++c.classes[ci >= 0 ? classColumn[ci] : columns.size() - 1];
+        if (activity) {
+            const size_t col = ci >= 0 ? classColumn[ci] : columns.size() - 1;
+            c.flipsSrc[col] += pendingSrc;
+            c.flipsDest[col] += pendingDest;
+        }
+    } else if (activity) {
+        c.flipsSrc.back() += pendingSrc;
+        c.flipsDest.back() += pendingDest;
     }
     memClass = No_OpClass;
+    pendingSrc = pendingDest = 0;
 
     if ((op.pc & ~Addr(1)) == markPC) {
         ThreadContext *tc = cpu->getContext(0);
@@ -198,8 +240,7 @@ TaskInstCounter::mark(uint32_t kind, uint32_t value)
         Task t;
         t.index = taskCount[value]++;
         t.begin = curTick();
-        t.counts.classes.assign(columns.size(), 0);
-        t.counts.stats.assign(statInfos.size(), 0.0);
+        t.counts = fresh();
         open.emplace(value, std::move(t));
         break;
       }
@@ -232,6 +273,17 @@ TaskInstCounter::write(const std::string &head, const Counts &c)
     for (size_t i = 0; i < columns.size(); ++i) {
         if (c.classes[i])
             out << " c." << columns[i] << '=' << c.classes[i];
+    }
+    if (activity) {
+        for (size_t i = 0; i < c.activity.size(); ++i)
+            out << " a." << InstActivity::countNames[i] << '='
+                << c.activity[i];
+        for (size_t i = 0; i < columns.size(); ++i) {
+            if (c.flipsSrc[i])
+                out << " fs." << columns[i] << '=' << c.flipsSrc[i];
+            if (c.flipsDest[i])
+                out << " fd." << columns[i] << '=' << c.flipsDest[i];
+        }
     }
     for (size_t i = 0; i < statNames.size(); ++i) {
         const double v = c.stats[i];

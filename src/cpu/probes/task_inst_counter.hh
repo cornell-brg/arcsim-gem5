@@ -21,7 +21,11 @@
 // task's context (an exception or another node's task that preempts it counts apart),
 // its instructions by the classifier's class names (c.other for none, classes of one
 // name together), and how much each statistic grew in its context, read whenever the
-// context changes. At the end of the simulation, a line each for the other contexts:
+// context changes. With activity, also a.<count>=<n> for the ten activity counts
+// (inst_activity.hh: a.n16 a.n32 a.shift a.iflip a.rdflash a.rdsram a.wrsram a.taken
+// a.kswitch a.kfirst4) and fs.<class>=<bits>, fd.<class>=<bits> for the operand bit
+// changes of its instructions by class, sources and results, those that occur; the
+// register copy the sources are read from is taken at the first instruction. At the end of the simulation, a line each for the other contexts:
 //   other context=<exception.<n>|node.<n>|none|before|sleep> insts=... cycles=... ...
 // and a task still open as an "open" line.
 
@@ -39,6 +43,7 @@
 #include "base/types.hh"
 #include "cpu/base.hh"
 #include "cpu/op_class.hh"
+#include "cpu/probes/inst_activity.hh"
 #include "cpu/simple/inst_latency.hh"
 #include "params/TaskInstCounter.hh"
 #include "sim/probe/probe_listener_object.hh"
@@ -65,6 +70,9 @@ class TaskInstCounter : public ProbeListenerObject
         uint64_t cycles = 0;
         std::vector<uint64_t> classes;
         std::vector<double> stats;
+        InstActivity::Counts activity{};
+        std::vector<uint64_t> flipsSrc;  // by class column
+        std::vector<uint64_t> flipsDest;
     };
 
     struct Task
@@ -77,6 +85,8 @@ class TaskInstCounter : public ProbeListenerObject
     /** The context of an instruction committing now. */
     Counts &context();
     Counts &other(const std::string &name);
+    /** A new context's counts, sized for the columns and statistics. */
+    Counts fresh() const;
     /** Give the statistics' growth since they were last read to c. */
     void readStats(Counts &c);
     void mark(uint32_t kind, uint32_t value);
@@ -111,8 +121,15 @@ class TaskInstCounter : public ProbeListenerObject
     bool asleep = false;
     Cycles sleepStart{0};
 
-    // The whole instruction in flight: its first memory micro-op's class.
+    // The whole instruction in flight: its first memory micro-op's class,
+    // and its operand bit changes so far.
     OpClass memClass = No_OpClass;
+    uint64_t pendingSrc = 0;
+    uint64_t pendingDest = 0;
+
+    const bool activity;
+    InstActivity activityState;
+    bool copied = false;
 };
 
 } // namespace gem5

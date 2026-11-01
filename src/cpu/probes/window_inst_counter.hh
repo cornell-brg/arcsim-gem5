@@ -47,6 +47,12 @@
 // shows its macro-op then, so the micro-ops of one that closes a window are outside it
 // and those of one that opens a window inside it.
 //
+// With a latency classes file and a classifier (an inst_latency, e.g. the Cortex-M33's
+// table), each window adds a line there with the same whole instructions by the
+// classifier's classes, as TaskInstCounter counts a task's: c.<class>=<count> pairs in
+// the classes' order for those that occur (classes of one name together), and c.other
+// for instructions in none. They add up to the window's count.
+//
 // With a stats file and the full names of scalar statistics (e.g.
 // system.flash.cache.chained), each window adds a line there with how much each grew
 // over the window, as name=value pairs in the order given. Any CPU model; the
@@ -74,7 +80,8 @@
 #include "base/stats/info.hh"
 #include "cpu/base.hh"
 #include "cpu/op_class.hh"
-#include "cpu/probes/thumb_traits.hh"
+#include "cpu/probes/inst_activity.hh"
+#include "cpu/simple/inst_latency.hh"
 #include "params/WindowInstCounter.hh"
 #include "sim/probe/probe_listener_object.hh"
 
@@ -93,20 +100,13 @@ class WindowInstCounter : public ProbeListenerObject
 
   private:
     void writeClasses();
+    void writeLatencyClasses();
     void writeNames();
     void writeFlips();
     void writeStats();
     void writeActivity();
     void countFlips(const StaticInst &inst, const StaticInst &whole);
-    void copyRegisters();
 
-    struct Encoded
-    {
-        uint32_t enc;
-        unsigned width;
-        thumb::Traits traits;
-    };
-    const Encoded &encoded(const StaticInst &whole);
     void activityInst(const StaticInst &whole, Addr pc);
     void activityAccess(const BaseCPU::CommittedOp &op,
                         const StaticInst &whole);
@@ -119,6 +119,7 @@ class WindowInstCounter : public ProbeListenerObject
     std::ofstream flipsOut;
     std::ofstream statsOut;
     std::ofstream activityOut;
+    std::ofstream latencyClassesOut;
     const std::vector<std::string> statNames;
     std::vector<const statistics::ScalarInfo *> statInfos;
     std::vector<double> statStart;
@@ -127,6 +128,12 @@ class WindowInstCounter : public ProbeListenerObject
     const bool flips;
     const bool activity;
     BaseCPU *cpu;
+    BaseInstLatency *classifier;
+    // The latency classes file's columns: one a class name, then other
+    std::vector<std::string> columns;
+    std::vector<size_t> classColumn;  // class number -> column
+    std::vector<uint64_t> latencyClasses;  // by column
+    OpClass memClass = No_OpClass;  // the first memory micro-op's
     bool counting = false;
     uint64_t count = 0;
     std::array<uint64_t, Num_OpClasses> instClasses{};
@@ -134,23 +141,14 @@ class WindowInstCounter : public ProbeListenerObject
     std::map<std::string, uint64_t> instNames;
     std::map<std::string, uint64_t> opNames;
 
-    static constexpr int Slots = 4;  // operand slots kept per OpClass
-    std::unordered_map<RegIndex, RegVal> copy;  // flat integer register -> value
-    std::array<std::array<RegVal, Slots>, Num_OpClasses> lastSrc{};
-    std::array<std::array<RegVal, Slots>, Num_OpClasses> lastDest{};
+    InstActivity flipsState;  // the flips file's register copy and slots
     std::map<std::string, std::pair<uint64_t, uint64_t>> nameFlips;  // s, d
 
     // The activity file's window opens and closes at a split instruction's
     // first micro-op, so it keeps its own.
     bool activityOpen = false;
-    std::array<uint64_t, 10> activityCounts{};
-    uint32_t lastEnc = 0;
-    Addr nextPC = 0;
-    bool nextPCValid = false;
-    std::array<thumb::Kind, 4> kinds{};  // the last ones, oldest first
-    size_t numKinds = 0;
-    // Machine instruction (encoding, IT state, width) -> what it is.
-    std::unordered_map<uint64_t, Encoded> encodings;
+    InstActivity::Counts activityCounts{};
+    InstActivity activityState;  // the activity file's history
 };
 
 } // namespace gem5
