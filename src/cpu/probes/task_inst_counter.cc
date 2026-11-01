@@ -23,6 +23,7 @@ TaskInstCounter::TaskInstCounter(const TaskInstCounterParams &p)
       classifier(p.classifier),
       statNames(p.stats),
       activity(p.activity),
+      countedRanges(p.counted_ranges),
       activityState(p.cpu)
 {
     fatal_if(!cpu, "%s: needs the cpu", name());
@@ -143,6 +144,14 @@ TaskInstCounter::committed(const BaseCPU::CommittedOp &op)
         fatal_if(!activityState.access(op, whole, c.activity),
                  "%s: the CPU does not report data addresses, which the "
                  "activity needs; use the atomic CPU", name());
+        if (op.effAddr) {
+            for (const AddrRange &r : countedRanges) {
+                if (r.contains(*op.effAddr)) {
+                    ++c.counted;
+                    break;
+                }
+            }
+        }
         const auto [s, d] = activityState.flips(inst);
         pendingSrc += s;
         pendingDest += d;
@@ -278,6 +287,7 @@ TaskInstCounter::write(const std::string &head, const Counts &c)
         for (size_t i = 0; i < c.activity.size(); ++i)
             out << " a." << InstActivity::countNames[i] << '='
                 << c.activity[i];
+        out << " a.counted=" << c.counted;
         for (size_t i = 0; i < columns.size(); ++i) {
             if (c.flipsSrc[i])
                 out << " fs." << columns[i] << '=' << c.flipsSrc[i];

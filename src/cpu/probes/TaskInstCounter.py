@@ -35,6 +35,11 @@ class TaskInstCounter(ProbeListenerObject):
         "fs.<class>, fd.<class> for the operand bit changes by the "
         "classifier's classes; needs the atomic CPU, for data addresses",
     )
+    counted_ranges = VectorParam.AddrRange(
+        [],
+        "with activity, the address ranges whose data accesses a.counted "
+        "counts (the RP2350's SRAM0-3 for the energy model)",
+    )
     stats = VectorParam.String(
         [],
         "full names of scalar statistics whose growth each line gets (e.g. "

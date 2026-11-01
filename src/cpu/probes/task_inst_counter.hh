@@ -24,8 +24,10 @@
 // context changes. With activity, also a.<count>=<n> for the ten activity counts
 // (inst_activity.hh: a.n16 a.n32 a.shift a.iflip a.rdflash a.rdsram a.wrsram a.taken
 // a.kswitch a.kfirst4) and fs.<class>=<bits>, fd.<class>=<bits> for the operand bit
-// changes of its instructions by class, sources and results, those that occur; the
-// register copy the sources are read from is taken at the first instruction. At the end of the simulation, a line each for the other contexts:
+// changes of its instructions by class, sources and results, those that occur, and
+// a.counted=<n>, its data accesses to counted_ranges (on the RP2350, SRAM0-3, whose bus
+// counters the energy fit's rows read); the register copy the sources are read from is
+// taken at the first instruction. At the end of the simulation, a line each for the other contexts:
 //   other context=<exception.<n>|node.<n>|none|before|sleep> insts=... cycles=... ...
 // and a task still open as an "open" line.
 
@@ -39,6 +41,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "base/addr_range.hh"
 #include "base/stats/info.hh"
 #include "base/types.hh"
 #include "cpu/base.hh"
@@ -71,6 +74,7 @@ class TaskInstCounter : public ProbeListenerObject
         std::vector<uint64_t> classes;
         std::vector<double> stats;
         InstActivity::Counts activity{};
+        uint64_t counted = 0;
         std::vector<uint64_t> flipsSrc;  // by class column
         std::vector<uint64_t> flipsDest;
     };
@@ -128,6 +132,7 @@ class TaskInstCounter : public ProbeListenerObject
     uint64_t pendingDest = 0;
 
     const bool activity;
+    const std::vector<AddrRange> countedRanges;
     InstActivity activityState;
     bool copied = false;
 };
