@@ -91,7 +91,8 @@ Execute::Execute(const std::string &name_, MinorCPU &cpu_,
           params.executeLSQTransfersQueueSize,
           params.executeLSQStoreBufferSize,
           params.executeLSQMaxStoreBufferStoresPerCycle,
-          params.executeWaitedStoreHoldsInsts),
+          params.executeWaitedStoreHoldsInsts,
+          params.executeWaitedLoadHoldsInsts),
       executeInfo(params.numThreads,
                   ExecuteThreadInfo(params.executeCommitLimit)),
       lastCompleted(params.numThreads, 0),
@@ -1909,7 +1910,7 @@ Execute::evaluate()
     BranchData &branch = *out.inputWire;
 
     unsigned int num_issued = 0;
-    bool store_holds_insts = false;
+    bool bus_holds_insts = false;
 
     /* Do all the cycle-wise activities for dcachePort here to potentially
      *  free up input spaces in the LSQ's requests queue */
@@ -1927,12 +1928,14 @@ Execute::evaluate()
          *  without overwriting them */
         DPRINTF(MinorInterrupt, "Execute skipping a cycle to allow old"
             " branch to complete\n");
-    } else if (lsq.storeHoldsInsts() && cpu.curCycle() > issueHeldUntil) {
-        /* Not for the transfers of a store that issue is already held
+    } else if ((lsq.storeHoldsInsts() || lsq.loadHoldsInsts()) &&
+        cpu.curCycle() > issueHeldUntil)
+    {
+        /* Not for the transfers of an access that issue is already held
          *  for */
-        DPRINTF(MinorExecute, "Holding instructions while the bus makes a"
-            " store wait\n");
-        store_holds_insts = true;
+        DPRINTF(MinorExecute, "Holding instructions while the bus makes"
+            " an access wait\n");
+        bus_holds_insts = true;
     } else {
         ThreadID commit_tid = getCommittingThread();
 
@@ -2097,7 +2100,7 @@ Execute::evaluate()
        lsq.needsToTick() || /* Must step the dcache port */
        cpu.curCycle() < lastBackgroundResult || /* A result to wait for */
        cpu.curCycle() < issueHeldUntil || /* Bus transfers to wait for */
-       store_holds_insts || /* Held this cycle, try again */
+       bus_holds_insts || /* Held this cycle, try again */
        interrupted; /* There are pending interrupts */
 
     if (!need_to_tick) {

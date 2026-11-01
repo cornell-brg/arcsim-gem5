@@ -266,10 +266,11 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
                 )
 
             # The Cortex-M33 has no write buffer: a store that the bus makes
-            # wait holds the instructions behind it. Only the banked SRAM has
-            # banks to lose; the legacy memories keep the store buffer's
-            # timing.
+            # wait holds the instructions behind it, and so does a load.
+            # Only the banked SRAM has banks to lose; the legacy memories
+            # keep the store buffer's timing.
             core.executeWaitedStoreHoldsInsts = board._banked_sram
+            core.executeWaitedLoadHoldsInsts = board._banked_sram
 
         if kind == "atomic" and inst_latency:
             # Each instruction's cycles from the Cortex-M33's table (the

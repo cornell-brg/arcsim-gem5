@@ -555,6 +555,14 @@ class BaseMinorCPU(BaseCPU):
         " commits, the cycle of its address phase",
     )
 
+    executeWaitedLoadHoldsInsts = Param.Bool(
+        False,
+        "A load sent to memory that is not answered within its cycle keeps"
+        " Execute from committing or issuing until it is, as on a core"
+        " whose pipeline stalls while its bus makes a load wait, so that no"
+        " later access starts its address phase in the meantime",
+    )
+
     executeDynamicLatencyHoldsInst = Param.Bool(
         False,
         "An FU's data-dependent extra latency (dynamicExtraLatency, e.g. an"
