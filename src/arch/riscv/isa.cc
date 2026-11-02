@@ -308,7 +308,7 @@ ISA::ISA(const Params &p) : BaseISA(p, "riscv"),
     _rvType(p.riscv_type), enableRvv(p.enable_rvv), vlen(p.vlen), elen(p.elen),
     _privilegeModeSet(p.privilege_mode_set),
     _wfiResumeOnPending(p.wfi_resume_on_pending), _enableZcd(p.enable_Zcd),
-    _enableSmrnmi(p.enable_Smrnmi), _xh3irq(p.xh3irq),
+    _enableSmrnmi(p.enable_Smrnmi), _xh3irq(p.xh3irq), _xh3power(p.xh3power),
     _enableXh3bextm(p.enable_Xh3bextm), _enableZfinx(p.enable_Zfinx)
 {
     _regClasses.push_back(&intRegClass);

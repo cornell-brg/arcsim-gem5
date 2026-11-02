@@ -74,6 +74,7 @@ enum FPUStatus
 using VPUStatus = FPUStatus;
 
 class Xh3irq;
+class Xh3power;
 
 class ISA : public BaseISA
 {
@@ -129,6 +130,9 @@ class ISA : public BaseISA
 
     // Hazard3's interrupt controller, or null when the core has none
     Xh3irq *_xh3irq;
+
+    // Hazard3's h3.block and h3.unblock, or null when the core has none
+    Xh3power *_xh3power;
 
     // Hazard3's bit extract multiple (h3.bextm, h3.bextmi)
     bool _enableXh3bextm;
@@ -235,6 +239,8 @@ class ISA : public BaseISA
     bool enableSmrnmi() { return _enableSmrnmi; }
 
     Xh3irq *xh3irq() const { return _xh3irq; }
+
+    Xh3power *xh3power() const { return _xh3power; }
 
     bool enableXh3bextm() const { return _enableXh3bextm; }
 

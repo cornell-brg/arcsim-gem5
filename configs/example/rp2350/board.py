@@ -448,6 +448,8 @@ def _add_hazard3_core(board, n, *, cpu, dma, xip_model, zfinx):
         # Single-precision FP in the x registers instead of F and D
         enable_Zfinx=zfinx,
         xh3irq=xh3irq,
+        # h3.block and h3.unblock (EXTENSION_XH3POWER = 1)
+        xh3power=board.xh3power,
     )]
     # Loads, stores and fetches outside what this board has are access
     # faults, as rtl-sim's bus errors are; the core raises them before the
@@ -517,6 +519,10 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     board.hwpe.tcdm_port = board.tcdm.hwpe_port
     if board._banked_sram:
         board.icode_router.mem_side_ports = board.sram.port
+    # h3.block and h3.unblock: each core's unblock reaches the other's, as
+    # soc.v cross-wires unblock_out and unblock_in; a core alone has none.
+    from m5.objects.Xh3power import Xh3power
+    board.xh3power = Xh3power(hart_ids=list(range(num_cores)))
     # The cores: core n has mhartid n, its thread in the system in the order
     # the cores are made.
     board._cores = [
