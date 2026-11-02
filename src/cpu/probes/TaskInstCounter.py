@@ -14,6 +14,11 @@ class TaskInstCounter(ProbeListenerObject):
     cxx_header = "cpu/probes/task_inst_counter.hh"
     cxx_class = "gem5::TaskInstCounter"
 
+    # The activity counts run on Minor as well as the atomic CPU: Minor
+    # reports data addresses to the CommittedOps probe point. Not a
+    # parameter; for configs that check what this gem5 can do.
+    _minor_activity = True
+
     cpu = Param.BaseCPU("the CPU whose registers and cycles it reads")
     mark_pc = Param.Addr("the address of the program's mark function")
     arg_regs = VectorParam.Unsigned(
