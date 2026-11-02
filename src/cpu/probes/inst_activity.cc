@@ -68,8 +68,15 @@ bool
 InstActivity::access(const BaseCPU::CommittedOp &op, const StaticInst &whole,
                      Counts &c)
 {
-    if (op.inst->isMemRef() && !op.effAddr)
-        return false;
+    // A memory reference whose condition fails (in an IT block) makes no
+    // access and has no address; a CPU that reports none has none for the
+    // first memory references either.
+    if (op.inst->isMemRef()) {
+        if (op.effAddr)
+            ++addressed;
+        else if (++unaddressed >= 64 && addressed == 0)
+            return false;
+    }
     if (!op.effAddr)
         return true;
     const Addr region = *op.effAddr >> 28;

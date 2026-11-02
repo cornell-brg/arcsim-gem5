@@ -54,7 +54,8 @@ class InstActivity
     void inst(const StaticInst &whole, Addr pc, Counts *c);
 
     /** A micro-op's (or an instruction's not split) data access, into c;
-     *  false when the CPU reports no address for a memory reference. */
+     *  false once 64 memory references have had no address and none has
+     *  had one: the CPU reports none. */
     bool access(const BaseCPU::CommittedOp &op, const StaticInst &whole,
                 Counts &c);
 
@@ -77,6 +78,8 @@ class InstActivity
     const Encoded &encoded(const StaticInst &whole);
 
     BaseCPU *cpu;
+    uint64_t addressed = 0;  // memory references with an address
+    uint64_t unaddressed = 0;
     uint32_t lastEnc = 0;
     Addr nextPC = 0;
     bool nextPCValid = false;
