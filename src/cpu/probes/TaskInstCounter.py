@@ -33,7 +33,8 @@ class TaskInstCounter(ProbeListenerObject):
         "each line also gets the instruction activity the energy model "
         "reads (inst_activity.hh): a.<count> for the ten counts and "
         "fs.<class>, fd.<class> for the operand bit changes by the "
-        "classifier's classes; needs the atomic CPU, for data addresses",
+        "classifier's classes; needs the atomic or Minor CPU, for data "
+        "addresses",
     )
     counted_ranges = VectorParam.AddrRange(
         [],

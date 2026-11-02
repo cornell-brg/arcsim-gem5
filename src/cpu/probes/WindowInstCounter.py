@@ -49,7 +49,7 @@ class WindowInstCounter(ProbeListenerObject):
         "the file each window's instruction activity (widths, shifter uses, "
         "instruction-word bit changes, data accesses by region, taken "
         "control transfers, unit switching) is written to (empty: none); "
-        "Arm Thumb only, needs the atomic CPU",
+        "Arm Thumb only, needs the atomic or Minor CPU",
     )
     latency_classes_file = Param.String(
         "",

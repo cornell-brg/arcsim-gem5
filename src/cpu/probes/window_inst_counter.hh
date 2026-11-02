@@ -26,7 +26,7 @@
 // kept as micro-ops write them; a result is the register after it. Values are taken as
 // 32 bits (both cores are 32-bit). Floating-point and condition registers are not counted.
 //
-// With an activity file (Arm Thumb cores, atomic CPU), each window adds a line there of
+// With an activity file (Arm Thumb cores, atomic or Minor CPU), each window adds a line of
 // ten counts, separated by spaces, with the definitions of the energy fit's m33width.py:
 //   1, 2  the 16-bit and the 32-bit instructions;
 //   3     those that use the shifter (thumb_traits.hh);
@@ -62,8 +62,8 @@
 // It listens to the CPU's CommittedOps probe point, which the CPU models notify for
 // every committed instruction and micro-op; a whole instruction ends at its last
 // micro-op, as for the RetiredInstsPC probe point. The atomic and Minor CPUs report the
-// macro-op of a micro-op, which the classes and names need; only the atomic CPU reports
-// data addresses, which the activity file needs.
+// macro-op of a micro-op, which the classes and names need, and data addresses, which
+// the activity file needs.
 
 #ifndef __CPU_PROBES_WINDOW_INST_COUNTER_HH__
 #define __CPU_PROBES_WINDOW_INST_COUNTER_HH__

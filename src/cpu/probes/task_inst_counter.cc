@@ -129,7 +129,8 @@ TaskInstCounter::committed(const BaseCPU::CommittedOp &op)
     if (activity) {
         fatal_if(inst.isMicroop() && !op.macro,
                  "%s: the CPU does not report the macro-op of a micro-op, "
-                 "which the activity needs; use the atomic CPU", name());
+                 "which the activity needs; use the atomic or Minor CPU",
+                 name());
         const StaticInst &whole = op.macro ? *op.macro : inst;
         if (!copied) {
             activityState.copyRegisters();
@@ -143,7 +144,7 @@ TaskInstCounter::committed(const BaseCPU::CommittedOp &op)
             activityState.inst(whole, op.pc, &c.activity);
         fatal_if(!activityState.access(op, whole, c.activity),
                  "%s: the CPU does not report data addresses, which the "
-                 "activity needs; use the atomic CPU", name());
+                 "activity needs; use the atomic or Minor CPU", name());
         if (op.effAddr) {
             for (const AddrRange &r : countedRanges) {
                 if (r.contains(*op.effAddr)) {

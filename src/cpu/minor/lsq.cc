@@ -1679,6 +1679,7 @@ LSQ::pushRequest(MinorDynInstPtr inst, bool isLoad, uint8_t *data,
 
     if (inst->traceData)
         inst->traceData->setMem(addr, size, flags);
+    inst->effAddr = addr;
 
     int cid = cpu.threads[inst->id.threadId]->getTC()->contextId();
     request->request->setContext(cid);

@@ -128,8 +128,8 @@ WindowInstCounter::committed(const BaseCPU::CommittedOp &op)
     if (activity) {
         fatal_if(inst.isMicroop() && !op.macro,
                  "%s: the CPU does not report the macro-op of a micro-op, "
-                 "which the activity file needs; use the atomic CPU",
-                 name());
+                 "which the activity file needs; use the atomic or Minor "
+                 "CPU", name());
         const StaticInst &whole = op.macro ? *op.macro : inst;
         // In the order the execution trace shows them: an instruction that
         // is not split, with its access; a split one's macro-op before its
@@ -153,7 +153,7 @@ WindowInstCounter::committed(const BaseCPU::CommittedOp &op)
         fatal_if((classes || names) && inst.isMicroop() && !op.macro,
                  "%s: the CPU does not report the macro-op of a micro-op, "
                  "which the instruction classes and names need; use the "
-                 "atomic CPU or neither file", name());
+                 "atomic or Minor CPU, or neither file", name());
         const StaticInst *whole = op.macro ? op.macro : op.inst;
         if (classes)
             ++instClasses[whole->opClass()];
@@ -232,7 +232,7 @@ WindowInstCounter::activityAccess(const BaseCPU::CommittedOp &op,
         return;
     fatal_if(!activityState.access(op, whole, activityCounts),
              "%s: the CPU does not report data addresses, which the "
-             "activity file needs; use the atomic CPU", name());
+             "activity file needs; use the atomic or Minor CPU", name());
 }
 
 void
