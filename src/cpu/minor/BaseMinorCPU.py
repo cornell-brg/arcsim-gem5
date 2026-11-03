@@ -610,6 +610,27 @@ class BaseMinorCPU(BaseCPU):
         " accesses, and those of more than a word, on a 32-bit bus",
     )
 
+    executeHalfwordWideMemCycles = Param.Cycles(
+        0,
+        "Cycles a 32-bit instruction waits to issue when it follows, in"
+        " sequence, a 32-bit load or store at an address two bytes into a"
+        " word (0: none), as on a core whose prefetch drains under such"
+        " loads: every other time when it is itself a load or store, and"
+        " not for the first executeHalfwordWideMemGrace of them after the"
+        " stream last broke, nor after an access of several transfers"
+        " (executeAlignedTransfers).  32-bit: executeWideInstMask/Match",
+    )
+    executeHalfwordWideMemGrace = Param.Unsigned(
+        3,
+        "see executeHalfwordWideMemCycles: the occurrences after a break in"
+        " the stream that cost nothing",
+    )
+    executeWideInstMask = Param.UInt64(
+        0, "ExtMachInst bits that, compared with executeWideInstMatch, mark"
+        " a 32-bit instruction"
+    )
+    executeWideInstMatch = Param.UInt64(0, "see executeWideInstMask")
+
     enableIdling = Param.Bool(
         True, "Enable cycle skipping when the processor is idle\n"
     )

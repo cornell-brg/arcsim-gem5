@@ -81,6 +81,10 @@ Execute::Execute(const std::string &name_, MinorCPU &cpu_,
       branchAtIssue(params.executeBranchAtIssue),
       loadAccessAtIssue(params.executeLoadAccessAtIssue),
       alignedTransfers(params.executeAlignedTransfers),
+      halfwordWideMemCycles(params.executeHalfwordWideMemCycles),
+      halfwordWideMemGrace(params.executeHalfwordWideMemGrace),
+      wideInstMask(params.executeWideInstMask),
+      wideInstMatch(params.executeWideInstMatch),
       inOrderCompletion(params.executeInOrderCompletion),
       dynamicLatencyHoldsInst(params.executeDynamicLatencyHoldsInst),
       lastBackgroundResult(0),
@@ -608,7 +612,10 @@ Execute::issue(ThreadID thread_id)
             /* Try FU from 0 each instruction */
             fu_index = 0;
 
-            if (waitsForCompletion(thread, inst)) {
+            if (halfwordWideMemHolds(inst)) {
+                DPRINTF(MinorExecute, "Can't issue inst: %s yet: it follows"
+                    " a 32-bit access two bytes into a word\n", *inst);
+            } else if (waitsForCompletion(thread, inst)) {
                 DPRINTF(MinorExecute, "Can't issue inst: %s until older"
                     " insts complete\n", *inst);
             } else
@@ -884,6 +891,7 @@ Execute::issue(ThreadID thread_id)
 
             /* A free micro-op is issued beyond the limit */
             if (!discarded && !inst->isBubble() && !inst->freeMicroop) {
+                halfwordWideMemIssued(inst);
                 num_insts_issued++;
 
                 if (num_insts_issued == issueLimit)
@@ -1219,6 +1227,61 @@ Execute::countInFlight(ExecuteThreadInfo &thread,
     }
 }
 
+bool
+Execute::isWideInst(const MinorDynInstPtr &inst) const
+{
+    return (inst->staticInst->getEMI() & wideInstMask) == wideInstMatch;
+}
+
+bool
+Execute::halfwordWideMemHolds(const MinorDynInstPtr &inst)
+{
+    if (halfwordWideMemCycles == 0 || !inst->isInst() || inst->isFault())
+        return false;
+    /* Each instruction once: its first micro-op, decided once */
+    if (inst->staticInst->isMicroop() && !inst->staticInst->isFirstMicroop())
+        return false;
+    if (inst->id.execSeqNum == hwDecidedSeq)
+        return false;
+    hwDecidedSeq = inst->id.execSeqNum;
+
+    const Addr pc = inst->pc->instAddr();
+    if (!hwLastWideMem || pc != hwLastPc + 4 || !isWideInst(inst))
+        return false;
+    if (hwGraceLeft != 0) {
+        hwGraceLeft--;
+        return false;
+    }
+    if (inst->staticInst->isMemRef()) {
+        hwToggle = !hwToggle;
+        if (!hwToggle)
+            return false;
+    }
+    Cycles until = cpu.curCycle() + halfwordWideMemCycles;
+    if (until > issueHeldUntil)
+        issueHeldUntil = until;
+    return true;
+}
+
+void
+Execute::halfwordWideMemIssued(const MinorDynInstPtr &inst)
+{
+    if (halfwordWideMemCycles == 0 || !inst->isInst() || inst->isFault())
+        return;
+    if (inst->staticInst->isMicroop() && !inst->staticInst->isFirstMicroop())
+        return;
+    const Addr pc = inst->pc->instAddr();
+    const bool wide = isWideInst(inst);
+    if (pc != hwLastPc + hwLastSize) {
+        /* The stream broke: the prefetch is full again */
+        hwGraceLeft = halfwordWideMemGrace;
+        hwToggle = false;
+    }
+    hwLastPc = pc;
+    hwLastSize = wide ? 4 : 2;
+    hwLastWideMem = wide && inst->staticInst->isMemRef() && (pc & 2) != 0;
+}
+
 void
 Execute::holdIssueForTransfers(bool is_load, Addr addr, unsigned int size)
 {
@@ -1250,6 +1313,10 @@ Execute::holdIssueForTransfers(bool is_load, Addr addr, unsigned int size)
     }
 
     if (transfers > 1) {
+        /* The prefetch catches up while the access makes its transfers:
+         *  the instruction after it does not wait for halfwordWideMemCycles */
+        hwLastWideMem = false;
+
         /* An access made in the pass for the instructions issued this
          *  cycle makes its second transfer in the next */
         Cycles until = cpu.curCycle() + Cycles(transfers - 1) +
