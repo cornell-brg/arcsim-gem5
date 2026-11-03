@@ -2467,9 +2467,58 @@ decode QUADRANT default Unknown::unknown() {
                     }});
                 }
                 0x2: decode FUNCT7 {
-                    0x0: slt({{
-                        Rd = (rvSext(Rs1_sd) < rvSext(Rs2_sd)) ? 1 : 0;
-                    }});
+                    0x0: decode XH3POWER_HINT {
+                        0x0: slt({{
+                            Rd = (rvSext(Rs1_sd) < rvSext(Rs2_sd)) ? 1 : 0;
+                        }});
+                        // Hazard3's h3.block: sleep as wfi does, until
+                        // another core's h3.unblock or an interrupt that
+                        // would wake a wfi; an h3.unblock since the last
+                        // h3.block lets it fall through (Xh3power.py).
+                        // Illegal where wfi is.
+                        0x1: SystemOp::h3_block({{
+                            STATUS status = xc->readMiscReg(MISCREG_STATUS);
+                            auto pm = (PrivilegeMode)xc->readMiscReg(
+                                MISCREG_PRV);
+                            if (pm != PRV_M && status.tw == 1) {
+                                return std::make_shared<IllegalInstFault>(
+                                        "h3.block not in M mode with TW "
+                                        "enabled", machInst);
+                            }
+                            auto tc = xc->tcBase();
+                            auto ic = dynamic_cast<RiscvISA::Interrupts*>(
+                                tc->getCpuPtr()->getInterruptController(
+                                    tc->threadId()));
+                            auto isa = static_cast<RiscvISA::ISA*>(
+                                tc->getIsaPtr());
+                            panic_if(!ic, "Invalid Interrupt Controller.");
+                            // What would wake a wfi, as wfi decides it
+                            bool wake = isa->resumeOnPending() ?
+                                ic->readIP() != 0 :
+                                (ic->readIP() & ic->readIE()) != 0;
+                            wake = wake ||
+                                xc->readMiscReg(MISCREG_NMIP) != 0;
+                            isa->xh3power()->block(tc, wake);
+                        }}, IsNonSpeculative, IsQuiesce,
+                            IsSerializeAfter, No_OpClass, IsSquashAfter);
+                        // Hazard3's h3.unblock: wake the other cores from
+                        // h3.block, or let their next one fall through.
+                        // An ALU instruction in Hazard3's pipeline.
+                        0x2: SystemOp::h3_unblock({{
+                            STATUS status = xc->readMiscReg(MISCREG_STATUS);
+                            auto pm = (PrivilegeMode)xc->readMiscReg(
+                                MISCREG_PRV);
+                            if (pm != PRV_M && status.tw == 1) {
+                                return std::make_shared<IllegalInstFault>(
+                                        "h3.unblock not in M mode with TW "
+                                        "enabled", machInst);
+                            }
+                            auto tc = xc->tcBase();
+                            auto isa = static_cast<RiscvISA::ISA*>(
+                                tc->getIsaPtr());
+                            isa->xh3power()->unblock(tc);
+                        }}, IsNonSpeculative, IntAluOp);
+                    }
                     0x1: mulhsu({{
                         if (machInst.rv_type == RV32) {
                             Rd_sd = mulhsu<int32_t>(Rs1_sd, Rs2);
@@ -6217,6 +6266,9 @@ decode QUADRANT default Unknown::unknown() {
                             auto isa = dynamic_cast<RiscvISA::ISA*>(
                                 tc->getIsaPtr());
                             panic_if(!ic, "Invalid Interrupt Controller.");
+                            // Hazard3: an h3.unblock does not end this sleep
+                            if (isa->xh3power())
+                                isa->xh3power()->wfi(tc);
                             if (isa->resumeOnPending()) {
                                 // Go to sleep only if there are no pending
                                 // interrupts at all, and no non-maskable

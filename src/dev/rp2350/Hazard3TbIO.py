@@ -14,13 +14,13 @@ class Hazard3TbIO(BasicPioDevice):
     Also models, as rtl-sim does, the interrupt registers and the timer:
     SET_IRQ (+0x20) and CLR_IRQ (+0x30) set and clear bits of a 32-bit IRQ
     state, bit n driving irq[n]; SET_SOFTIRQ (+0x10) and CLR_SOFTIRQ (+0x14)
-    likewise for the soft IRQ state, bit 0 (core 0) driving soft_irq; reads
-    of either register return the state. MTIME (+0x100) counts this device's
-    clock cycles and MTIMECMP0 (+0x108) drives timer_irq while
-    mtime >= mtimecmp0 (so from reset, when both are 0); each is read and
-    written as two 32-bit halves. MTIMECMP1 (core 1's) is stored and read back
-    and drives nothing. Bits of the IRQ states beyond the connected pins are
-    stored and drive nothing.
+    likewise for the soft IRQ state, bit n (core n's) driving soft_irq[n];
+    reads of either register return the state. MTIME (+0x100) counts this
+    device's clock cycles, and MTIMECMP0 (+0x108) and MTIMECMP1 (+0x110)
+    drive timer_irq[0] and timer_irq[1] while mtime >= mtimecmp0 or
+    mtimecmp1 (so from reset, when all are 0); each is read and written as
+    two 32-bit halves. Bits of the IRQ states beyond the connected pins, and
+    a comparator whose pin is not connected, are stored and drive nothing.
 
     Every other offset or access size is fatal.
     """
@@ -31,5 +31,7 @@ class Hazard3TbIO(BasicPioDevice):
 
     pio_addr = 0xC0000000
     irq = VectorIntSourcePin("IRQ n: bit n of SET_IRQ/CLR_IRQ, in order")
-    soft_irq = IntSourcePin("Core 0's soft IRQ: bit 0 of SET/CLR_SOFTIRQ")
-    timer_irq = IntSourcePin("Core 0's timer IRQ: mtime >= mtimecmp0")
+    soft_irq = VectorIntSourcePin(
+        "Core n's soft IRQ: bit n of SET/CLR_SOFTIRQ, in order (at most 2)")
+    timer_irq = VectorIntSourcePin(
+        "Core n's timer IRQ: mtime >= mtimecmpn, in order (at most 2)")

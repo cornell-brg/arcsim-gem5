@@ -26,13 +26,19 @@ Hazard3TbIO::Hazard3TbIO(const Params &p)
         irqPins.emplace_back(std::make_unique<IntSourcePin<Hazard3TbIO>>(
             csprintf("%s.irq[%d]", name(), n), n, this));
     }
-    if (p.port_soft_irq_connection_count) {
-        softIrqPin = std::make_unique<IntSourcePin<Hazard3TbIO>>(
-            name() + ".soft_irq", 0, this);
+    fatal_if(p.port_soft_irq_connection_count > NumHarts,
+             "Hazard3TbIO: %d soft IRQ pins connected; there are %d cores\n",
+             p.port_soft_irq_connection_count, NumHarts);
+    fatal_if(p.port_timer_irq_connection_count > NumHarts,
+             "Hazard3TbIO: %d timer IRQ pins connected; there are %d "
+             "cores\n", p.port_timer_irq_connection_count, NumHarts);
+    for (int n = 0; n < p.port_soft_irq_connection_count; ++n) {
+        softIrqPins.emplace_back(std::make_unique<IntSourcePin<Hazard3TbIO>>(
+            csprintf("%s.soft_irq[%d]", name(), n), n, this));
     }
-    if (p.port_timer_irq_connection_count) {
-        timerIrqPin = std::make_unique<IntSourcePin<Hazard3TbIO>>(
-            name() + ".timer_irq", 0, this);
+    for (int n = 0; n < p.port_timer_irq_connection_count; ++n) {
+        timerIrqPins.emplace_back(std::make_unique<IntSourcePin<Hazard3TbIO>>(
+            csprintf("%s.timer_irq[%d]", name(), n), n, this));
     }
 }
 
@@ -44,10 +50,16 @@ Hazard3TbIO::getPort(const std::string &if_name, PortID idx)
                  "Hazard3TbIO: no IRQ pin %d\n", idx);
         return *irqPins[idx];
     }
-    if (if_name == "soft_irq" && softIrqPin)
-        return *softIrqPin;
-    if (if_name == "timer_irq" && timerIrqPin)
-        return *timerIrqPin;
+    if (if_name == "soft_irq") {
+        fatal_if(idx < 0 || static_cast<size_t>(idx) >= softIrqPins.size(),
+                 "Hazard3TbIO: no soft IRQ pin %d\n", idx);
+        return *softIrqPins[idx];
+    }
+    if (if_name == "timer_irq") {
+        fatal_if(idx < 0 || static_cast<size_t>(idx) >= timerIrqPins.size(),
+                 "Hazard3TbIO: no timer IRQ pin %d\n", idx);
+        return *timerIrqPins[idx];
+    }
     return BasicPioDevice::getPort(if_name, idx);
 }
 
@@ -55,8 +67,8 @@ void
 Hazard3TbIO::startup()
 {
     BasicPioDevice::startup();
-    // As from rtl-sim's reset: the timer IRQ is up while mtime >= mtimecmp0,
-    // both 0.
+    // As from rtl-sim's reset: each timer IRQ is up while
+    // mtime >= mtimecmp[n], all 0.
     driveIrqs();
     updateTimer();
 }
@@ -74,44 +86,48 @@ Hazard3TbIO::setMtime(uint64_t value)
 }
 
 void
-Hazard3TbIO::driveIrqs()
+Hazard3TbIO::drivePins(
+    std::vector<std::unique_ptr<IntSourcePin<Hazard3TbIO>>> &pins,
+    uint32_t levels, uint32_t &driven)
 {
-    for (size_t n = 0; n < irqPins.size(); ++n) {
-        const bool level = bits(irqState, n);
-        if (level == bool(bits(irqDriven, n)))
+    for (size_t n = 0; n < pins.size(); ++n) {
+        const bool level = bits(levels, n);
+        if (level == bool(bits(driven, n)))
             continue;
         if (level)
-            irqPins[n]->raise();
+            pins[n]->raise();
         else
-            irqPins[n]->lower();
-        irqDriven = insertBits(irqDriven, n, level);
+            pins[n]->lower();
+        driven = insertBits(driven, n, level);
     }
-    const bool soft = bits(softIrqState, 0);
-    if (softIrqPin && soft != softIrqDriven) {
-        if (soft)
-            softIrqPin->raise();
-        else
-            softIrqPin->lower();
-        softIrqDriven = soft;
-    }
+}
+
+void
+Hazard3TbIO::driveIrqs()
+{
+    drivePins(irqPins, irqState, irqDriven);
+    drivePins(softIrqPins, softIrqState, softIrqDriven);
 }
 
 void
 Hazard3TbIO::updateTimer()
 {
     const uint64_t now = mtime();
-    const bool level = now >= mtimecmp[0];
-    if (timerIrqPin && level != timerIrqDriven) {
-        if (level)
-            timerIrqPin->raise();
-        else
-            timerIrqPin->lower();
-        timerIrqDriven = level;
+    uint32_t levels = 0;
+    // Cycles until the first low comparator rises; 0 if none is low.
+    uint64_t next = 0;
+    for (size_t n = 0; n < timerIrqPins.size(); ++n) {
+        if (now >= mtimecmp[n]) {
+            levels = insertBits(levels, n, 1);
+        } else if (next == 0 || mtimecmp[n] - now < next) {
+            next = mtimecmp[n] - now;
+        }
     }
+    drivePins(timerIrqPins, levels, timerIrqDriven);
     if (timerEvent.scheduled())
         deschedule(timerEvent);
-    if (!level)
-        schedule(timerEvent, clockEdge(Cycles(mtimecmp[0] - now)));
+    if (next)
+        schedule(timerEvent, clockEdge(Cycles(next)));
 }
 
 const char *
@@ -271,9 +287,11 @@ Hazard3TbIO::write(PacketPtr pkt)
         break;
       case MTIMECMP1:
         mtimecmp[1] = insertBits(mtimecmp[1], 31, 0, data);
+        updateTimer();
         break;
       case MTIMECMP1H:
         mtimecmp[1] = insertBits(mtimecmp[1], 63, 32, data);
+        updateTimer();
         break;
       default:
         unmodelled(pkt, offset);
@@ -290,7 +308,7 @@ Hazard3TbIO::serialize(CheckpointOut &cp) const
     SERIALIZE_SCALAR(softIrqState);
     const uint64_t mtime_now = mtime();
     SERIALIZE_SCALAR(mtime_now);
-    SERIALIZE_ARRAY(mtimecmp, 2);
+    SERIALIZE_ARRAY(mtimecmp, NumHarts);
 }
 
 void
@@ -302,7 +320,7 @@ Hazard3TbIO::unserialize(CheckpointIn &cp)
     uint64_t mtime_now;
     UNSERIALIZE_SCALAR(mtime_now);
     setMtime(mtime_now);
-    UNSERIALIZE_ARRAY(mtimecmp, 2);
+    UNSERIALIZE_ARRAY(mtimecmp, NumHarts);
 }
 
 } // namespace gem5

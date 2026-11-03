@@ -44,9 +44,10 @@ class Xh3irq(SimObject):
 
 class Xh3irqLine(ClockedObject):
     """
-    One external interrupt line of an Xh3irq as an interrupt sink pin, for
-    devices that signal through gem5's interrupt pins. The line is
-    level-sensitive. Each edge reaches the controller at the delay-th rising
+    One external interrupt line as an interrupt sink pin, for devices that
+    signal through gem5's interrupt pins. The line is level-sensitive. It
+    reaches every controller in controllers, as an IRQ that is wired to
+    each core's controller (arcsim-soc's soc.v, as on the RP2350). Each edge reaches the controller at the delay-th rising
     edge of the line's clock after it arrives, as through that many
     registers: Hazard3 registers each IRQ input once in the core clock
     (hazard3_irq_ctrl.v, unless IRQ_INPUT_BYPASS), so the default is 1.
@@ -56,7 +57,11 @@ class Xh3irqLine(ClockedObject):
     cxx_class = "gem5::RiscvISA::Xh3irqLine"
     cxx_header = "arch/riscv/xh3irq.hh"
 
-    controller = Param.Xh3irq("The controller the line belongs to")
+    controllers = VectorParam.Xh3irq([], "The controllers the line reaches")
+    controller = Param.Xh3irq(
+        NULL, "One more controller the line reaches, for configs that name "
+        "a single one"
+    )
     irq_num = Param.UInt32("External interrupt number (0..num_irqs - 1)")
     delay = Param.Cycles(1, "Register stages between the pin and the controller")
     pin = IntSinkPin("The line")

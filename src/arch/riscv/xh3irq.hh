@@ -116,18 +116,18 @@ class Xh3irqLine : public ClockedObject
     void lowerInterruptPin(int number);
 
   private:
-    // Pass a level on to the controller delay clock edges from now.
+    // Pass a level on to the controllers delay clock edges from now.
     void edge(bool high);
     void deliver();
 
-    Xh3irq *controller;
+    std::vector<Xh3irq *> controllers;
     const uint32_t irqNum;
     const Cycles delay;
     IntSinkPin<Xh3irqLine> pin;
     // Levels on their way through the registers, oldest first, with the
     // tick each reaches the controller.
     std::deque<std::pair<Tick, bool>> inFlight;
-    bool delivered = false;      // the level last given to the controller
+    bool delivered = false;      // the level last given to the controllers
     void apply(bool high);
     EventFunctionWrapper deliverEvent;
 };

@@ -53,6 +53,9 @@ class Hazard3TbIO : public BasicPioDevice
         SIZE = 0x200,
     };
 
+    // Cores with a soft IRQ bit and a timer comparator (rtl-sim's two).
+    static constexpr int NumHarts = 2;
+
     // The first EXIT write has ended the simulation; later ones are
     // ignored, as on rtl-sim.
     bool exited = false;
@@ -64,25 +67,32 @@ class Hazard3TbIO : public BasicPioDevice
     // mtime is this device's cycle count plus mtimeOffset, so a write to
     // MTIME or MTIMEH moves the offset.
     uint64_t mtimeOffset = 0;
-    uint64_t mtimecmp[2] = {0, 0};
+    uint64_t mtimecmp[NumHarts] = {0, 0};
 
+    // Pin n of each vector is IRQ n, or core n's soft or timer IRQ.
     std::vector<std::unique_ptr<IntSourcePin<Hazard3TbIO>>> irqPins;
-    std::unique_ptr<IntSourcePin<Hazard3TbIO>> softIrqPin;
-    std::unique_ptr<IntSourcePin<Hazard3TbIO>> timerIrqPin;
-    // The pins' levels as last driven, so each edge is sent once.
+    std::vector<std::unique_ptr<IntSourcePin<Hazard3TbIO>>> softIrqPins;
+    std::vector<std::unique_ptr<IntSourcePin<Hazard3TbIO>>> timerIrqPins;
+    // The pins' levels as last driven, bit n for pin n, so each edge is
+    // sent once.
     uint32_t irqDriven = 0;
-    bool softIrqDriven = false;
-    bool timerIrqDriven = false;
+    uint32_t softIrqDriven = 0;
+    uint32_t timerIrqDriven = 0;
 
-    // When mtime reaches mtimecmp0.
+    // When mtime next reaches a connected core's mtimecmp.
     EventFunctionWrapper timerEvent;
 
     uint64_t mtime() const;
     void setMtime(uint64_t value);
+    // Drive pins[n] to bit n of levels, for each pin whose bit in driven
+    // differs, and record the new levels in driven.
+    static void drivePins(
+        std::vector<std::unique_ptr<IntSourcePin<Hazard3TbIO>>> &pins,
+        uint32_t levels, uint32_t &driven);
     // Drive the IRQ and soft IRQ pins from their states.
     void driveIrqs();
-    // Drive timer_irq from mtime and mtimecmp0, and schedule timerEvent for
-    // when it next rises.
+    // Drive each timer_irq[n] from mtime and mtimecmp[n], and schedule
+    // timerEvent for when the next one that is low rises.
     void updateTimer();
 
     // The name of the register at offset, or nullptr if there is none.

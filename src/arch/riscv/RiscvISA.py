@@ -134,6 +134,11 @@ class RiscvISA(BaseISA):
         "Hazard3's interrupt controller (Xh3irq); None means the core has "
         "no Xh3irq and its CSRs are illegal",
     )
+    xh3power = Param.Xh3power(
+        NULL,
+        "Hazard3's h3.block and h3.unblock (Xh3power); None means their "
+        "encodings are the plain hints slt x0, x0, x0 and slt x0, x0, x1",
+    )
     enable_Xh3bextm = Param.Bool(
         False,
         "Hazard3's bit extract multiple (h3.bextm, h3.bextmi, in custom-0); "

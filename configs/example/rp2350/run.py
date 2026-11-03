@@ -61,8 +61,10 @@ parser.add_argument("--cpu", choices=("minor", "atomic"), default="minor",
                     help="minor: the timed core; atomic: gem5's atomic CPU, "
                     "no core timing")
 parser.add_argument("--cores", type=int, choices=(1, 2), default=1,
-                    help="2 adds the second M33, which starts from the "
-                    "firmware's arcsim_core1_launch (arm-m4-proxy only)")
+                    help="2: on the arm-m4-proxy, the second M33, which starts "
+                    "from the firmware's arcsim_core1_launch; on the "
+                    "hazard3-proxy, arcsim-soc's dual-core soc.v, core 1 "
+                    "waiting in init.S until core 0 starts it")
 parser.add_argument("--tick-limit", type=int, default=100_000_000_000)
 args = parser.parse_args()
 if not args.firmware.is_file():
@@ -98,7 +100,7 @@ if args.xip_model == "legacy":
 board.exit_on_work_items = True
 root = Root(full_system=True, system=board)
 m5.instantiate()
-print(f"RP2350 core={args.core} cpu_id=0 clock=150MHz")
+print(f"RP2350 core={args.core} cores={args.cores} clock=150MHz")
 print("XIP=0x10000000+16MiB cache=16KiB/2-way/8B")
 if args.xip_model == "qmi":
     print("XIP model=qmi: two cache banks, flash interface timing of a Pico 2")
