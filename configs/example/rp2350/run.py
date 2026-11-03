@@ -48,9 +48,11 @@ parser.add_argument("--arm-timing", choices=("tuned", "pre-tuning"),
                     "STM32G474")
 parser.add_argument("--dma", action=argparse.BooleanOptionalAction,
                     help="Add the DMA controller")
-parser.add_argument("--xip-model", choices=("legacy", "qmi"),
+parser.add_argument("--xip-model", choices=("legacy", "qmi", "soc"),
                     help="qmi selects the cache banks and flash interface "
-                    "timing of a Pico 2; the XIP knobs apply only to legacy")
+                    "timing of a Pico 2; soc (hazard3-proxy) arcsim-soc's RTL "
+                    "code memory, zero wait states; the XIP knobs apply only "
+                    "to legacy")
 parser.add_argument("--hwpe", choices=tuple(HWPES), default="vvadd",
                     help="The HWPE on the Hazard3 board, as arcsim-soc's "
                     "CONFIG_HWPE")

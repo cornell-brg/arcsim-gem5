@@ -152,7 +152,17 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
     # the shared cache. The QMI bridge connects only to flash memory.
     # The physical XIP cache is shared by instruction fetch and data reads.
     board.xip_front = _router(board.fast_clock)
-    if xip_model == "qmi":
+    if xip_model == "soc":
+        # arcsim-soc's RTL code memory in place of the XIP path: its
+        # testbench's "magic mem" at 0x10000000 (soc.v), an AHB minion with
+        # zero wait states and one transfer a cycle behind the crossbar, as
+        # an SRAM bank is (rtl-sim's sim_top::step answers every data phase
+        # in its cycle). There is no XIP cache in soc.v yet.
+        from m5.objects import RP2350SRAM
+        board.flash = RP2350SRAM(range=xip_range, one_bank=True,
+                                 clk_domain=board.clk_domain)
+        board.xip_front.mem_side_ports = board.flash.port
+    elif xip_model == "qmi":
         # The cache's two banks and the flash interface's serial transfers,
         # with a Pico 2's timing (RP2350XIP); xip_miss_ns is not used.
         from m5.objects import RP2350XIP
@@ -733,7 +743,9 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     dma adds the DMA controller (RP2350DMA) at 0x50000000-0x50003fff; on the
     Hazard3 proxy its interrupt outputs are left unconnected. xip_model
     "qmi" replaces the generic cache and fixed miss delay in front of flash
-    with RP2350XIP. hwpe names the Hazard3 board's HWPE (HWPES). zfinx gives
+    with RP2350XIP; "soc" (hazard3-proxy only) puts arcsim-soc's RTL code
+    memory there instead, zero wait states and one transfer a cycle, as
+    rtl-sim's testbench answers soc.v at 0x10000000. hwpe names the Hazard3 board's HWPE (HWPES). zfinx gives
     the Hazard3 proxy Zfinx (floats in the x registers) instead of F and D.
     switch_cpu ("minor" or "atomic", either proxy) adds board.switch_cpu,
     a core of that kind switched out, for m5.switchCpus. clock is the core
@@ -757,8 +769,11 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                                                 xip_model)
     if sram_model not in ("legacy", "banked"):
         raise ValueError(f"Unknown SRAM model: {sram_model}")
-    if xip_model not in ("legacy", "qmi"):
+    if xip_model not in ("legacy", "qmi", "soc"):
         raise ValueError(f"Unknown XIP model: {xip_model}")
+    if xip_model == "soc" and core != "hazard3-proxy":
+        raise ValueError("xip_model soc is arcsim-soc's code memory, for the "
+                         "hazard3-proxy")
     if cpu not in ("minor", "atomic"):
         raise ValueError(f"Unknown CPU: {cpu}")
     if hwpe not in HWPES:

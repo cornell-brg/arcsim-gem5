@@ -30,3 +30,10 @@ class RP2350SRAM(AbstractMemory):
     latency = Param.Latency("1ns", "From a bank's grant to the data, within the clock cycle")
     queue_depth = Param.Unsigned(8, "Outstanding packets per manager, including responses")
     port_priority = VectorParam.Unsigned([0], "Per-manager priority, 0 or 1; last entry repeats")
+    one_bank = Param.Bool(
+        False,
+        "One bank over the whole range, which may then be any range: a"
+        " memory that serves one manager a cycle with zero wait states, as"
+        " arcsim-soc's RTL testbench's code memory at 0x10000000 (its 'magic"
+        " mem'; its statistics are bank sram0's)",
+    )
