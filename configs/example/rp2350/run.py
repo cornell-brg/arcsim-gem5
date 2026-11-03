@@ -67,6 +67,10 @@ parser.add_argument("--cores", type=int, choices=(1, 2), default=1,
                     "from the firmware's arcsim_core1_launch; on the "
                     "hazard3-proxy, arcsim-soc's dual-core soc.v, core 1 "
                     "waiting in init.S until core 0 starts it")
+parser.add_argument("--inst-latency", action="store_true",
+                    help="with --cpu atomic: each instruction's cycles from "
+                    "the core's latency table (the M33's or Hazard3's), with "
+                    "RP2350XIP's flash misses")
 parser.add_argument("--tick-limit", type=int, default=100_000_000_000)
 args = parser.parse_args()
 if not args.firmware.is_file():
@@ -92,6 +96,7 @@ board = make_board(
     zfinx=args.zfinx,
     cpu=args.cpu,
     cores=args.cores,
+    inst_latency=args.inst_latency,
 )
 if args.xip_model == "legacy":
     board.xip_cache.tag_latency = args.xip_hit_latency_cycles
