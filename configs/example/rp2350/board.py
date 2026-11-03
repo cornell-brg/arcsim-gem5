@@ -152,7 +152,17 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
     # the shared cache. The QMI bridge connects only to flash memory.
     # The physical XIP cache is shared by instruction fetch and data reads.
     board.xip_front = _router(board.fast_clock)
-    if xip_model == "qmi":
+    if xip_model == "soc":
+        # arcsim-soc's RTL code memory in place of the XIP path: its
+        # testbench's "magic mem" at 0x10000000 (soc.v), an AHB minion with
+        # zero wait states and one transfer a cycle behind the crossbar, as
+        # an SRAM bank is (rtl-sim's sim_top::step answers every data phase
+        # in its cycle). There is no XIP cache in soc.v yet.
+        from m5.objects import RP2350SRAM
+        board.flash = RP2350SRAM(range=xip_range, one_bank=True,
+                                 clk_domain=board.clk_domain)
+        board.xip_front.mem_side_ports = board.flash.port
+    elif xip_model == "qmi":
         # The cache's two banks and the flash interface's serial transfers,
         # with a Pico 2's timing (RP2350XIP); xip_miss_ns is not used.
         from m5.objects import RP2350XIP
@@ -406,6 +416,13 @@ def _add_second_m33(board, core, scs):
     board.workload.secondary_launch = CORE1_LAUNCH_SYMBOL
 
 
+# Hazard3's timing (instruction_timings.adoc), which _configure_hazard3_minor
+# gives MinorCPU and hazard3_latency.py the atomic CPU's latency table: a
+# divide's cycles, and the cycle a loaded register comes after the load.
+HAZARD3_DIV_CYCLES = 19
+HAZARD3_LOAD_RESULT_DELAY = 1
+
+
 def _configure_hazard3_minor(core):
     """Give a RISC-V MinorCPU Hazard3's pipeline timing."""
     from m5.objects.BaseMinorCPU import (
@@ -483,12 +500,12 @@ def _configure_hazard3_minor(core):
                 MinorFUTiming(
                     description="Hazard3Load",
                     srcRegsRelativeLats=[1],
-                    resultUsePenalty=1,
+                    resultUsePenalty=HAZARD3_LOAD_RESULT_DELAY,
                 ),
             ]
         elif isinstance(unit, MinorDefaultIntDivFU):
-            unit.opLat = 19
-            unit.issueLat = 19
+            unit.opLat = HAZARD3_DIV_CYCLES
+            unit.issueLat = HAZARD3_DIV_CYCLES
     core.executeFuncUnits = units
 
 
@@ -532,6 +549,19 @@ def _hazard3_cpu(board, n, kind, zfinx, accessible, switched_out=False):
     core.mmu.pma_checker.accessible = accessible
     if kind == "minor":
         _configure_hazard3_minor(core)
+    elif getattr(board, "_inst_latency", False):
+        # Each instruction's cycles from Hazard3's latency table, from the
+        # CL model's classes, and its flash misses' from RP2350XIP. An APB
+        # register read takes 2 cycles over the instruction's own and a
+        # write 3, as on the M33 [RP2350 datasheet 2.1.4].
+        from hazard3_latency import hazard3_inst_latency
+
+        timed = ([board.flash.range] if type(board.flash).__name__ ==
+                 "RP2350XIP" else [])
+        core.inst_latency = hazard3_inst_latency(
+            timed_ranges=timed,
+            wait_ranges=[AddrRange(0x40000000, 0x50000000)],
+            wait_cycles=[2], wait_write_cycles=[3])
     core.createThreads()
     core.createInterruptController()
     return core
@@ -574,7 +604,8 @@ def _add_hazard3_core(board, n, *, cpu, zfinx, accessible):
 
 def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
                 scratch_bank_bandwidth, sram_model, dma, xip_model, cpu,
-                hwpe, zfinx, switch_cpu=None, clock=CLOCK, cores=1):
+                hwpe, zfinx, switch_cpu=None, clock=CLOCK, cores=1,
+                inst_latency=False):
     from m5.objects import RiscvSystem
     from m5.objects.RiscvFsWorkload import RiscvBareMetal
     from m5.objects.RiscvSemihosting import RiscvSemihosting
@@ -585,6 +616,13 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
                    scratch_bank_bandwidth=scratch_bank_bandwidth,
                    sram_model=sram_model, dma=dma, xip_model=xip_model,
                    clock=clock)
+    # An atomic core's latency table (_hazard3_cpu), with RP2350XIP's flash
+    # misses, which then tracks its tags; arcsim-soc's code memory (xip_model
+    # soc) answers in its cycle, as SRAM does
+    board._inst_latency = inst_latency
+    if inst_latency and xip_model == "qmi":
+        board.flash.track_tags = True
+        board.flash.atomic_latency = True
     # Hazard3 testbench IO registers (print, exit, IRQs, timer) at 0xc0000000
     # (tb_cxxrtl_io.h), so firmware built for rtl-sim runs unchanged.
     from m5.objects import Hazard3TbIO
@@ -733,7 +771,9 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     dma adds the DMA controller (RP2350DMA) at 0x50000000-0x50003fff; on the
     Hazard3 proxy its interrupt outputs are left unconnected. xip_model
     "qmi" replaces the generic cache and fixed miss delay in front of flash
-    with RP2350XIP. hwpe names the Hazard3 board's HWPE (HWPES). zfinx gives
+    with RP2350XIP; "soc" (hazard3-proxy only) puts arcsim-soc's RTL code
+    memory there instead, zero wait states and one transfer a cycle, as
+    rtl-sim's testbench answers soc.v at 0x10000000. hwpe names the Hazard3 board's HWPE (HWPES). zfinx gives
     the Hazard3 proxy Zfinx (floats in the x registers) instead of F and D.
     switch_cpu ("minor" or "atomic", either proxy) adds board.switch_cpu,
     a core of that kind switched out, for m5.switchCpus. clock is the core
@@ -757,8 +797,11 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                                                 xip_model)
     if sram_model not in ("legacy", "banked"):
         raise ValueError(f"Unknown SRAM model: {sram_model}")
-    if xip_model not in ("legacy", "qmi"):
+    if xip_model not in ("legacy", "qmi", "soc"):
         raise ValueError(f"Unknown XIP model: {xip_model}")
+    if xip_model == "soc" and core != "hazard3-proxy":
+        raise ValueError("xip_model soc is arcsim-soc's code memory, for the "
+                         "hazard3-proxy")
     if cpu not in ("minor", "atomic"):
         raise ValueError(f"Unknown CPU: {cpu}")
     if hwpe not in HWPES:
@@ -773,9 +816,11 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
         raise ValueError("cores is 1 or 2")
     if cores == 2 and switch_cpu:
         raise ValueError("cores 2 is without switch_cpu")
-    if inst_latency and (core != "arm-m4-proxy" or xip_model != "qmi"):
-        raise ValueError("inst_latency is for the arm-m4-proxy, with "
-                         "xip_model qmi")
+    if inst_latency and not (
+            (core == "arm-m4-proxy" and xip_model == "qmi") or
+            (core == "hazard3-proxy" and xip_model in ("qmi", "soc"))):
+        raise ValueError("inst_latency is for the arm-m4-proxy with "
+                         "xip_model qmi, or the hazard3-proxy with qmi or soc")
     if core == "arm-m4-proxy":
         return _make_arm(firmware, xip_miss_ns=xip_miss_ns,
                          sram_latency_ns=sram_latency_ns,
@@ -793,5 +838,6 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                            sram_model=sram_model, dma=dma,
                            xip_model=xip_model, cpu=cpu, hwpe=hwpe,
                            zfinx=zfinx, switch_cpu=switch_cpu,
-                           clock=clock, cores=cores)
+                           clock=clock, cores=cores,
+                           inst_latency=inst_latency)
     raise ValueError(f"Unknown RP2350 core selector: {core}")  
