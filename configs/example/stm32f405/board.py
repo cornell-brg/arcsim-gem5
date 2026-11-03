@@ -1,5 +1,5 @@
-"""The Crazyflie 2.1's STM32F405 as a gem5 board: CortexM4CPU (the G474's core,
-Cortex-M4 r0p1 on both), the F405's flash accelerator (ART) in each of its four
+"""The Crazyflie 2.1's STM32F405 as a gem5 board: CrazyflieF405CPU (cpu.py: the G474's
+CortexM4CPU, Cortex-M4 r0p1 on both, with the Crazyflie's own timing), the F405's flash accelerator (ART) in each of its four
 settings, SRAM on the system bus and CCM on the data bus only.
 
     make_board(firmware, caches="full", clock_mhz=168, flash_ws=5) -> ArmMSystem
@@ -36,8 +36,13 @@ from m5.objects.Cache import ARTCache, NoncoherentCache
 from m5.objects.ReplacementPolicies import LRURP
 from m5.params import AddrRange
 
-from gem5.prebuilt.cortexm.cpu.cortex_m4 import CortexM4CPU
+import os
+import sys
+
 from gem5.prebuilt.cortexm.platforms import STM32F405Platform
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cpu import CrazyflieF405CPU  # noqa: E402  (this directory's cpu.py)
 
 CACHES = {
     # setting: (instruction and data caches, prefetch)
@@ -106,7 +111,7 @@ def make_board(firmware=None, *, caches="full", clock_mhz=168, flash_ws=5):
         clock="1ps", voltage_domain=VoltageDomain(voltage="1.0V")
     )
 
-    cpu = CortexM4CPU()
+    cpu = CrazyflieF405CPU()  # cpu.py: CortexM4CPU with the Crazyflie's own timing
     board.cpu = cpu
     board.mem_mode = cpu.memory_mode()
     cpu.clk_domain = board.clk_domain
@@ -122,7 +127,16 @@ def make_board(firmware=None, *, caches="full", clock_mhz=168, flash_ws=5):
     # ICode and DCode decode: flash to the accelerator, CCM (DCode only) to its
     # own memory, everything else to the system bus.
     board.icode_bus = _xbar(clk, 8)
-    board.icode_bus.default = board.system_bus.cpu_side_ports
+    # An instruction fetch from SRAM goes over the system bus, one word every two core
+    # cycles (the Crazyflie: 32-bit instructions in SRAM about 2 cycles each, 16-bit
+    # ones 1): a 32-bit router clocked at half the core's, which a word occupies for
+    # one of its cycles.
+    board.sram_fetch_clk_domain = SrcClockDomain(
+        clock=f"{clock_mhz / 2}MHz", voltage_domain=board.voltage_domain
+    )
+    board.sram_fetch_bus = _xbar(board.sram_fetch_clk_domain, 4)
+    board.icode_bus.default = board.sram_fetch_bus.cpu_side_ports
+    board.sram_fetch_bus.default = board.system_bus.cpu_side_ports
     board.dcode_bus = _xbar(clk, 8)
     board.dcode_bus.default = board.system_bus.cpu_side_ports
 
