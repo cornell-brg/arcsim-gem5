@@ -222,6 +222,13 @@ RP2350XIP::maintain(PacketPtr pkt)
         const Addr target = pkt->getAddr() - maintenanceRange.start();
         const unsigned op = target & 0x7;
         if (op == 0) {
+            // The SDK steps over the chip's 16 KiB of set and way addresses,
+            // which a cache of another shape does not match
+            warn_if_once(lineBytes != 8 || numWays != 2 || numSets != 1024,
+                         "RP2350XIP: maintenance by set and way on a cache "
+                         "shape other than the chip's 16 KiB, 2 ways, 8-byte "
+                         "lines: software that walks the chip's sets and ways "
+                         "leaves lines it did not reach");
             // Invalidate by set and way: the way from the address bits above
             // the set's (bit 13 for 16 KiB of two ways)
             Way &way = setWays(target)[
