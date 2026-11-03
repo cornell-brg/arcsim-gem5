@@ -9,7 +9,10 @@ a 32-bit target at a halfword address a cycle more. Zfinx's FP operations
 are arcsim-soc's FPU's (rtl/fpu/hazard3_fpu.sv: one at a time, the core
 held until its result): fp_cycles for add, multiply, compare and convert
 (one plus FPU_PIPE_ADDMUL's, NONCOMP's and CONV's one register), and
-fp_div_cycles for divide and square root (FPnew's iterative unit)."""
+fp_div_cycles for divide and square root, FPnew's T-Head divider
+(FPU_PIPE_DIVSQRT 0): its result 17 cycles after it takes ordinary operands
+(soc's rtl/fpu/test testbench: 1/3, pi/e, sqrt 2, sqrt 0.3), sooner for
+exact or special ones (6/2 in 5, sqrt 4 in 4), so one more for the core."""
 
 from m5.objects import RiscvInstLatency, RiscvLatencyClass
 
@@ -20,7 +23,7 @@ FP_OPS = ["FloatAdd", "FloatCmp", "FloatCvt", "FloatMult", "FloatMultAcc",
 FP_DIV_OPS = ["FloatDiv", "FloatSqrt"]
 
 
-def hazard3_inst_latency(*, fp_cycles=2, fp_div_cycles=12, **kwargs):
+def hazard3_inst_latency(*, fp_cycles=2, fp_div_cycles=18, **kwargs):
     """The table; kwargs set RiscvInstLatency's own parameters
     (timed_ranges, wait_ranges, ...)."""
     classes = [
