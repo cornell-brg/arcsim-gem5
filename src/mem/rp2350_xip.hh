@@ -20,9 +20,6 @@ namespace gem5::memory
 class RP2350XIP : public AbstractMemory
 {
   private:
-    static constexpr unsigned LineBytes = 8;
-    static constexpr unsigned NumSets = 1024;
-    static constexpr unsigned NumWays = 2;
     static constexpr unsigned NumBanks = 2;
 
     // An access on its way through the cache: the lines it still needs.
@@ -65,6 +62,8 @@ class RP2350XIP : public AbstractMemory
     {
         bool valid = false;
         Addr line = 0;
+        // With LRU replacement: when it was last looked up or filled
+        uint64_t lastUse = 0;
     };
 
     // One of the cache's two banks: the lines of even or of odd line
@@ -109,8 +108,18 @@ class RP2350XIP : public AbstractMemory
     const Addr pageBreak;
     const bool trackTags;
     const bool atomicLatency;
+    // The cache's shape: bytes a line, ways a set, sets; LRU or random
+    // replacement; the cycles each 32-bit word of a line past its first two
+    // adds to its transfer
+    const unsigned lineBytes;
+    const unsigned numWays;
+    const unsigned numSets;
+    const bool lru;
+    const Cycles extraWordCycles;
 
-    std::array<std::array<Way, NumWays>, NumSets> sets;
+    // The ways of set s at [s * numWays, (s + 1) * numWays)
+    std::vector<Way> sets;
+    uint64_t useCount = 0;
     std::array<Bank, NumBanks> banks;
     std::map<RequestorID, Manager> managers;
     mutable Random::RandomPtr rng = Random::genRandom();
@@ -142,16 +151,17 @@ class RP2350XIP : public AbstractMemory
         XIPStats(RP2350XIP &xip);
     } xipStats;
 
-    static Addr lineOf(Addr addr) { return addr & ~Addr(LineBytes - 1); }
-    static unsigned bankOf(Addr line) { return (line / LineBytes) % NumBanks; }
-    static unsigned setOf(Addr line) { return (line / LineBytes) % NumSets; }
+    Addr lineOf(Addr addr) const { return addr & ~Addr(lineBytes - 1); }
+    unsigned bankOf(Addr line) const { return (line / lineBytes) % NumBanks; }
+    unsigned setOf(Addr line) const { return (line / lineBytes) % numSets; }
+    Way *setWays(Addr line) { return &sets[setOf(line) * numWays]; }
     Way *lookup(Addr line);
     void fill(Addr line);
 
     bool receive(PacketPtr pkt);
     void maintain(PacketPtr pkt);
     // The 32-bit words of `line` the access covers
-    static unsigned wordsIn(const Access &access, Addr line);
+    unsigned wordsIn(const Access &access, Addr line) const;
     // Takes the access through the lines it still needs, until one must
     // wait.
     void advance(const AccessPtr &access);
