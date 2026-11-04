@@ -421,12 +421,22 @@ def _add_second_m33(board, core, scs):
 # divide's cycles, and the cycle a loaded register comes after the load.
 HAZARD3_DIV_CYCLES = 19
 HAZARD3_LOAD_RESULT_DELAY = 1
+# Zfinx on arcsim-soc's FPU (rtl/fpu/hazard3_fpu.sv): one op at a time, the core held until its result.
+# Measured on the SoC's rtl_sim (soc 51bf51d; smoke/zfinx_timing.S): an add, multiply, compare, convert or
+# sign-inject 3 cycles, dependent or not; a divide 17; a square root 19; an integer use of the result no more.
+HAZARD3_FP_CYCLES = 3
+HAZARD3_FP_DIV_CYCLES = 17
+HAZARD3_FP_SQRT_CYCLES = 19
+HAZARD3_FP_OPS = ["FloatAdd", "FloatCmp", "FloatCvt", "FloatMisc", "FloatMult", "FloatMultAcc"]
 
 
 def _configure_hazard3_minor(core):
     """Give a RISC-V MinorCPU Hazard3's pipeline timing."""
     from m5.objects.BaseMinorCPU import (
+        MinorFU,
+        MinorFUPool,
         MinorDefaultFUPool,
+        MinorDefaultFloatSimdFU,
         MinorDefaultIntDivFU,
         MinorDefaultIntFU,
         MinorDefaultIntMulFU,
@@ -472,7 +482,18 @@ def _configure_hazard3_minor(core):
     # A load's address phase is its X cycle, and the instruction after
     # it is in X during the load's data phase.
     core.executeLoadAccessAtIssue = True
-    units = MinorDefaultFUPool()
+    # The FP ops on blocking units in place of Minor's float/SIMD unit, which would pipeline them (and takes
+    # an FP op whenever a blocking unit is busy, so it is left out; Hazard3 has no SIMD): an op takes its unit
+    # for its whole latency, as the SoC's FPU takes one op at a time. Then fresh copies of Minor's other
+    # default units (a new pool, so that every unit is its child).
+    fp_units = [
+        MinorFU(opClasses=minorMakeOpClassSet(classes), opLat=cycles, issueLat=cycles,
+                timings=[MinorFUTiming(description="Hazard3Fpu", srcRegsRelativeLats=[1])])
+        for classes, cycles in ((HAZARD3_FP_OPS, HAZARD3_FP_CYCLES), (["FloatDiv"], HAZARD3_FP_DIV_CYCLES),
+                                (["FloatSqrt"], HAZARD3_FP_SQRT_CYCLES))
+    ]
+    units = MinorFUPool(funcUnits=fp_units + [
+        type(u)() for u in MinorDefaultFUPool().funcUnits if not isinstance(u, MinorDefaultFloatSimdFU)])
     for unit in units.funcUnits:
         if isinstance(unit, (MinorDefaultIntFU, MinorDefaultIntMulFU,
                              MinorDefaultIntDivFU, MinorDefaultMiscFU)):

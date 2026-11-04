@@ -6,24 +6,26 @@ Hazard3's instruction_timings.adoc): an instruction 1 cycle; a load's result
 a cycle late, except to a store's data, which is read a cycle later; a
 divide HAZARD3_DIV_CYCLES; a taken branch or jump 2, a predicted one 1, and
 a 32-bit target at a halfword address a cycle more. Zfinx's FP operations
-are arcsim-soc's FPU's (rtl/fpu/hazard3_fpu.sv: one at a time, the core
-held until its result): fp_cycles for add, multiply, compare and convert
-(one plus FPU_PIPE_ADDMUL's, NONCOMP's and CONV's one register), and
-fp_div_cycles for divide and square root, FPnew's T-Head divider
-(FPU_PIPE_DIVSQRT 0): its result 17 cycles after it takes ordinary operands
-(soc's rtl/fpu/test testbench: 1/3, pi/e, sqrt 2, sqrt 0.3), sooner for
-exact or special ones (6/2 in 5, sqrt 4 in 4), so one more for the core."""
+are arcsim-soc's FPU's, as board.py's HAZARD3_FP_* give them for both tiers
+(rtl/fpu/hazard3_fpu.sv takes one op at a time and holds the core until its
+result; the cycles measured on the SoC's rtl_sim by smoke/zfinx_timing.S):
+fp_cycles for an add, multiply, compare, convert or sign-inject,
+fp_div_cycles for a divide, fp_sqrt_cycles for a square root."""
 
 from m5.objects import RiscvInstLatency, RiscvLatencyClass
 
-from board import HAZARD3_DIV_CYCLES, HAZARD3_LOAD_RESULT_DELAY
+from board import (
+    HAZARD3_DIV_CYCLES,
+    HAZARD3_FP_CYCLES,
+    HAZARD3_FP_DIV_CYCLES,
+    HAZARD3_FP_OPS,
+    HAZARD3_FP_SQRT_CYCLES,
+    HAZARD3_LOAD_RESULT_DELAY,
+)
 
-FP_OPS = ["FloatAdd", "FloatCmp", "FloatCvt", "FloatMult", "FloatMultAcc",
-          "FloatMisc"]
-FP_DIV_OPS = ["FloatDiv", "FloatSqrt"]
 
-
-def hazard3_inst_latency(*, fp_cycles=2, fp_div_cycles=18, **kwargs):
+def hazard3_inst_latency(*, fp_cycles=HAZARD3_FP_CYCLES, fp_div_cycles=HAZARD3_FP_DIV_CYCLES,
+                         fp_sqrt_cycles=HAZARD3_FP_SQRT_CYCLES, **kwargs):
     """The table; kwargs set RiscvInstLatency's own parameters
     (timed_ranges, wait_ranges, ...)."""
     classes = [
@@ -38,9 +40,11 @@ def hazard3_inst_latency(*, fp_cycles=2, fp_div_cycles=18, **kwargs):
         RiscvLatencyClass(description="Hazard3Div", op_classes=["IntDiv"],
                           cycles=HAZARD3_DIV_CYCLES),
         RiscvLatencyClass(description="Hazard3Mul", op_classes=["IntMult"]),
-        RiscvLatencyClass(description="Hazard3Fpu", op_classes=FP_OPS,
+        RiscvLatencyClass(description="Hazard3Fpu", op_classes=HAZARD3_FP_OPS,
                           cycles=fp_cycles),
-        RiscvLatencyClass(description="Hazard3FpuDiv", op_classes=FP_DIV_OPS,
+        RiscvLatencyClass(description="Hazard3FpuDiv", op_classes=["FloatDiv"],
                           cycles=fp_div_cycles),
+        RiscvLatencyClass(description="Hazard3FpuSqrt", op_classes=["FloatSqrt"],
+                          cycles=fp_sqrt_cycles),
     ]
     return RiscvInstLatency(classes=classes, **kwargs)
