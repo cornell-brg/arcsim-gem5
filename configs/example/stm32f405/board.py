@@ -124,6 +124,14 @@ def make_board(firmware=None, *, caches="full", clock_mhz=168, flash_ws=5):
     board.system_bus = _with_badaddr(_xbar(clk, 4))
     board.flash_bus = _with_badaddr(_xbar(clk, 4))
     board.dcode_flash_bus = _with_badaddr(_xbar(clk, 4))
+    # An instruction read from flash takes the wait states plus one cycle (RM0090
+    # table 11: 6 cycles at 5 WS) and a data read the wait states, the core's load
+    # spending the other cycle: this router holds instruction reads for that cycle.
+    board.icode_flash_link = _xbar(clk, LINE)
+    board.icode_flash_link.frontend_latency = flash_latency_ps(
+        caches, clock_mhz, flash_ws + 1
+    ) - flash_latency_ps(caches, clock_mhz, flash_ws)
+    board.icode_flash_link.mem_side_ports = board.flash_bus.cpu_side_ports
     # ICode and DCode decode: flash to the accelerator, CCM (DCode only) to its
     # own memory, everything else to the system bus.
     board.icode_bus = _xbar(clk, 8)
@@ -154,7 +162,7 @@ def make_board(firmware=None, *, caches="full", clock_mhz=168, flash_ws=5):
         )
         board.flash.port = board.flash_bus.mem_side_ports
         board.flash.port = board.dcode_flash_bus.mem_side_ports
-        board.icode_bus.mem_side_ports = board.flash_bus.cpu_side_ports
+        board.icode_bus.mem_side_ports = board.icode_flash_link.cpu_side_ports
         board.dcode_bus.mem_side_ports = board.dcode_flash_bus.cpu_side_ports
     else:
         board.flash = SimpleMemory(range=FLASH, latency=latency)
@@ -185,7 +193,7 @@ def make_board(firmware=None, *, caches="full", clock_mhz=168, flash_ws=5):
             arrive_buffer_size=0,
         )
         board.art_icache.cpu_side = board.icode_bus.mem_side_ports
-        board.art_icache.mem_side = board.flash_bus.cpu_side_ports
+        board.art_icache.mem_side = board.icode_flash_link.cpu_side_ports
         if cache_on:
             board.art_dcache = NoncoherentCache(
                 size=f"{8 * LINE}B",
