@@ -369,8 +369,18 @@ Streamer::request(Addr addr, unsigned size) const
 void
 Streamer::wake()
 {
-    if (units.empty())
+    // tickAtomic() looks again for accesses after each one
+    if (units.empty() || atomicLoop)
         return;
+    // Atomic mode: not at once, since the subclass may still be starting
+    // its streams (startJob()), but in an event at this tick
+    if (hwpe.atomicMode()) {
+        if (!tickEvent.scheduled())
+            hwpe.schedule(tickEvent, curTick());
+        else if (tickEvent.when() > curTick())
+            hwpe.reschedule(tickEvent, curTick());
+        return;
+    }
     // One access per cycle: if one was already sent in this cycle, wait
     // for the next
     Tick when = hwpe.clockEdge();
@@ -398,6 +408,10 @@ Streamer::progress()
 void
 Streamer::tick()
 {
+    if (hwpe.atomicMode()) {
+        tickAtomic();
+        return;
+    }
     // Send nothing while a refused access waits to be resent (retried()
     // wakes us again) or while draining (drainResume() wakes us again)
     if (!hwpe.canSendTcdm())
@@ -435,6 +449,26 @@ Streamer::tick()
             break;
         }
     }
+}
+
+// One access per unit in turn, so that an engine that takes a beat from
+// several sources at once gets them all. The mux's priority and the
+// statistics on refusals and conflicts mean nothing here.
+void
+Streamer::tickAtomic()
+{
+    atomicLoop = true;
+    bool sent = true;
+    while (sent && hwpe.canSendTcdm()) {
+        sent = false;
+        for (auto &unit : units) {
+            if (unit->wantsAccess()) {
+                hwpe.sendTcdm(unit->makeAccess());
+                sent = true;
+            }
+        }
+    }
+    atomicLoop = false;
 }
 
 void

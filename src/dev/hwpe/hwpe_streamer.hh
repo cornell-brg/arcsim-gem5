@@ -195,6 +195,8 @@ class Sink : public StreamUnit
 // one access per cycle, chosen among the units that want one by the mux's
 // rotating priority (see tick()). If the TCDM refuses an access, nothing
 // else is sent until the TCDM has accepted it.
+// In atomic mode a job's accesses take no time: all of them are made in one
+// event, at the tick the units first want one (see tickAtomic()).
 class Streamer : public statistics::Group, public Serializable
 {
   public:
@@ -205,7 +207,8 @@ class Streamer : public statistics::Group, public Serializable
     Sink &addSink(const std::string &name, unsigned depth);
 
     // A unit may want to make an access: run tick() at the next clock edge
-    // (or one cycle later if an access was already sent in this cycle).
+    // (or one cycle later if an access was already sent in this cycle);
+    // in atomic mode, at this tick.
     void wake();
 
     void serialize(CheckpointOut &cp) const override;
@@ -241,8 +244,13 @@ class Streamer : public statistics::Group, public Serializable
     // A request for an access by this HWPE
     RequestPtr request(Addr addr, unsigned size) const;
 
-    // Sends at most one access (see the class comment)
+    // Sends at most one access (see the class comment); in atomic mode,
+    // calls tickAtomic()
     void tick();
+    // Makes every access the units want, one per unit in turn, until none
+    // wants one. Each response arrives within the send, so the engine may
+    // take beats and push results meanwhile.
+    void tickAtomic();
     // The start of the current clock cycle: curTick() if it is on a clock
     // edge, else the last edge before it
     Tick cycleStart() const;
@@ -252,6 +260,7 @@ class Streamer : public statistics::Group, public Serializable
     const unsigned muxChannels;
     unsigned rrCounter = 0;       // the mux's priority counter
     Tick lastSend = MaxTick;      // start of the cycle of the last access
+    bool atomicLoop = false;      // tickAtomic() is running
     EventFunctionWrapper tickEvent;
 
     statistics::Scalar refusals;

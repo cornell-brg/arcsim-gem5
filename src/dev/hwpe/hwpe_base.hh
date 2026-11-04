@@ -78,6 +78,10 @@ class HWPEBase : public BasicPioDevice
 
     uint32_t genericReg(unsigned index) const { return generic[index]; }
 
+    // The system runs in atomic memory mode: TCDM accesses are atomic and
+    // the streamer makes all of a job's at one tick
+    bool atomicMode() const;
+
     // Direct TCDM access. The streamer uses these; a subclass needs them
     // only if it makes TCDM accesses of its own besides the streamer's (the
     // default implementations below forward everything to the streamer).
@@ -161,6 +165,7 @@ class HWPEBase : public BasicPioDevice
     const unsigned numContexts;
     const Cycles startLatency;
     const Cycles doneLatency;
+    const Cycles atomicLatency;
 
     std::vector<uint32_t> generic;
     std::vector<std::vector<uint32_t>> io;  // [context][register]
@@ -189,6 +194,9 @@ class HWPEBase : public BasicPioDevice
     uint32_t readRegister(Addr offset);
     void writeRegister(Addr offset, uint32_t value, uint32_t mask);
     uint32_t status() const;
+    // start_latency and done_latency; in atomic mode, 0 and atomic_latency
+    Cycles jobStartLatency() const;
+    Cycles jobDoneLatency() const;
     void trigger();
     void softClear(bool registers);
     void start();

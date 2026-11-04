@@ -36,6 +36,10 @@ class HWPEBase(BasicPioDevice):
     cycles later the job counts as done: STATUS and FINISHED show it, and
     irq pulses.
 
+    In atomic mode (an atomic CPU) a job's TCDM accesses are atomic and take
+    no time: the job starts at its TRIGGER (or when the previous job is
+    done) and counts as done atomic_latency cycles after it starts.
+
     Differences from arcsim-soc's prototype (hwpe-vvadd), which follows the
     hwpe_ctrl RTL more literally. In the prototype:
       - the register window repeats every 0x400;
@@ -75,6 +79,12 @@ class HWPEBase(BasicPioDevice):
         1,
         "Cycles from the job's last completed access to STATUS and "
         "FINISHED showing it done",
+    )
+    atomic_latency = Param.Cycles(
+        5,
+        "In atomic mode, cycles from a job's start to STATUS and FINISHED "
+        "showing it done, in place of start_latency, done_latency and the "
+        "job's own timing",
     )
     mux_channels = Param.Unsigned(
         "Channels of the streamer's TCDM mux (the RTL's NB_IN_CHAN, a power "

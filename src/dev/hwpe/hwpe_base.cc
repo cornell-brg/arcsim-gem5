@@ -23,6 +23,12 @@ HWPEBase::TcdmPort::TcdmPort(const std::string &name, HWPEBase &_hwpe)
 void
 HWPEBase::TcdmPort::send(PacketPtr pkt)
 {
+    // Atomic mode: the response is there at once
+    if (hwpe.atomicMode()) {
+        sendAtomic(pkt);
+        hwpe.recvTcdmRespFromPort(pkt);
+        return;
+    }
     if (!sendTimingReq(pkt))
         held = pkt;
 }
@@ -65,6 +71,7 @@ HWPEBase::HWPEBase(const Params &p)
       numContexts(p.num_contexts),
       startLatency(p.start_latency),
       doneLatency(p.done_latency),
+      atomicLatency(p.atomic_latency),
       generic(p.num_generic_regs, 0),
       io(p.num_contexts, std::vector<uint32_t>(p.num_io_regs, 0)),
       startEvent([this] { start(); }, name() + ".start"),
@@ -255,6 +262,19 @@ HWPEBase::write(PacketPtr pkt)
 
 // ---- jobs -------------------------------------------------------------
 
+Cycles
+HWPEBase::jobStartLatency() const
+{
+    return atomicMode() ? Cycles(0) : startLatency;
+}
+
+// In atomic mode the job itself takes no time, so this is all of it
+Cycles
+HWPEBase::jobDoneLatency() const
+{
+    return atomicMode() ? atomicLatency : doneLatency;
+}
+
 void
 HWPEBase::trigger()
 {
@@ -268,7 +288,7 @@ HWPEBase::trigger()
     pointerContext = (pointerContext + 1) % numContexts;
     ++pending;
     if (!running && !startEvent.scheduled())
-        schedule(startEvent, clockEdge(startLatency));
+        schedule(startEvent, clockEdge(jobStartLatency()));
 }
 
 void
@@ -284,7 +304,7 @@ HWPEBase::jobDone()
 {
     panic_if(!running || doneEvent.scheduled(),
              "%s: jobDone() without a running job", name());
-    schedule(doneEvent, clockEdge(doneLatency));
+    schedule(doneEvent, clockEdge(jobDoneLatency()));
 }
 
 void
@@ -298,7 +318,7 @@ HWPEBase::finish()
     ++finished;
     pulseIrq();
     if (pending)
-        schedule(startEvent, clockEdge(startLatency));
+        schedule(startEvent, clockEdge(jobStartLatency()));
 }
 
 void
@@ -350,6 +370,12 @@ HWPEBase::pulseIrq()
 }
 
 // ---- TCDM -------------------------------------------------------------
+
+bool
+HWPEBase::atomicMode() const
+{
+    return sys->isAtomicMode();
+}
 
 bool
 HWPEBase::canSendTcdm() const
