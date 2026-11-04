@@ -37,8 +37,9 @@ class HWPEBase(BasicPioDevice):
     irq pulses.
 
     In atomic mode (an atomic CPU) a job's TCDM accesses are atomic and take
-    no time: the job starts at its TRIGGER (or when the previous job is
-    done) and counts as done atomic_latency cycles after it starts.
+    no time: the job starts atomic_latency cycles after its TRIGGER (or
+    after the previous job is done), makes all its accesses at that tick and
+    counts as done at once. So its results appear when it counts as done.
 
     Differences from arcsim-soc's prototype (hwpe-vvadd), which follows the
     hwpe_ctrl RTL more literally. In the prototype:
@@ -82,9 +83,9 @@ class HWPEBase(BasicPioDevice):
     )
     atomic_latency = Param.Cycles(
         5,
-        "In atomic mode, cycles from a job's start to STATUS and FINISHED "
-        "showing it done, in place of start_latency, done_latency and the "
-        "job's own timing",
+        "In atomic mode, cycles from a job's TRIGGER (or the previous job "
+        "being done) to its start, at which it is also done; in place of "
+        "start_latency, done_latency and the job's own timing",
     )
     mux_channels = Param.Unsigned(
         "Channels of the streamer's TCDM mux (the RTL's NB_IN_CHAN, a power "
@@ -122,7 +123,8 @@ class HWPEVvaddWide(HWPEBase):
     and adds them. The sum is ready for c compute_latency cycles later, and
     the next pair can be taken compute_interval cycles later. The RTL's
     adds are combinational, which gives 0 and 1. The job ends when the last
-    write to c is acknowledged.
+    write to c is acknowledged. In atomic mode (see HWPEBase) the job takes
+    no time: compute_latency and compute_interval are not used.
     """
 
     type = "HWPEVvaddWide"
@@ -138,6 +140,8 @@ class HWPEVvaddWide(HWPEBase):
     # acknowledgement takes 1 of them, done_latency the others).
     start_latency = 6
     done_latency = 2
+    # Not calibrated
+    atomic_latency = 5
     elems = Param.Unsigned(8, "Elements per TCDM access (1 to 8)")
     buffer_depth = Param.Unsigned(
         2, "Beats buffered in each of a, b and c (the RTL's FIFO depth)"
@@ -183,7 +187,8 @@ class HWPEFastCellBestK(HWPEBase):
     (fastScoreMulticycle); any other pixel for 2. After the last pixel,
     the scoring, the non-max suppression and the best-k list take
     cycles + 4 + (cell_width - 6) + 3 cycles before the corner beat goes to
-    the sink. So the job's time does not depend on the pixels.
+    the sink. So the job's time does not depend on the pixels. In atomic
+    mode (see HWPEBase) the job takes no time and this timing is not used.
     """
 
     type = "HWPEFastCellBestK"
@@ -197,6 +202,8 @@ class HWPEFastCellBestK(HWPEBase):
     # calibrated for this HWPE
     start_latency = 6
     done_latency = 3
+    # Not calibrated
+    atomic_latency = 5
     cell_width = Param.Unsigned(64, "Pixels in a row of the cell")
     cell_height = Param.Unsigned(64, "Rows of the cell")
     frame_width = Param.Unsigned(

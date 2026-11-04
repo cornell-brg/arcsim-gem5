@@ -172,7 +172,7 @@ HWPEFastCellBestK::takeBeat()
             beatCorners += s != 0;
         }
         beatEnd = when;
-        when += cyclesToTicks(pixelCycles(row, col));
+        when = after(when, pixelCycles(row, col));
     }
     nextTake = when;
     consuming = true;
@@ -182,8 +182,7 @@ HWPEFastCellBestK::takeBeat()
         // the one above and to the left of it to the end of the last row
         // (width - 6 + 2, one a cycle), and the best-k list is sent the
         // cycle after the last decision
-        cornersDue = beatEnd +
-                     cyclesToTicks(Cycles(cycles + 4 + (width - 6) + 3));
+        cornersDue = after(beatEnd, Cycles(cycles + 4 + (width - 6) + 3));
     }
     DPRINTF(HWPE, "fast: beat of pixels %d to %d, %d corners\n",
             taken - beatBytes, taken - 1, beatCorners);
@@ -264,19 +263,29 @@ HWPEFastCellBestK::compute()
 {
     if (!active)
         return;
-    // The beat whose last pixel is taken by now leaves the pixel FIFO, and
-    // its corners count from now on
-    if (consuming && curTick() >= beatEnd) {
-        pixels.pop();
-        consuming = false;
-        cornerCount += beatCorners;
-    }
-    if (!consuming && taken < cell.size() && pixels.ready())
-        takeBeat();
-    if (!consuming && !written && curTick() >= cornersDue &&
-        corners.room()) {
-        writeCorners();
-        written = true;
+    // Repeat until nothing changes: in atomic mode a beat is taken in no
+    // time, so it can be popped at once and the next one taken
+    bool moved = true;
+    while (moved) {
+        moved = false;
+        // The beat whose last pixel is taken by now leaves the pixel FIFO,
+        // and its corners count from now on
+        if (consuming && curTick() >= beatEnd) {
+            pixels.pop();
+            consuming = false;
+            cornerCount += beatCorners;
+            moved = true;
+        }
+        if (!consuming && taken < cell.size() && pixels.ready()) {
+            takeBeat();
+            moved = true;
+        }
+        if (!consuming && !written && curTick() >= cornersDue &&
+            corners.room()) {
+            writeCorners();
+            written = true;
+            moved = true;
+        }
     }
     if (written && corners.done()) {
         DPRINTF(HWPE, "fast: done, %d corners\n", cornerCount);

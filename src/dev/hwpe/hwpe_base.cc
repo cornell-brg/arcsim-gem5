@@ -262,17 +262,18 @@ HWPEBase::write(PacketPtr pkt)
 
 // ---- jobs -------------------------------------------------------------
 
+// In atomic mode the job itself takes no time, so this is all of it: the
+// job's accesses are made, and it is done, atomic_latency after TRIGGER
 Cycles
 HWPEBase::jobStartLatency() const
 {
-    return atomicMode() ? Cycles(0) : startLatency;
+    return atomicMode() ? atomicLatency : startLatency;
 }
 
-// In atomic mode the job itself takes no time, so this is all of it
 Cycles
 HWPEBase::jobDoneLatency() const
 {
-    return atomicMode() ? atomicLatency : doneLatency;
+    return atomicMode() ? Cycles(0) : doneLatency;
 }
 
 void
@@ -375,6 +376,12 @@ bool
 HWPEBase::atomicMode() const
 {
     return sys->isAtomicMode();
+}
+
+Tick
+HWPEBase::after(Tick from, Cycles cycles) const
+{
+    return atomicMode() ? from : from + cyclesToTicks(cycles);
 }
 
 bool

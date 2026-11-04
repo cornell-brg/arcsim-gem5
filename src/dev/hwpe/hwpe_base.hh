@@ -81,6 +81,9 @@ class HWPEBase : public BasicPioDevice
     // The system runs in atomic memory mode: TCDM accesses are atomic and
     // the streamer makes all of a job's at one tick
     bool atomicMode() const;
+    // For a subclass's own timing: the tick 'cycles' cycles after 'from';
+    // in atomic mode, where a job takes no time, 'from' itself
+    Tick after(Tick from, Cycles cycles) const;
 
     // Direct TCDM access. The streamer uses these; a subclass needs them
     // only if it makes TCDM accesses of its own besides the streamer's (the
@@ -194,7 +197,7 @@ class HWPEBase : public BasicPioDevice
     uint32_t readRegister(Addr offset);
     void writeRegister(Addr offset, uint32_t value, uint32_t mask);
     uint32_t status() const;
-    // start_latency and done_latency; in atomic mode, 0 and atomic_latency
+    // start_latency and done_latency; in atomic mode, atomic_latency and 0
     Cycles jobStartLatency() const;
     Cycles jobDoneLatency() const;
     void trigger();

@@ -107,9 +107,9 @@ HWPEVvaddWide::compute()
             a.pop();
             b.pop();
             remaining -= n;
-            nextTake = cycle + computeInterval * clockPeriod();
+            nextTake = after(cycle, computeInterval);
             results.push_back(Result{std::move(sum), 4 * n,
-                                     cycle + computeLatency * clockPeriod()});
+                                     after(cycle, computeLatency)});
             moved = true;
         }
     }
