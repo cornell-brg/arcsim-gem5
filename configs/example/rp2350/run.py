@@ -19,6 +19,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--core", choices=("arm-m4-proxy", "hazard3-proxy"),
                     required=True)
 parser.add_argument("--firmware", type=Path, required=True)
+parser.add_argument("--cpu", choices=("minor", "atomic"), default="minor",
+                    help="minor is the timed core (CortexM33CPU, or the "
+                    "Hazard3 proxy's MinorCPU); atomic is gem5's atomic CPU, "
+                    "an instruction-level simulator with no core timing, "
+                    "for which the --arm-* options do nothing")
 parser.add_argument("--xip-miss-ns", type=int, default=50)
 parser.add_argument("--xip-hit-latency-cycles", type=int, default=1,
                     help="Set both parallel XIP cache tag and data latency, "
@@ -85,6 +90,7 @@ board = make_board(
     hwpe=args.hwpe,
     zfinx=args.zfinx,
     num_cores=args.cores,
+    cpu=args.cpu,
 )
 if args.xip_model == "legacy":
     board.xip_cache.tag_latency = args.xip_hit_latency_cycles
@@ -95,7 +101,8 @@ if args.xip_model == "legacy":
 board.exit_on_work_items = True
 root = Root(full_system=True, system=board)
 m5.instantiate()
-print(f"RP2350 core={args.core} cores={args.cores} clock=150MHz")
+print(f"RP2350 core={args.core} cpu={args.cpu} cores={args.cores} "
+      "clock=150MHz")
 print("XIP=0x10000000+16MiB cache=16KiB/2-way/8B")
 if args.xip_model == "qmi":
     print("XIP model=qmi: two cache banks, flash interface timing of a Pico 2")
