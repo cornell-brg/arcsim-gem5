@@ -1106,14 +1106,11 @@ bool
 SingleStageFetch1::takeTargetLine(FetchRequestPtr &target_request,
     const BranchData &execute_branch, ForwardLineData &line_out)
 {
-    /* Not for a SuspendThread (wfi): the thread stops fetching and refetches
-     * from its PC when it wakes, so Fetch2 must not start on the line now. A
-     * 32-bit instruction across the line's end would leave its first half in
-     * the decoder, and the refetched line would be decoded behind it */
+    /* A suspend (wfi) stops fetch: no line goes on to Fetch2 until the
+     *  wakeup restarts it */
     if (!target_request || !target_request->isComplete() ||
-        !execute_branch.isStreamChange() ||
+        !execute_branch.isStreamChange() || !execute_branch.target ||
         execute_branch.reason == BranchData::SuspendThread ||
-        !execute_branch.target ||
         !execute_branch.inst || execute_branch.inst->isBubble() ||
         execute_branch.inst->isFault() ||
         !(execute_branch.inst->staticInst->isDirectCtrl() ||

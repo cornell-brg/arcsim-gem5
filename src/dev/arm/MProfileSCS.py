@@ -99,3 +99,8 @@ class MProfileSCS(BasicPioDevice):
     systick_calib = Param.UInt32(
         "SysTick CALIB register value (implementation-defined)"
     )
+
+    # The core whose private peripheral bus this SCS sits on, by context id:
+    # each core of a multi-core M-profile system has its own NVIC, SCB and
+    # SysTick at the same addresses.
+    core = Param.UInt32(0, "Context id of the core this SCS belongs to")

@@ -205,6 +205,8 @@ class HWPEBase : public BasicPioDevice
     void start();
     void finish();
     void pulseIrq();
+    // Drain done, once drain() is Drained while draining
+    void checkDrained();
     void unmodelled(Addr offset, bool is_write);
 
     // Called by tcdmPort; they forward to the virtual hooks above

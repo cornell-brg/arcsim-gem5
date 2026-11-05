@@ -69,6 +69,8 @@ class RP2350SRAM : public AbstractMemory
     const Tick window;
     const Tick latency;
     const unsigned queueDepth;
+    // One bank over the whole range (one_bank), any range
+    const bool oneBank;
     // Runs after everything else of its tick, so that every request of a
     // cycle is in before the banks choose.
     EventFunctionWrapper arbitrateEvent;

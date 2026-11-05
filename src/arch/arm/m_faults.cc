@@ -356,7 +356,7 @@ ArmMFault::invoke(ThreadContext *tc, const StaticInstPtr &inst)
 
     auto *msys = dynamic_cast<ArmMSystem *>(tc->getSystemPtr());
     assert(msys && "M-profile fault on non-M-profile system");
-    MProfileSCS *scs = msys->getSCS();
+    MProfileSCS *scs = msys->getSCS(tc->contextId());
     assert(scs && "MProfileSCS not registered with ArmMSystem");
 
     if (!scs->activateIRQ(_excNumber)) {
@@ -532,9 +532,11 @@ MProfileReset::invoke(ThreadContext *tc, const StaticInstPtr &inst)
     PortProxy &phys = tc->getSystemPtr()->physProxy;
 
     // Entry 0: initial Main Stack Pointer value.
-    uint32_t initialMSP = phys.read<uint32_t>(vtor, ByteOrder::little);
     // Entry 1: Reset_Handler address.
-    uint32_t resetHandler = phys.read<uint32_t>(vtor + 4,
+    // Both from the launch pair instead, if the workload gave one.
+    const uint32_t start = launchAddr ? launchAddr : vtor;
+    uint32_t initialMSP = phys.read<uint32_t>(start, ByteOrder::little);
+    uint32_t resetHandler = phys.read<uint32_t>(start + 4,
                                                 ByteOrder::little);
 
     // Initialise MSP and the architectural SP register (R13).

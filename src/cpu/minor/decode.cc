@@ -263,6 +263,7 @@ Decode::evaluate()
 
                     output_inst =
                         new MinorDynInst(static_micro_inst, inst->id);
+                    output_inst->staticInstMacro = static_inst;
                     set(output_inst->pc, decode_info.microopPC);
                     output_inst->fault = NoFault;
                     output_inst->freeMicroop = freeUpdateMicroops &&

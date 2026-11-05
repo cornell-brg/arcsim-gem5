@@ -362,6 +362,11 @@ m_profile_rp2350_dma_test(
     "rp2350_store_wait", "test_rp2350_store_wait.elf",
     r"RP2350_STORE_WAIT_OK", "run_rp2350_sdk.py", "banked",
 )
+# So does a load, beside the DMA and beside the core's own fetches from SRAM
+m_profile_rp2350_dma_test(
+    "rp2350_load_wait", "test_rp2350_load_wait.elf",
+    r"RP2350_LOAD_WAIT_OK", "run_rp2350_sdk.py", "banked",
+)
 # GPIO coprocessor instructions stay in program order with SIO accesses on
 # the Minor-based Arm proxy
 m_profile_rp2350_test(

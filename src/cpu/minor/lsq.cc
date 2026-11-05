@@ -841,6 +841,21 @@ LSQ::StoreBuffer::hasWaitedStore() const
     return false;
 }
 
+bool
+LSQ::hasWaitedLoad() const
+{
+    bool waited = false;
+    auto check = [&waited](const LSQRequestPtr &request) {
+        if (request->isLoad && !request->isComplete() &&
+            request->loadSentTick < curTick())
+            waited = true;
+    };
+    requests.forEach(check);
+    transfers.forEach(check);
+
+    return waited;
+}
+
 void
 LSQ::StoreBuffer::countIssuedStore(LSQRequestPtr request)
 {
@@ -1238,6 +1253,8 @@ LSQ::tryToSend(LSQRequestPtr request)
                 /* Fully or partially issued a request in the transfers
                  *  queue */
                 request->setState(LSQRequest::RequestIssuing);
+                if (request->isLoad && request->loadSentTick == MaxTick)
+                    request->loadSentTick = curTick();
                 break;
               case LSQRequest::StoreInStoreBuffer:
               case LSQRequest::StoreBufferIssuing:
@@ -1259,6 +1276,11 @@ LSQ::tryToSend(LSQRequestPtr request)
             /* Needs to be resent, wait for that */
             state = MemoryNeedsRetry;
             retryRequest = request;
+
+            /* Memory refusing a load makes it wait as answering it late
+             *  would */
+            if (request->isLoad && request->loadSentTick == MaxTick)
+                request->loadSentTick = curTick();
 
             switch (request->state) {
               case LSQRequest::Translated:
@@ -1419,7 +1441,7 @@ LSQ::LSQ(std::string name_, std::string dcache_port_name_,
     unsigned int requests_queue_size, unsigned int transfers_queue_size,
     unsigned int store_buffer_size,
     unsigned int store_buffer_cycle_store_limit,
-    bool waited_store_holds_insts) :
+    bool waited_store_holds_insts, bool waited_load_holds_insts) :
     Named(name_),
     cpu(cpu_),
     execute(execute_),
@@ -1438,7 +1460,8 @@ LSQ::LSQ(std::string name_, std::string dcache_port_name_,
     numAccessesIssuedToMemory(0),
     retryRequest(NULL),
     cacheBlockMask(~(cpu_.cacheLineSize() - 1)),
-    waitedStoreHoldsInsts(waited_store_holds_insts)
+    waitedStoreHoldsInsts(waited_store_holds_insts),
+    waitedLoadHoldsInsts(waited_load_holds_insts)
 {
     if (in_memory_system_limit < 1) {
         fatal("%s: executeMaxAccessesInMemory must be >= 1 (%d)\n", name_,
@@ -1656,6 +1679,7 @@ LSQ::pushRequest(MinorDynInstPtr inst, bool isLoad, uint8_t *data,
 
     if (inst->traceData)
         inst->traceData->setMem(addr, size, flags);
+    inst->effAddr = addr;
 
     int cid = cpu.threads[inst->id.threadId]->getTC()->contextId();
     request->request->setContext(cid);

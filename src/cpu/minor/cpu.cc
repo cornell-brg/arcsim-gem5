@@ -157,6 +157,10 @@ MinorCPU::startup()
 
     BaseCPU::startup();
 
+    // A switched-out core starts fetching when it takes over (drainResume)
+    if (switchedOut())
+        return;
+
     for (ThreadID tid = 0; tid < numThreads; tid++)
         pipeline->wakeupFetch(tid);
 }

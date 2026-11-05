@@ -45,6 +45,12 @@ DebugFlag("InstTracker")
 
 SimObject("WindowInstCounter.py", sim_objects=["WindowInstCounter"])
 Source("window_inst_counter.cc")
+Source("inst_activity.cc")
 Source("thumb_traits.cc")
 
 DebugFlag("WindowInstCounter")
+
+SimObject("TaskInstCounter.py", sim_objects=["TaskInstCounter"])
+Source("task_inst_counter.cc")
+
+DebugFlag("TaskInstCounter")

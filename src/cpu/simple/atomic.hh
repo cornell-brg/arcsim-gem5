@@ -42,6 +42,7 @@
 #define __CPU_SIMPLE_ATOMIC_HH__
 
 #include "cpu/simple/base.hh"
+#include "cpu/simple/inst_latency.hh"
 #include "cpu/simple/exec_context.hh"
 #include "mem/request.hh"
 #include "params/BaseAtomicSimpleCPU.hh"
@@ -67,8 +68,20 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     const bool simulate_data_stalls;
     const bool simulate_inst_stalls;
 
+    /** Each instruction's cycles, or null for one period a micro-op. */
+    BaseInstLatency *const instLatency;
+    /** The PC of the instruction instLatency is told has retired. */
+    std::unique_ptr<PCStateBase> latencyPC;
+    /** A read of the word the core had fetched past an instruction. */
+    RequestPtr ahead_req;
+    void fetchAhead(Addr addr);
+
     // main simulation loop (one cycle)
     void tick();
+
+    /** tick() with instLatency: one instruction, or several when those
+     *  before the last take no cycles, then its cycles. */
+    void tickWithLatency();
 
     /**
      * Check if a system is in a drained state.

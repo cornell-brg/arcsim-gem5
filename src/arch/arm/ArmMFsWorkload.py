@@ -56,3 +56,12 @@ class ArmMFsWorkload(KernelWorkload):
     # Identity load — no address masking or offset.
     load_addr_mask = 0xFFFFFFFFFFFFFFFF
     load_addr_offset = 0
+
+    # A symbol of the firmware's: a {stack pointer, entry} pair of 32-bit
+    # words that every core after the first starts from, with VTOR the
+    # image's vector table, as a boot ROM launching it would (the RP2350's
+    # multicore_launch_core1_raw). Empty: every core starts from the
+    # vector table.
+    secondary_launch = Param.String(
+        "", "Symbol of the {SP, entry} pair cores after the first start from"
+    )

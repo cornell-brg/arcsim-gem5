@@ -21,7 +21,7 @@ class WindowInstCounter(ProbeListenerObject):
     classes_file = Param.String(
         "",
         "the file each window's instructions and micro-ops by OpClass are "
-        "written to (empty: none); needs the atomic CPU",
+        "written to (empty: none); needs the atomic or Minor CPU",
     )
     stats = VectorParam.String(
         [], "full names of scalar statistics whose growth over each window the "
@@ -42,12 +42,24 @@ class WindowInstCounter(ProbeListenerObject):
         "",
         "the file each window's instructions, and the micro-ops of the "
         "split ones, by name are written to (empty: none); needs the atomic "
-        "CPU",
+        "or Minor CPU",
     )
     activity_file = Param.String(
         "",
         "the file each window's instruction activity (widths, shifter uses, "
         "instruction-word bit changes, data accesses by region, taken "
         "control transfers, unit switching) is written to (empty: none); "
-        "Arm Thumb only, needs the atomic CPU",
+        "Arm Thumb only, needs the atomic or Minor CPU",
+    )
+    latency_classes_file = Param.String(
+        "",
+        "the file each window's instructions by the classifier's classes "
+        "are written to (empty: none); needs the classifier, and the atomic "
+        "or Minor CPU",
+    )
+    classifier = Param.BaseInstLatency(
+        NULL,
+        "what classes each instruction for the latency classes file "
+        "(classOf), as TaskInstCounter's; it need not be the CPU's own "
+        "inst_latency",
     )

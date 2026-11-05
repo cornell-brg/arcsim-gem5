@@ -120,7 +120,7 @@ class Xh3irqLine : public ClockedObject
     void edge(bool high);
     void deliver();
 
-    const std::vector<Xh3irq *> controllers;
+    std::vector<Xh3irq *> controllers;
     const uint32_t irqNum;
     const Cycles delay;
     IntSinkPin<Xh3irqLine> pin;

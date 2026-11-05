@@ -229,10 +229,15 @@ class MProfileReset : public ArmMFault
      *  In gem5, the workload sets this to the ELF's flash base address
      *  since we may not have a boot alias at address 0. */
     uint32_t vtorAddr;
+    /** Where the initial SP and PC are read from, if not the vector
+     *  table: a core the boot ROM launches (the RP2350's second core)
+     *  starts from a {stack pointer, entry} pair with VTOR still the
+     *  image's vector table.  0: the vector table's. */
+    uint32_t launchAddr;
 
   public:
-    MProfileReset(uint32_t _vtor = 0) : ArmMFault(MPEXC_RESET),
-        vtorAddr(_vtor) {}
+    MProfileReset(uint32_t _vtor = 0, uint32_t _launch = 0)
+        : ArmMFault(MPEXC_RESET), vtorAddr(_vtor), launchAddr(_launch) {}
     void invoke(ThreadContext *tc,
                 const StaticInstPtr &inst = nullStaticInstPtr) override;
 };

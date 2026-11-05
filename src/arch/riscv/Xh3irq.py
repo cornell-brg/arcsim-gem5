@@ -57,7 +57,11 @@ class Xh3irqLine(ClockedObject):
     cxx_class = "gem5::RiscvISA::Xh3irqLine"
     cxx_header = "arch/riscv/xh3irq.hh"
 
-    controllers = VectorParam.Xh3irq("The controllers the line reaches")
+    controllers = VectorParam.Xh3irq([], "The controllers the line reaches")
+    controller = Param.Xh3irq(
+        NULL, "One more controller the line reaches, for configs that name "
+        "a single one"
+    )
     irq_num = Param.UInt32("External interrupt number (0..num_irqs - 1)")
     delay = Param.Cycles(1, "Register stages between the pin and the controller")
     pin = IntSinkPin("The line")

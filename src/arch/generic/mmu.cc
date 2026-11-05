@@ -176,10 +176,10 @@ BaseMMU::takeOverFrom(BaseMMU *old_mmu)
     Port *new_itb_port = itb->getTableWalkerPort();
     Port *new_dtb_port = dtb->getTableWalkerPort();
 
-    // Move over any table walker ports if they exist
-    if (new_itb_port)
+    // Move over any table walker ports if they exist and are connected
+    if (new_itb_port && old_itb_port->isConnected())
         new_itb_port->takeOverFrom(old_itb_port);
-    if (new_dtb_port)
+    if (new_dtb_port && old_dtb_port->isConnected())
         new_dtb_port->takeOverFrom(old_dtb_port);
 
     itb->takeOverFrom(old_mmu->itb);

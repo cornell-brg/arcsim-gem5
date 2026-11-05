@@ -61,6 +61,11 @@ class BaseAtomicSimpleCPU(BaseSimpleCPU):
     width = Param.Int(1, "CPU width")
     simulate_data_stalls = Param.Bool(False, "Simulate dcache stall cycles")
     simulate_inst_stalls = Param.Bool(False, "Simulate icache stall cycles")
+    inst_latency = Param.BaseInstLatency(
+        NULL,
+        "each instruction's cycles (inst_latency.hh), in place of one "
+        "clock period a micro-op; none by default",
+    )
 
     def addSimPointProbe(self, interval):
         simpoint = SimPoint()
