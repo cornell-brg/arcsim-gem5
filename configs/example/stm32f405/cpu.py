@@ -12,6 +12,11 @@ is an F405 option: CortexM4CPU and the G474 board are unchanged.
   word waits a cycle (MinorCPU's executeHalfwordWideMemCycles; every other time when it is
   itself a load or store, the first three after a branch free), as the Crazyflie's
   prefetch drains under such loads (arcsim-bench micro/unaligned's lw and lwh bodies).
+- A taken branch whose target line is still on its way keeps that fetch (MinorCPU's
+  fetchKeepTargetInFlight) rather than fetching the line again. From flash the line has
+  always arrived (an ART hit answers at once); from SRAM, over the system bus, it never
+  has, and the refetch cost every taken branch about 4 cycles the Crazyflie does not
+  spend (micro/fetch br_back_0 from SRAM: 1010 cycles against the board's 608).
 """
 
 from m5.objects.BaseMinorCPU import (
@@ -88,6 +93,7 @@ class F405FUPool(MinorFUPool):
 
 class CrazyflieF405CPU(CortexM4CPU):
     executeFuncUnits = F405FUPool()
+    fetchKeepTargetInFlight = True
     executeAlignedTransfers = True
     if HALFWORD_WIDE_MEM:
         executeHalfwordWideMemCycles = 1

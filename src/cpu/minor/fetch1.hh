@@ -519,6 +519,24 @@ class SingleStageFetch1 : public Fetch1
      *  limit) */
     unsigned int readAheadLimit;
 
+    /** See fetchKeepTargetInFlight in BaseMinorCPU.py */
+    bool keepTargetInFlight;
+
+    /** A target request Execute's branch went to while it was still on
+     *  its way, kept to start the new stream (fetchKeepTargetInFlight);
+     *  null if none.  The line's id, PC and addresses are fixed when it
+     *  is kept, before the stream's next lines are requested */
+    FetchRequestPtr keptTargetRequest = NULL;
+    InstId keptId;
+    std::unique_ptr<PCStateBase> keptPC;
+    Addr keptFetchAddr = 0;
+    Addr keptLineBase = 0;
+
+    /** If execute_branch goes to the line target_request is still
+     *  fetching, keep the request as keptTargetRequest and return true */
+    bool keepTargetLine(FetchRequestPtr &target_request,
+        const BranchData &execute_branch);
+
     /** Is the stream fetched as far ahead of decode as readAheadLimit
      *  allows? */
     bool readAheadFull();

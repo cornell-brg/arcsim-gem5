@@ -888,6 +888,7 @@ SingleStageFetch1::recvTimingResp(PacketPtr pkt)
 
     if (fetch_request == targetRequest ||
         fetch_request == olderTargetRequest ||
+        (fetch_request == keptTargetRequest && keptTargetRequest) ||
         abandoned != abandonedTargetRequests.end())
     {
         numFetchesInMemorySystem--;
@@ -901,6 +902,10 @@ SingleStageFetch1::recvTimingResp(PacketPtr pkt)
             DPRINTF(Fetch, "SF1: branch target line arrived addr=%#x\n",
                 pkt->getAddr());
         }
+
+        /* Fetch waits for a kept target line: it goes on now */
+        if (fetch_request == keptTargetRequest)
+            cpu.wakeupOnEventImmediate(Pipeline::Fetch1StageId);
 
         return true;
     }
@@ -1156,6 +1161,55 @@ SingleStageFetch1::takeTargetLine(FetchRequestPtr &target_request,
     return true;
 }
 
+bool
+SingleStageFetch1::keepTargetLine(FetchRequestPtr &target_request,
+    const BranchData &execute_branch)
+{
+    /* As takeTargetLine, for a request still in the memory system; one on
+     *  speculation may yet be declined, so it is not kept */
+    if (!keepTargetInFlight || !target_request ||
+        target_request->state != FetchRequest::RequestIssuing ||
+        target_request->request->isPrefetch() ||
+        !execute_branch.isStreamChange() || !execute_branch.target ||
+        execute_branch.reason == BranchData::SuspendThread ||
+        !execute_branch.inst || execute_branch.inst->isBubble() ||
+        execute_branch.inst->isFault() ||
+        !(execute_branch.inst->staticInst->isDirectCtrl() ||
+          execute_branch.inst->staticInst->isSquashAfter() ||
+          (fetch2->registerAtDecode() &&
+           execute_branch.inst->staticInst->isIndirectCtrl())))
+    {
+        return false;
+    }
+
+    Addr target_addr = execute_branch.target->instAddr();
+    Addr line_base = target_request->request->getVaddr();
+    unsigned int size = target_request->request->getSize();
+
+    if (target_addr < line_base || target_addr >= line_base + size)
+        return false;
+
+    ThreadID tid = execute_branch.threadId;
+    Fetch1ThreadInfo &thread = fetchInfo[tid];
+
+    keptId = InstId(tid, thread.streamSeqNum, thread.predictionSeqNum,
+        lineSeqNum);
+    lineSeqNum++;
+    set(keptPC, thread.pc);
+    keptFetchAddr = target_addr;
+    keptLineBase = line_base;
+
+    /* Fetching carries on after this line */
+    thread.fetchAddr = line_base + size;
+
+    DPRINTF(Fetch, "SF1: keeping branch target line addr=%#x on its way"
+        " as %s\n", line_base, keptId);
+
+    keptTargetRequest = target_request;
+    target_request = NULL;
+    return true;
+}
+
 SingleStageFetch1::SingleStageFetch1(const std::string &name_,
     MinorCPU &cpu_,
     const BaseMinorCPUParams &params,
@@ -1174,7 +1228,8 @@ SingleStageFetch1::SingleStageFetch1(const std::string &name_,
     branchSpeculation(params.fetchBranchSpeculation),
     targetRequest(NULL),
     olderTargetRequest(NULL),
-    readAheadLimit(params.fetchReadAheadLimit)
+    readAheadLimit(params.fetchReadAheadLimit),
+    keepTargetInFlight(params.fetchKeepTargetInFlight)
 {
 }
 
@@ -1295,9 +1350,16 @@ SingleStageFetch1::evaluate()
     bool have_target_line = false;
 
     if (exec_branch.isStreamChange()) {
+        /* A line kept for the stream before this one is no longer wanted */
+        abandonTargetRequest(keptTargetRequest);
         have_target_line =
             takeTargetLine(olderTargetRequest, exec_branch, target_line) ||
             takeTargetLine(targetRequest, exec_branch, target_line);
+        /* A target line still on its way is kept rather than fetched
+         *  again (fetchKeepTargetInFlight) */
+        bool kept = !have_target_line &&
+            (keepTargetLine(olderTargetRequest, exec_branch) ||
+             keepTargetLine(targetRequest, exec_branch));
         abandonTargetRequest(olderTargetRequest);
         abandonTargetRequest(targetRequest);
         fetch2->decodedBranchTarget.reset();
@@ -1306,9 +1368,9 @@ SingleStageFetch1::evaluate()
         fetch2->sureBranch = nullptr;
         fetch2->lastBranch = nullptr;
         sendOnSpeculation = false;
-        /* A target line taken here was fetched without the compare, and
-         *  fetching carries on after it */
-        executeRedirected = !have_target_line;
+        /* A target line taken or kept here was fetched without the
+         *  compare, and fetching carries on after it */
+        executeRedirected = !have_target_line && !kept;
         predictAfterThis = false;
     } else if (fetch2->decodedBranchTarget) {
         /* The direct branch decoded last cycle is in Decode now.  The
@@ -1366,7 +1428,38 @@ SingleStageFetch1::evaluate()
     ForwardLineData line;
     bool was_discarded = false;
     ThreadID discarded_tid = InvalidThreadID;
-    processCompletedFetch(line, was_discarded, discarded_tid);
+
+    if (keptTargetRequest) {
+        /* The kept target line goes first: nothing of its stream behind it
+         *  is fetched before it has arrived */
+        if (keptTargetRequest->isComplete()) {
+            PacketPtr packet = keptTargetRequest->packet;
+
+            if (!packet || packet->isError()) {
+                /* The memory system gave it up (a stale stream's read):
+                 *  the line is fetched as any other */
+                fetchInfo[keptId.threadId].fetchAddr = keptLineBase;
+                DPRINTF(Fetch, "SF1: kept branch target line addr=%#x"
+                    " given up, fetched again\n", keptLineBase);
+            } else {
+                line.setFault(NoFault);
+                line.id = keptId;
+                set(line.pc, keptPC);
+                line.fetchAddr = keptFetchAddr;
+                line.lineBaseAddr = keptLineBase;
+                line.adoptPacketData(packet);
+                keptTargetRequest->packet = NULL;
+
+                DPRINTF(Fetch, "SF1: kept branch target line addr=%#x"
+                    " arrived as %s\n", keptLineBase, keptId);
+            }
+
+            delete keptTargetRequest;
+            keptTargetRequest = NULL;
+        }
+    } else {
+        processCompletedFetch(line, was_discarded, discarded_tid);
+    }
 
     /* --- Handoff: push line to Fetch2's inputBuffer --- */
     if (!line.isBubble()) {
@@ -1429,7 +1522,7 @@ SingleStageFetch1::evaluate()
     resendDeclined(sendOnSpeculation);
 
     if (!prediction.isBubble() || !fetch2->scanNextForBranch()) {
-        if (!fetch2->sureBranch && !readAheadFull())
+        if (!fetch2->sureBranch && !readAheadFull() && !keptTargetRequest)
             tryToFetch();
     }
 
