@@ -177,9 +177,9 @@ def make_board(
     latency = f"{flash_latency_ps(caches, clock_mhz, flash_ws)}ps"
     # At IL every setting has the accelerator, whose atomic timing keeps the line last
     # read. With every bit off it serves only that line (direct mode), and the next line is
-    # read ahead as the core's own fetch-ahead reads it, a line of 16 bytes every 9 cycles
-    # (the wait states plus 4: the Crazyflie's nop16 and nop32 bodies, 9 to 10 cycles a
-    # line whatever its instructions take).
+    # read ahead as the core's own fetch-ahead reads it. This setting is the IL tier's
+    # weakest: no read time fits both the Crazyflie's straight-line bodies (9 to 10 cycles
+    # a line) and its kernels and suites, so it keeps the documented one.
     if caches == "none" and not inst_latency:
         # One memory with an ICode and a DCode port, DCode first, each keeping
         # the last 128-bit line it read.
@@ -225,7 +225,7 @@ def make_board(
             # An instruction read from flash: the wait states plus one cycle
             # (RM0090 table 11).
             atomic_latency=inst_latency,
-            atomic_line_cycles=flash_ws + (4 if caches == "none" else 1),
+            atomic_line_cycles=flash_ws + 1,
         )
         board.art_icache.cpu_side = board.icode_bus.mem_side_ports
         board.art_icache.mem_side = board.icode_flash_link.cpu_side_ports

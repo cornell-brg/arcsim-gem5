@@ -38,13 +38,16 @@ _UNITS = {F405FloatFU: 0, F405FloatMacFU: 1, F405FloatDivFU: 2}
 # - a load or store (M4Mem): an address phase before its transfers (ldm4, stm4, ldrd,
 #   strd: 1 + N), which a single load after a load or store overlaps and a single store
 #   never pays (load, store: 1 each), and its result a cycle after its transfer
-#   (load_dep: 2 each).
+#   (load_dep: 2 each);
+# - VMLA and VFMA (F405FMac): 3 cycles that hold the next instruction, as the CL model's
+#   in-order completion and the TRM's 3 cycles [table 7-1] (fp_busy's vfma_vldr and
+#   vfma_vstr; kalman -24 % to -10 %, the held-out set unchanged).
 _PIPELINE_CLASSES = (
     ("F405Isb", _T32 | 0xFFFFFFF0, _T32 | 0xF3BF8F60, {"cycles": 3}),
     ("F405BxLr", _T32 | 0xFFFF, _T16 | 0x4770, {}),
     ("F405BxReg", _T32 | 0xFF07, _T16 | 0x4700, {"branch_extra": 1}),
 )
-_DEFAULTS = {"M4Mem": {"address_phase": 1, "result_delay": 1}}
+_DEFAULTS = {"M4Mem": {"address_phase": 1, "result_delay": 1}, "F405FMac": {"cycles": 3}}
 # An IT takes no cycle before a 16-bit instruction (fold's it_same and it_cross); nothing
 # else folds.
 _IT_FOLDS = _fold([(0xFF08, 0xBF08, 2), (0xFF04, 0xBF04, 2), (0xFF02, 0xBF02, 2), (0xFF01, 0xBF01, 2)])
