@@ -2,11 +2,18 @@
 CortexM4CPU, Cortex-M4 r0p1 on both, with the Crazyflie's own timing), the F405's flash accelerator (ART) in each of its four
 settings, SRAM on the system bus and CCM on the data bus only.
 
-    make_board(firmware, caches="full", clock_mhz=168, flash_ws=5) -> ArmMSystem
+    make_board(firmware, caches="full", clock_mhz=168, flash_ws=5, cpu="minor",
+               inst_latency=False) -> ArmMSystem
 
 caches names FLASH_ACR's bits as arcsim-bench does: full (ICEN DCEN PRFTEN),
 noprefetch (ICEN DCEN), nocache (PRFTEN), none. Peripherals beyond the SCS and
 the DWT are the caller's: attach them to board.system_bus.mem_side_ports.
+
+cpu is minor (CrazyflieF405CPU, the cycle-level model) or atomic (gem5's atomic CPU,
+instruction level: no core timing). With inst_latency the atomic CPU is timed by the
+F405's latency table (latency.py: CrazyflieF405CPU's classes), the accelerator's atomic
+timing (its hits, its current and prefetched lines, a flash line read of the wait states
+plus one) and the system bus that SRAM code's fetches share with data.
 
 The accelerator (RM0090 section 3.4): flash reads 128 bits; the instruction cache
 holds 64 lines and the data cache 8, each of 128 bits, replaced least recently
@@ -89,9 +96,15 @@ def flash_latency_ps(caches, clock_mhz, flash_ws):
     return int(round(ws_ps * 23000 / (4 * 1e6 / 170)))
 
 
-def make_board(firmware=None, *, caches="full", clock_mhz=168, flash_ws=5):
+def make_board(
+    firmware=None, *, caches="full", clock_mhz=168, flash_ws=5, cpu="minor", inst_latency=False
+):
     if caches not in CACHES:
         raise ValueError(f"caches is one of {', '.join(CACHES)}, not {caches}")
+    if cpu not in ("minor", "atomic"):
+        raise ValueError(f"cpu is minor or atomic, not {cpu}")
+    if inst_latency and cpu != "atomic":
+        raise ValueError("inst_latency is for the atomic CPU")
     cache_on, prefetch_on = CACHES[caches]
     platform = STM32F405Platform()
 
@@ -111,7 +124,20 @@ def make_board(firmware=None, *, caches="full", clock_mhz=168, flash_ws=5):
         clock="1ps", voltage_domain=VoltageDomain(voltage="1.0V")
     )
 
-    cpu = CrazyflieF405CPU()  # cpu.py: CortexM4CPU with the Crazyflie's own timing
+    kind = cpu
+    if kind == "atomic":
+        from m5.objects.ArmMCPU import ArmMAtomicSimpleCPU
+
+        cpu = ArmMAtomicSimpleCPU()
+        if inst_latency:
+            from latency import f405_inst_latency  # this directory's latency.py
+
+            # Flash: the latency the accelerator (or the flash) returns. SRAM: the
+            # system bus, which its code's fetches share with data [DDI0439D 2.3.1:
+            # a system-bus fetch is registered, two cycles, never back to back].
+            cpu.inst_latency = f405_inst_latency(timed_ranges=[FLASH], bus_ranges=[SRAM])
+    else:
+        cpu = CrazyflieF405CPU()  # cpu.py: CortexM4CPU with the Crazyflie's own timing
     board.cpu = cpu
     board.mem_mode = cpu.memory_mode()
     cpu.clk_domain = board.clk_domain
@@ -149,7 +175,12 @@ def make_board(firmware=None, *, caches="full", clock_mhz=168, flash_ws=5):
     board.dcode_bus.default = board.system_bus.cpu_side_ports
 
     latency = f"{flash_latency_ps(caches, clock_mhz, flash_ws)}ps"
-    if caches == "none":
+    # At IL every setting has the accelerator, whose atomic timing keeps the line last
+    # read. With every bit off it serves only that line (direct mode), and the next line is
+    # read ahead as the core's own fetch-ahead reads it, a line of 16 bytes every 9 cycles
+    # (the wait states plus 4: the Crazyflie's nop16 and nop32 bodies, 9 to 10 cycles a
+    # line whatever its instructions take).
+    if caches == "none" and not inst_latency:
         # One memory with an ICode and a DCode port, DCode first, each keeping
         # the last 128-bit line it read.
         board.flash = PipelinedSimpleMemory(
@@ -183,7 +214,7 @@ def make_board(firmware=None, *, caches="full", clock_mhz=168, flash_ws=5):
             addr_ranges=[FLASH],
             cache_blk_size=LINE,
             pf_blk_size=LINE,
-            enable_prefetch=prefetch_on,
+            enable_prefetch=prefetch_on or (inst_latency and caches == "none"),
             direct_memory_mode=not cache_on,
             prefetch_on_cache_hit=True,
             buffer_hit_latency="0ns",
@@ -191,6 +222,10 @@ def make_board(firmware=None, *, caches="full", clock_mhz=168, flash_ws=5):
             flash_start_addr=FLASH.start,
             flash_end_addr=FLASH.end,
             arrive_buffer_size=0,
+            # An instruction read from flash: the wait states plus one cycle
+            # (RM0090 table 11).
+            atomic_latency=inst_latency,
+            atomic_line_cycles=flash_ws + (4 if caches == "none" else 1),
         )
         board.art_icache.cpu_side = board.icode_bus.mem_side_ports
         board.art_icache.mem_side = board.icode_flash_link.cpu_side_ports

@@ -45,6 +45,7 @@ class MProfileLatencyClass : public SimObject
     const bool divide;
     const bool accumulate;
     const Cycles branchExtra;
+    const Cycles addressPhase;
 
   private:
     std::vector<bool> opClasses;
@@ -134,12 +135,30 @@ class MProfileInstLatency : public BaseInstLatency
     std::vector<AddrRange> waitRanges;
     std::vector<Cycles> waitCycles;
     std::vector<Cycles> waitWriteCycles;
+    std::vector<AddrRange> busRanges;
+    const Cycles busFetchCycles;
+    const Cycles busDataCycles;
+    const bool divideBySize;
+
+    /** Whether an address is on the shared bus. */
+    bool onBus(Addr paddr) const;
+
+    /** The instruction in flight's fetches from the shared bus and its
+     *  data transfers to it. */
+    unsigned busFetches = 0;
+    unsigned busTransfers = 0;
+    /** When the shared bus is free for the next fetch. */
+    Cycles busFree{0};
+    /** The word the last fetch over the shared bus read. */
+    Addr busFetchWord = MaxAddr;
 
     // The instruction in flight: what its micro-ops did so far.
     /** The OpClass it is classed by: its first memory micro-op's, else
      *  its own. */
     OpClass memOpClass = No_OpClass;
     bool hasMemOp = false;
+    /** Whether it loads or stores several registers (micro-ops). */
+    bool severalRegs = false;
     /** Its data accesses' aligned transfers on the 32-bit bus, a cycle
      *  each. */
     unsigned transfers = 0;
@@ -167,6 +186,8 @@ class MProfileInstLatency : public BaseInstLatency
     bool prevSequential = false;
     bool prevWritesFlags = false;
     bool prevPushPop = false;
+    /** Whether the instruction before loaded or stored. */
+    bool prevMemOp = false;
     /** The instruction before was an IT that folds into this one if it is
      *  16-bit. */
     bool itPending = false;
@@ -198,6 +219,7 @@ class MProfileInstLatency : public BaseInstLatency
         statistics::Scalar memoryCycles;
         statistics::Scalar resultWaits;
         statistics::Scalar unitWaits;
+        statistics::Scalar busWaits;
         statistics::Scalar folded;
         statistics::Scalar takenBranches;
         statistics::Scalar unalignedTargets;

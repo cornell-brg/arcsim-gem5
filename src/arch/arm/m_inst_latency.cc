@@ -1,6 +1,7 @@
 #include "arch/arm/m_inst_latency.hh"
 
 #include <algorithm>
+#include <cstdlib>
 #include <map>
 
 #include "arch/arm/m_faults.hh"
@@ -92,7 +93,8 @@ MProfileLatencyClass::MProfileLatencyClass(const Params &p)
     : SimObject(p), description(p.description), cycles(p.cycles),
       resultDelay(p.result_delay), unit(p.unit), busy(p.busy),
       divide(p.divide), accumulate(p.accumulate),
-      branchExtra(p.branch_extra), mask(p.mask), match(p.match),
+      branchExtra(p.branch_extra), addressPhase(p.address_phase),
+      mask(p.mask), match(p.match),
       srcLats(p.src_lats.begin(), p.src_lats.end()), minSrcLat(0)
 {
     if (!p.op_classes.empty()) {
@@ -142,6 +144,8 @@ MProfileInstLatency::LatencyStats::LatencyStats(statistics::Group *parent)
                "cycles instructions waited for a result"),
       ADD_STAT(unitWaits, statistics::units::Cycle::get(),
                "cycles instructions waited for their unit"),
+      ADD_STAT(busWaits, statistics::units::Cycle::get(),
+               "cycles instructions waited for a fetch over the shared bus"),
       ADD_STAT(folded, statistics::units::Count::get(),
                "instructions folded with the one before or after"),
       ADD_STAT(takenBranches, statistics::units::Count::get(),
@@ -172,6 +176,8 @@ MProfileInstLatency::MProfileInstLatency(const Params &p)
       waitWriteCycles(p.wait_write_cycles.empty() ? waitCycles
           : std::vector<Cycles>(p.wait_write_cycles.begin(),
                                 p.wait_write_cycles.end())),
+      busRanges(p.bus_ranges), busFetchCycles(p.bus_fetch_cycles),
+      busDataCycles(p.bus_data_cycles), divideBySize(p.divide_by_size),
       stats(this)
 {
     fatal_if(foldMasks.size() != foldMatches.size() ||
@@ -259,6 +265,7 @@ void
 MProfileInstLatency::clearInFlight()
 {
     hasMemOp = false;
+    severalRegs = false;
     transfers = 0;
     readsMemory = false;
     control = false;
@@ -272,6 +279,8 @@ void
 MProfileInstLatency::forgetPrevious()
 {
     havePrevious = false;
+    prevMemOp = false;
+    busFetchWord = MaxAddr;
     itPending = false;
     branchedTo = false;
     aheadPending = false;
@@ -299,6 +308,8 @@ MProfileInstLatency::faultTaken(const Fault &fault, ThreadContext *tc)
 {
     // Whatever the faulting fetch or instruction did is not charged.
     memoryCycles = Cycles(0);
+    busFetches = 0;
+    busTransfers = 0;
     forgetPrevious();
     if (dynamic_cast<const MProfileExcReturnFetch *>(fault.get())) {
         // Charged to the next instruction, or folded into the next entry.
@@ -344,7 +355,24 @@ MProfileInstLatency::beforeOp(const StaticInstPtr &inst,
         sources.push_back({regKey(reg), late});
     }
 
-    if (inst->opClass() == IntDivOp && inst->numSrcRegs() >= 2) {
+    if (inst->opClass() == IntDivOp && divideBySize) {
+        // As MinorCPU's Cortex-M4 divider (DynamicLatencyIntDivFU): 4 cycles
+        // and one for each 4 significant bits of the larger operand, from 2
+        // to 12 [DDI0439D table 3-1].
+        uint32_t largest = 0;
+        for (int i = 0; i < inst->numSrcRegs(); ++i) {
+            const RegId reg = inst->srcRegIdx(i);
+            if (!reg.is(IntRegClass))
+                continue;
+            const uint32_t value = tc->getReg(reg);
+            largest = std::max(largest, static_cast<uint32_t>(
+                std::abs(static_cast<int32_t>(value))));
+        }
+        const unsigned significant = largest ? 32 - __builtin_clz(largest)
+                                             : 0;
+        operandCycles = Cycles(largest == 0 ? 2
+            : std::clamp(4u + (significant + 3) / 4, 2u, 12u));
+    } else if (inst->opClass() == IntDivOp && inst->numSrcRegs() >= 2) {
         // As MinorCPU's RP2350 M33 divider (DynamicLatencyIntDivFU): Thumb's
         // divide decodes its divisor before its dividend, and the cycles
         // follow the distance between their most significant ones.
@@ -380,6 +408,9 @@ MProfileInstLatency::afterOp(const StaticInstPtr &inst,
         hasMemOp = true;
         memOpClass = inst->opClass();
     }
+    // A load or store of several registers (LDM, STM, PUSH, POP) comes as
+    // micro-ops of one instruction.
+    severalRegs = severalRegs || (inst->isMemRef() && macro);
     readsMemory = readsMemory || load;
     // A load's registers come one a bus transfer, in order; this one's
     // transfers have been counted already.
@@ -413,6 +444,16 @@ MProfileInstLatency::access(Addr paddr, unsigned size, Cycles latency,
 {
     if (!fetch)
         transfers += transfersOf(paddr, size, inFlightStore);
+    if (onBus(paddr)) {
+        // A fetch reads a word: the instruction after a 16-bit one in the
+        // same word, reached in sequence, needs no fetch of its own.
+        const Addr word = paddr & ~Addr(3);
+        if (fetch && word != busFetchWord) {
+            ++busFetches;
+            busFetchWord = word;
+        } else if (!fetch)
+            busTransfers += transfersOf(paddr, size, inFlightStore);
+    }
     for (const AddrRange &range : timedRanges) {
         if (range.contains(paddr)) {
             memoryCycles += latency;
@@ -426,6 +467,16 @@ MProfileInstLatency::access(Addr paddr, unsigned size, Cycles latency,
             return;
         }
     }
+}
+
+bool
+MProfileInstLatency::onBus(Addr paddr) const
+{
+    for (const AddrRange &range : busRanges) {
+        if (range.contains(paddr))
+            return true;
+    }
+    return false;
 }
 
 bool
@@ -466,6 +517,11 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
     // two for a word that crosses a word boundary.
     if (transfers > 1)
         c += Cycles(transfers - 1);
+    if (hasMemOp && cls && cls->addressPhase > 0) {
+        const bool several = transfers > 1 || severalRegs;
+        if (several || (readsMemory && !prevMemOp))
+            c += cls->addressPhase;
+    }
 
     bool folded = false;
     bool branched_to = false;
@@ -488,6 +544,8 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
             }
             branched_to = !prevPushPop;
             ++stats.takenBranches;
+            // The target is fetched anew, even from the same word.
+            busFetchWord = MaxAddr;
             if (fetchAhead) {
                 // The word after the one the branch ends in
                 aheadPending = true;
@@ -523,6 +581,20 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
         issue += unalignedTarget;
         ++stats.unalignedTargets;
     }
+    // Its fetches over the shared bus, one after another once the bus is
+    // free: it issues no sooner than the last of them starts.
+    if (busFetches > 0) {
+        Cycles start = now;
+        for (unsigned i = 0; i < busFetches; ++i) {
+            start = std::max(start, busFree);
+            busFree = start + busFetchCycles;
+        }
+        if (start > issue) {
+            stats.busWaits += start - issue;
+            issue = start;
+        }
+        busFetches = 0;
+    }
     Cycles needed(0);
     for (const Source &s : sources) {
         auto it = ready.find(s.reg);
@@ -543,6 +615,13 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
             issue = free;
         }
         free = issue + cls->busy;
+    }
+    // Its data transfers over the shared bus, from when it issues, ahead
+    // of the next fetch.
+    if (busTransfers > 0) {
+        busFree = std::max(busFree, issue) +
+            Cycles(busTransfers * busDataCycles);
+        busTransfers = 0;
     }
     const Cycles memory = memoryCycles;
     memoryCycles = Cycles(0);
@@ -590,6 +669,7 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
     prevSequential = sequential;
     prevWritesFlags = writesFlags;
     prevPushPop = isPushPop(emi);
+    prevMemOp = hasMemOp;
     itPending = fold == 2;
     branchedTo = branched_to;
     clearInFlight();

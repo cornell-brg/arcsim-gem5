@@ -222,6 +222,20 @@ class ARTCache(NoncoherentCache):
     )
 
     address_phase_latency = Param.Latency("0ns", "AHB address phase duration")
+
+    atomic_latency = Param.Bool(
+        False,
+        "In atomic mode, return the cycles a fetch waits (an atomic CPU's "
+        "inst_latency charges them): none for a cache hit or the line last "
+        "read; what is left of its read for the line being prefetched; a "
+        "flash read of atomic_line_cycles, after any read in flight, for "
+        "any other line. With enable_prefetch the next line is read next.",
+    )
+    atomic_line_cycles = Param.Cycles(
+        6,
+        "core cycles of a flash line read for a fetch (the wait states plus "
+        "one), in atomic mode",
+    )
     arrive_buffer_size = Param.Int(
         1, "Max entries in arrive buffer (0 = unlimited)"
     )

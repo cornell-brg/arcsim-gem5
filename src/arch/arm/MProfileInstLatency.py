@@ -43,6 +43,15 @@ class MProfileLatencyClass(SimObject):
         False, "cycles from its operands, as the RP2350's Cortex-M33 divides"
     )
     branch_extra = Param.Cycles(0, "more cycles when it is a taken branch")
+    address_phase = Param.Cycles(
+        0,
+        "a load or store's address phase before its transfers: always for "
+        "one of several registers or transfers (LDM, STM, LDRD, STRD, PUSH, "
+        "POP), for a single load unless the instruction before was a load "
+        "or store, whose data phase it overlaps, and never for a single "
+        "store, which the store buffer takes (the Cortex-M4, DDI0439D "
+        "3.3.2)",
+    )
     accumulate = Param.Bool(
         False,
         "a multiply whose accumulate operands (Ra; a long multiply's RdLo "
@@ -125,4 +134,23 @@ class MProfileInstLatency(BaseInstLatency):
         [],
         "per wait range, a write's cycles beyond the instruction's (empty: "
         "as a read's)",
+    )
+    bus_ranges = VectorParam.AddrRange(
+        [],
+        "memory on a bus that instruction fetches and data accesses share, "
+        "data first (the Cortex-M3 and M4's system bus): a fetch from it "
+        "starts once the bus is free and holds it bus_fetch_cycles, a data "
+        "transfer to it holds it bus_data_cycles",
+    )
+    bus_fetch_cycles = Param.Cycles(
+        2, "cycles a fetch from bus_ranges holds the bus"
+    )
+    bus_data_cycles = Param.Cycles(
+        1, "cycles a data transfer to bus_ranges holds the bus"
+    )
+    divide_by_size = Param.Bool(
+        False,
+        "a divide's cycles from its larger operand's size, as the Cortex-M4 "
+        "(DDI0439D table 3-1), instead of from its operands' distance, as "
+        "the RP2350's Cortex-M33",
     )

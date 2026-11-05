@@ -164,7 +164,28 @@ class ART : public NoncoherentCache
     void retryStaleReturn();
     EventFunctionWrapper staleReturnEvent;
 
+    // ---------------------------------------------------------------
+    //  Atomic mode (atomic_latency): the cycles a fetch waits
+    // ---------------------------------------------------------------
+
+    /** Return the cycles a fetch waits in atomic mode. */
+    const bool atomicLatency;
+
+    /** Core cycles of a flash line read for a fetch. */
+    const Cycles atomicLineCycles;
+
+    /** The line last read from flash (the current buffer). */
+    Addr atomicCurLine = MaxAddr;
+
+    /** The line being prefetched, and when its read ends. */
+    Addr atomicPfLine = MaxAddr;
+    Tick atomicPfReady = 0;
+
+    /** When the flash finishes the reads started so far. */
+    Tick atomicFlashFree = 0;
+
   protected:
+    Tick recvAtomic(PacketPtr pkt) override;
     QueueEntry* getNextQueueEntry() override;
     Tick nextQueueReadyTime() const override;
     void recvTimingReq(PacketPtr pkt) override;
