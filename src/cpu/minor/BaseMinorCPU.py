@@ -378,6 +378,15 @@ class BaseMinorCPU(BaseCPU):
         " memory system may decline with an error, and a declined line is"
         " fetched again once it is sure to be wanted",
     )
+    fetchKeepTargetInFlight = Param.Bool(
+        False,
+        "With fetchBranchTargetAtDecode: when Execute takes a branch whose"
+        " target line is still on its way (fetched while the branch was in"
+        " Decode, not on speculation), that request is kept and starts the"
+        " new stream when it arrives, where otherwise it is given up and the"
+        " same line fetched again; this matters only where a fetch takes"
+        " longer than the branch's Decode cycle (code over a slower bus)",
+    )
     fetchRegisterTargetAtDecode = Param.Bool(
         False,
         "With fetchBranchTargetAtDecode: a branch to the value of its one"
