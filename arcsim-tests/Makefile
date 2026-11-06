@@ -37,9 +37,10 @@ check-verbose: configure
 # soc builds an HWPE's test program only for the HWPE it is configured with, and
 # keeps the ELFs of earlier ones; vvadd, its default, last.
 soc-tests:
+	@$(MAKE) --no-print-directory -C $(ARCSIM_SOC_HOME)/tests build HWPE=vvadd FPU=zfinx
 	@$(MAKE) --no-print-directory -C $(ARCSIM_SOC_HOME)/tests build \
-	         HWPE=fast-with-scoring-wide-multicycle-cell-best-k
-	@$(MAKE) --no-print-directory -C $(ARCSIM_SOC_HOME)/tests build HWPE=vvadd
+	         HWPE=fast-with-scoring-wide-multicycle-cell-best-k FPU=zfinx
+	@$(MAKE) --no-print-directory -C $(ARCSIM_SOC_HOME)/tests build HWPE=optical-flow FPU=zfinx
 
 check-rebuild: soc-tests
 	@$(MAKE) --no-print-directory check
