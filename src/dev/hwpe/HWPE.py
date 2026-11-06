@@ -40,6 +40,7 @@ class HWPEBase(BasicPioDevice):
     no time: the job starts atomic_latency cycles after its TRIGGER (or
     after the previous job is done), makes all its accesses at that tick and
     counts as done at once. So its results appear when it counts as done.
+    With `timed_in_atomic`, a job keeps the timing it has with a timing CPU.
 
     Differences from arcsim-soc's prototype (hwpe-vvadd), which follows the
     hwpe_ctrl RTL more literally. In the prototype:
@@ -86,6 +87,11 @@ class HWPEBase(BasicPioDevice):
         "In atomic mode, cycles from a job's TRIGGER (or the previous job "
         "being done) to its start, at which it is also done; in place of "
         "start_latency, done_latency and the job's own timing",
+    )
+    timed_in_atomic = Param.Bool(
+        False,
+        "With an atomic CPU, a job still takes the cycles it takes with a "
+        "timing CPU, its TCDM accesses made as timing accesses",
     )
     mux_channels = Param.Unsigned(
         "Channels of the streamer's TCDM mux (the RTL's NB_IN_CHAN, a power "
