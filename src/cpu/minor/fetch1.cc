@@ -1199,8 +1199,11 @@ SingleStageFetch1::keepTargetLine(FetchRequestPtr &target_request,
     keptFetchAddr = target_addr;
     keptLineBase = line_base;
 
-    /* Fetching carries on after this line */
+    /* Fetching carries on after this line, and the request belongs to the
+     *  new stream, so a memory that gives up a stale stream's reads (the
+     *  STM32 ART) keeps it */
     thread.fetchAddr = line_base + size;
+    target_request->request->setStreamId(thread.streamSeqNum);
 
     DPRINTF(Fetch, "SF1: keeping branch target line addr=%#x on its way"
         " as %s\n", line_base, keptId);
@@ -1430,8 +1433,7 @@ SingleStageFetch1::evaluate()
     ThreadID discarded_tid = InvalidThreadID;
 
     if (keptTargetRequest) {
-        /* The kept target line goes first: nothing of its stream behind it
-         *  is fetched before it has arrived */
+        /* The kept target line goes first */
         if (keptTargetRequest->isComplete()) {
             PacketPtr packet = keptTargetRequest->packet;
 
@@ -1522,6 +1524,12 @@ SingleStageFetch1::evaluate()
     resendDeclined(sendOnSpeculation);
 
     if (!prediction.isBubble() || !fetch2->scanNextForBranch()) {
+        /* Nothing more of the stream is fetched while its kept target
+         *  line is on its way: on the Crazyflie's system bus a fetch never
+         *  follows another back to back (DDI0439D 2.3.1), and a sequential
+         *  fetch beside the kept one delays the next branch's target from
+         *  SRAM (micro/fetch br_back_0: 714 cycles with one, 616 without,
+         *  the board 608) */
         if (!fetch2->sureBranch && !readAheadFull() && !keptTargetRequest)
             tryToFetch();
     }
