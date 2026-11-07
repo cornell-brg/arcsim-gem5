@@ -149,6 +149,12 @@ class MProfileInstLatency(BaseInstLatency):
     bus_data_cycles = Param.Cycles(
         1, "cycles a data transfer to bus_ranges holds the bus"
     )
+    bus_word_fifo = Param.Unsigned(
+        0,
+        "words the fetch queue holds for fetches from bus_ranges, which then "
+        "run ahead of the instruction that needs them (0: no queue: a fetch "
+        "waits for the instruction before)",
+    )
     unaligned_pieces = Param.Bool(
         False,
         "an unaligned load splits as a store does, into the naturally aligned "

@@ -178,7 +178,7 @@ MProfileInstLatency::MProfileInstLatency(const Params &p)
                                 p.wait_write_cycles.end())),
       busRanges(p.bus_ranges), busFetchCycles(p.bus_fetch_cycles),
       busDataCycles(p.bus_data_cycles),
-      unalignedPieces(p.unaligned_pieces),
+      busWordFifo(p.bus_word_fifo), unalignedPieces(p.unaligned_pieces),
       divideBySize(p.divide_by_size),
       stats(this)
 {
@@ -186,6 +186,8 @@ MProfileInstLatency::MProfileInstLatency(const Params &p)
              foldMasks.size() != foldKinds.size(),
              "%s: fold_masks, fold_matches and fold_kinds differ in length",
              name());
+    fatal_if(busWordFifo > busWordIssue.size(),
+             "%s: bus_word_fifo is above %d", name(), busWordIssue.size());
     fatal_if(waitRanges.size() != waitCycles.size() ||
              waitRanges.size() != waitWriteCycles.size(),
              "%s: wait_ranges, wait_cycles and wait_write_cycles differ in "
@@ -284,6 +286,7 @@ MProfileInstLatency::forgetPrevious()
     havePrevious = false;
     prevMemOp = false;
     busFetchWord = MaxAddr;
+    busQueueEmpty = true;
     itPending = false;
     branchedTo = false;
     aheadPending = false;
@@ -593,11 +596,19 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
     }
     // Its fetches over the shared bus, each once the bus is free and
     // busFetchCycles after the one before, the bus held for one cycle of
-    // those: it issues no sooner than the last of them starts.
+    // those: it issues no sooner than the last of them starts. With a fetch
+    // queue a fetch need not wait for the instruction before to finish, only
+    // for room in the queue.
+    const unsigned fetched = busFetches;
     if (busFetches > 0) {
         Cycles start = now;
+        if (busFifoOn() && !busQueueEmpty)
+            start = Cycles(0);
         for (unsigned i = 0; i < busFetches; ++i) {
             start = std::max({start, busFree, busNextFetch});
+            if (busFifoOn())
+                start = std::max(start,
+                                 busWordIssue[(busWordHead + i) % busWordFifo]);
             busFree = start + Cycles(1);
             busNextFetch = start + busFetchCycles;
         }
@@ -606,6 +617,7 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
             issue = start;
         }
         busFetches = 0;
+        busQueueEmpty = false;
     }
     Cycles needed(0);
     for (const Source &s : sources) {
@@ -628,12 +640,25 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
         }
         free = issue + cls->busy;
     }
+    // A queued word leaves the queue as its first instruction issues.
+    if (busFifoOn()) {
+        for (unsigned i = 0; i < fetched; ++i) {
+            busWordIssue[busWordHead] = issue;
+            busWordHead = (busWordHead + 1) % busWordFifo;
+        }
+    }
     // Its data transfers over the shared bus, from when it issues, ahead
     // of the next fetch.
     if (busTransfers > 0) {
         busFree = std::max(busFree, issue) +
             Cycles(busTransfers * busDataCycles);
         busTransfers = 0;
+    }
+    if (taken)
+        busQueueEmpty = true;
+    if (taken) {
+        for (Cycles &w : busWordIssue)
+            w = Cycles(0);
     }
     const Cycles memory = memoryCycles;
     memoryCycles = Cycles(0);
