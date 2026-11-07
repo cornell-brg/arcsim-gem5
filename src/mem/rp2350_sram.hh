@@ -71,6 +71,9 @@ class RP2350SRAM : public AbstractMemory
     const unsigned queueDepth;
     // One bank over the whole range (one_bank), any range
     const bool oneBank;
+    // SRAM4-7 present (sram4_7); without them the ports claim only
+    // SRAM0-3 and SRAM8-9
+    const bool sram4_7;
     // Runs after everything else of its tick, so that every request of a
     // cycle is in before the banks choose.
     EventFunctionWrapper arbitrateEvent;
@@ -94,6 +97,10 @@ class RP2350SRAM : public AbstractMemory
     unsigned bankFor(Addr address) const;
     unsigned beatSize(Addr address, unsigned remaining) const;
     void validate(PacketPtr pkt) const;
+    // The ranges the ports claim: the whole range, or without SRAM4-7 the
+    // two around them
+    AddrRangeList claimedRanges() const;
+    bool claims(const AddrRange &request) const;
     bool receive(PacketPtr pkt, PortID id);
     void functional(PacketPtr pkt);
     void complete(const Beat &beat);

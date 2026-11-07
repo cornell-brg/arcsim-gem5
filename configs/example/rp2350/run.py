@@ -58,9 +58,14 @@ parser.add_argument("--xip-model", choices=("legacy", "qmi", "soc"),
                     "timing of a Pico 2; soc (hazard3-proxy) arcsim-soc's RTL "
                     "code memory, zero wait states; the XIP knobs apply only "
                     "to legacy")
-parser.add_argument("--hwpe", choices=tuple(HWPES), default="vvadd",
+parser.add_argument("--hwpe", choices=tuple(HWPES), default="empty",
                     help="The HWPE on the Hazard3 board, as arcsim-soc's "
-                    "CONFIG_HWPE")
+                    "CONFIG_HWPE; empty is no HWPE and no TCDM, as "
+                    "arcsim-soc's configs without an accelerator")
+parser.add_argument("--no-sram4-7", dest="sram4_7", action="store_false",
+                    help="Without SRAM4-7 on the hazard3-proxy "
+                    "(0x20040000-0x2007ffff fault), as arcsim-soc's "
+                    "SRAM4_7_PRESENT=0")
 parser.add_argument("--hwpe-timed-in-atomic", action="store_true",
                     help="With --cpu atomic, the HWPE's jobs still take the cycles "
                     "they take with a timing CPU")
@@ -100,6 +105,7 @@ board = make_board(
     hwpe=args.hwpe,
     hwpe_timed_in_atomic=args.hwpe_timed_in_atomic,
     zfinx=args.zfinx,
+    sram4_7=args.sram4_7,
     cpu=args.cpu,
     cores=args.cores,
     inst_latency=args.inst_latency,
@@ -122,13 +128,20 @@ else:
     print(f"XIP cache tag/data latency={args.xip_hit_latency_cycles} cycles; "
           f"replacement={args.xip_replacement}; "
           f"QMI delay={args.xip_miss_ns} ns")
-print("SRAM=0x20000000+512KiB group windows, 0x20080000/0x20081000+4KiB")
+if args.sram4_7:
+    print("SRAM=0x20000000+512KiB group windows, 0x20080000/0x20081000+4KiB")
+else:
+    print("SRAM=0x20000000+256KiB group window (SRAM4-7 absent), "
+          "0x20080000/0x20081000+4KiB")
 if args.sram_model == "banked":
     print("SRAM model=banked: ten banks, 32-bit grants at 150MHz, zero wait states")
 else:
     print(f"SRAM model=legacy; scratch bank effective bandwidth={args.scratch_bank_bandwidth}")
 if args.core == "hazard3-proxy":
-    print(f"HWPE={args.hwpe} at 0x50800000, TCDM=0x60000000+256KiB")
+    if args.hwpe == "empty":
+        print("HWPE=empty: no HWPE, no TCDM")
+    else:
+        print(f"HWPE={args.hwpe} at 0x50800000, TCDM=0x60000000+256KiB")
     print(f"FPU={'zfinx' if args.zfinx else 'f+d'}")
 roi_start = None
 roi_number = 0
