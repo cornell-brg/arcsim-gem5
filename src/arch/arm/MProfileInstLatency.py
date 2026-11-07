@@ -139,14 +139,18 @@ class MProfileInstLatency(BaseInstLatency):
         [],
         "memory on a bus that instruction fetches and data accesses share, "
         "data first (the Cortex-M3 and M4's system bus): a fetch from it "
-        "starts once the bus is free and holds it bus_fetch_cycles, a data "
-        "transfer to it holds it bus_data_cycles",
+        "starts once the bus is free and bus_fetch_cycles after the fetch "
+        "before and holds it a cycle, a load's transfer holds it "
+        "bus_data_cycles and a store's bus_write_cycles",
     )
     bus_fetch_cycles = Param.Cycles(
-        2, "cycles a fetch from bus_ranges holds the bus"
+        2, "cycles from a fetch from bus_ranges to the next one"
     )
     bus_data_cycles = Param.Cycles(
-        1, "cycles a data transfer to bus_ranges holds the bus"
+        1, "cycles a load's transfer from bus_ranges holds the bus"
+    )
+    bus_write_cycles = Param.Cycles(
+        1, "cycles a store's transfer to bus_ranges holds the bus"
     )
     divide_by_size = Param.Bool(
         False,

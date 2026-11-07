@@ -138,6 +138,7 @@ class MProfileInstLatency : public BaseInstLatency
     std::vector<AddrRange> busRanges;
     const Cycles busFetchCycles;
     const Cycles busDataCycles;
+    const Cycles busWriteCycles;
     const bool divideBySize;
 
     /** Whether an address is on the shared bus. */
@@ -149,6 +150,7 @@ class MProfileInstLatency : public BaseInstLatency
     unsigned busTransfers = 0;
     /** When the shared bus is free for the next fetch. */
     Cycles busFree{0};
+    Cycles busNextFetch{0};
     /** The word the last fetch over the shared bus read. */
     Addr busFetchWord = MaxAddr;
 

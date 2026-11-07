@@ -177,7 +177,8 @@ MProfileInstLatency::MProfileInstLatency(const Params &p)
           : std::vector<Cycles>(p.wait_write_cycles.begin(),
                                 p.wait_write_cycles.end())),
       busRanges(p.bus_ranges), busFetchCycles(p.bus_fetch_cycles),
-      busDataCycles(p.bus_data_cycles), divideBySize(p.divide_by_size),
+      busDataCycles(p.bus_data_cycles), busWriteCycles(p.bus_write_cycles),
+      divideBySize(p.divide_by_size),
       stats(this)
 {
     fatal_if(foldMasks.size() != foldMatches.size() ||
@@ -451,8 +452,10 @@ MProfileInstLatency::access(Addr paddr, unsigned size, Cycles latency,
         if (fetch && word != busFetchWord) {
             ++busFetches;
             busFetchWord = word;
-        } else if (!fetch)
-            busTransfers += transfersOf(paddr, size, inFlightStore);
+        } else if (!fetch) {
+            busTransfers += transfersOf(paddr, size, inFlightStore) *
+                (inFlightStore ? busWriteCycles : busDataCycles);
+        }
     }
     for (const AddrRange &range : timedRanges) {
         if (range.contains(paddr)) {
@@ -581,13 +584,15 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
         issue += unalignedTarget;
         ++stats.unalignedTargets;
     }
-    // Its fetches over the shared bus, one after another once the bus is
-    // free: it issues no sooner than the last of them starts.
+    // Its fetches over the shared bus, each once the bus is free and
+    // busFetchCycles after the one before, the bus held for one cycle of
+    // those: it issues no sooner than the last of them starts.
     if (busFetches > 0) {
         Cycles start = now;
         for (unsigned i = 0; i < busFetches; ++i) {
-            start = std::max(start, busFree);
-            busFree = start + busFetchCycles;
+            start = std::max({start, busFree, busNextFetch});
+            busFree = start + Cycles(1);
+            busNextFetch = start + busFetchCycles;
         }
         if (start > issue) {
             stats.busWaits += start - issue;
@@ -619,8 +624,7 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
     // Its data transfers over the shared bus, from when it issues, ahead
     // of the next fetch.
     if (busTransfers > 0) {
-        busFree = std::max(busFree, issue) +
-            Cycles(busTransfers * busDataCycles);
+        busFree = std::max(busFree, issue) + Cycles(busTransfers);
         busTransfers = 0;
     }
     const Cycles memory = memoryCycles;
