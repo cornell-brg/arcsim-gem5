@@ -138,7 +138,6 @@ class MProfileInstLatency : public BaseInstLatency
     std::vector<AddrRange> busRanges;
     const Cycles busFetchCycles;
     const Cycles busDataCycles;
-    const Cycles busWriteCycles;
     const bool divideBySize;
 
     /** Whether an address is on the shared bus. */

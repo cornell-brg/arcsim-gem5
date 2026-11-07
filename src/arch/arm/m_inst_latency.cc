@@ -177,8 +177,7 @@ MProfileInstLatency::MProfileInstLatency(const Params &p)
           : std::vector<Cycles>(p.wait_write_cycles.begin(),
                                 p.wait_write_cycles.end())),
       busRanges(p.bus_ranges), busFetchCycles(p.bus_fetch_cycles),
-      busDataCycles(p.bus_data_cycles), busWriteCycles(p.bus_write_cycles),
-      divideBySize(p.divide_by_size),
+      busDataCycles(p.bus_data_cycles), divideBySize(p.divide_by_size),
       stats(this)
 {
     fatal_if(foldMasks.size() != foldMatches.size() ||
@@ -452,10 +451,8 @@ MProfileInstLatency::access(Addr paddr, unsigned size, Cycles latency,
         if (fetch && word != busFetchWord) {
             ++busFetches;
             busFetchWord = word;
-        } else if (!fetch) {
-            busTransfers += transfersOf(paddr, size, inFlightStore) *
-                (inFlightStore ? busWriteCycles : busDataCycles);
-        }
+        } else if (!fetch)
+            busTransfers += transfersOf(paddr, size, inFlightStore);
     }
     for (const AddrRange &range : timedRanges) {
         if (range.contains(paddr)) {
@@ -624,7 +621,8 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
     // Its data transfers over the shared bus, from when it issues, ahead
     // of the next fetch.
     if (busTransfers > 0) {
-        busFree = std::max(busFree, issue) + Cycles(busTransfers);
+        busFree = std::max(busFree, issue) +
+            Cycles(busTransfers * busDataCycles);
         busTransfers = 0;
     }
     const Cycles memory = memoryCycles;
