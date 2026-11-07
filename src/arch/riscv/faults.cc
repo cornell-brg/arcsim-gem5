@@ -31,6 +31,7 @@
 
 #include "arch/riscv/faults.hh"
 
+#include "arch/riscv/bare_metal/fs_workload.hh"
 #include "arch/riscv/insts/static_inst.hh"
 #include "arch/riscv/isa.hh"
 #include "arch/riscv/mmu.hh"
@@ -272,10 +273,19 @@ Reset::invoke(ThreadContext *tc, const StaticInstPtr &inst)
     tc->setMiscReg(MISCREG_STATUS, status);
     tc->setMiscReg(MISCREG_MCAUSE, 0);
 
-    // Advance the PC to the implementation-defined reset vector
+    // Advance the PC to the implementation-defined reset vector, or, for a
+    // hart after the first on a bare-metal workload with secondary_launch,
+    // to the launch pair's entry with its stack pointer.
     auto workload = dynamic_cast<Workload *>(tc->getSystemPtr()->workload);
+    Addr entry = workload->getEntry();
+    Addr launch_sp = 0;
+    auto *bare_metal = dynamic_cast<BareMetal *>(workload);
+    if (bare_metal &&
+        bare_metal->secondaryLaunch(tc->contextId(), launch_sp, entry)) {
+        tc->setReg(int_reg::Sp, launch_sp);
+    }
     std::unique_ptr<PCState> new_pc(dynamic_cast<PCState *>(
-        tc->getIsaPtr()->newPCState(workload->getEntry())));
+        tc->getIsaPtr()->newPCState(entry)));
     panic_if(!new_pc, "Failed create new PCState from ISA pointer");
     VTYPE vtype = 0;
     vtype.vill = 1;

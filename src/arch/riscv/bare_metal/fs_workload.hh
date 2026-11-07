@@ -50,6 +50,12 @@ class BareMetal : public Workload
     loader::ObjectFile *bootloader;
     loader::SymbolTable bootloaderSymtab;
     RiscvSemihosting* semihosting;
+    // The secondary_launch pair's address, and the pair once the image is
+    // in memory: harts after the first start from it.
+    bool _hasLaunch = false;
+    Addr _launchAddr = 0;
+    Addr _launchSp = 0;
+    Addr _launchPc = 0;
 
   public:
     PARAMS(RiscvBareMetal);
@@ -88,6 +94,17 @@ class BareMetal : public Workload
     bool isBareMetal() const { return _isBareMetal; }
 
     Addr getEntry() const override { return _resetVect; }
+
+    // Whether hart `id` starts from the secondary_launch pair, and the pair.
+    bool
+    secondaryLaunch(ContextID id, Addr &sp, Addr &pc) const
+    {
+        if (!_hasLaunch || id == 0)
+            return false;
+        sp = _launchSp;
+        pc = _launchPc;
+        return true;
+    }
     RiscvSemihosting *getSemihosting() const override { return semihosting; }
 };
 
