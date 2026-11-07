@@ -135,7 +135,9 @@ def make_board(
             # Flash: the latency the accelerator (or the flash) returns. SRAM: the
             # system bus, which its code's fetches share with data [DDI0439D 2.3.1:
             # a system-bus fetch is registered, two cycles, never back to back].
-            cpu.inst_latency = f405_inst_latency(timed_ranges=[FLASH], bus_ranges=[SRAM])
+            cpu.inst_latency = f405_inst_latency(
+                timed_ranges=[FLASH], bus_ranges=[SRAM], unaligned_pieces=True
+            )
     else:
         cpu = CrazyflieF405CPU()  # cpu.py: CortexM4CPU with the Crazyflie's own timing
     board.cpu = cpu

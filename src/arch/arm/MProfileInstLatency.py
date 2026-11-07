@@ -149,6 +149,11 @@ class MProfileInstLatency(BaseInstLatency):
     bus_data_cycles = Param.Cycles(
         1, "cycles a data transfer to bus_ranges holds the bus"
     )
+    unaligned_pieces = Param.Bool(
+        False,
+        "an unaligned load splits as a store does, into the naturally aligned "
+        "bytes, halfwords and words it covers, with no address phase for that",
+    )
     divide_by_size = Param.Bool(
         False,
         "a divide's cycles from its larger operand's size, as the Cortex-M4 "

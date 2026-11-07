@@ -138,6 +138,7 @@ class MProfileInstLatency : public BaseInstLatency
     std::vector<AddrRange> busRanges;
     const Cycles busFetchCycles;
     const Cycles busDataCycles;
+    const bool unalignedPieces;
     const bool divideBySize;
 
     /** Whether an address is on the shared bus. */
@@ -160,6 +161,8 @@ class MProfileInstLatency : public BaseInstLatency
     bool hasMemOp = false;
     /** Whether it loads or stores several registers (micro-ops). */
     bool severalRegs = false;
+    /** An access is not a multiple of its size. */
+    bool unalignedAccess = false;
     /** Its data accesses' aligned transfers on the 32-bit bus, a cycle
      *  each. */
     unsigned transfers = 0;

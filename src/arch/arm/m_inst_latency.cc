@@ -177,7 +177,9 @@ MProfileInstLatency::MProfileInstLatency(const Params &p)
           : std::vector<Cycles>(p.wait_write_cycles.begin(),
                                 p.wait_write_cycles.end())),
       busRanges(p.bus_ranges), busFetchCycles(p.bus_fetch_cycles),
-      busDataCycles(p.bus_data_cycles), divideBySize(p.divide_by_size),
+      busDataCycles(p.bus_data_cycles),
+      unalignedPieces(p.unaligned_pieces),
+      divideBySize(p.divide_by_size),
       stats(this)
 {
     fatal_if(foldMasks.size() != foldMatches.size() ||
@@ -266,6 +268,7 @@ MProfileInstLatency::clearInFlight()
 {
     hasMemOp = false;
     severalRegs = false;
+    unalignedAccess = false;
     transfers = 0;
     readsMemory = false;
     control = false;
@@ -442,8 +445,14 @@ void
 MProfileInstLatency::access(Addr paddr, unsigned size, Cycles latency,
                             bool fetch)
 {
-    if (!fetch)
-        transfers += transfersOf(paddr, size, inFlightStore);
+    // Unaligned reads split as writes do where the table says so: a byte, a
+    // halfword and a byte, whatever words they touch.
+    const bool pieces = inFlightStore || unalignedPieces;
+    if (!fetch) {
+        transfers += transfersOf(paddr, size, pieces);
+        if (unalignedPieces && (paddr % std::min(size, 4u)) != 0)
+            unalignedAccess = true;
+    }
     if (onBus(paddr)) {
         // A fetch reads a word: the instruction after a 16-bit one in the
         // same word, reached in sequence, needs no fetch of its own.
@@ -452,7 +461,7 @@ MProfileInstLatency::access(Addr paddr, unsigned size, Cycles latency,
             ++busFetches;
             busFetchWord = word;
         } else if (!fetch)
-            busTransfers += transfersOf(paddr, size, inFlightStore);
+            busTransfers += transfersOf(paddr, size, pieces);
     }
     for (const AddrRange &range : timedRanges) {
         if (range.contains(paddr)) {
@@ -518,7 +527,8 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
     if (transfers > 1)
         c += Cycles(transfers - 1);
     if (hasMemOp && cls && cls->addressPhase > 0) {
-        const bool several = transfers > 1 || severalRegs;
+        const bool several =
+            (transfers > 1 && !unalignedAccess) || severalRegs;
         if (several || (readsMemory && !prevMemOp))
             c += cls->addressPhase;
     }
