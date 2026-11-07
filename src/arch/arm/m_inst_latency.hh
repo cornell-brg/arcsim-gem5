@@ -161,6 +161,8 @@ class MProfileInstLatency : public BaseInstLatency
     Cycles busFetchGate{0};
     /** The instruction in flight stores over the shared bus. */
     bool busStore = false;
+    /** It is a taken or conditional branch from the shared bus. */
+    bool branchFromBus = false;
     /** Nothing is queued: the next fetch starts from now. */
     bool busQueueEmpty = true;
     /** When each queued word's first instruction issued, oldest at the

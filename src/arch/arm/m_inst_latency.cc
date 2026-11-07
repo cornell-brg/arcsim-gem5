@@ -271,6 +271,7 @@ MProfileInstLatency::clearInFlight()
     hasMemOp = false;
     severalRegs = false;
     unalignedAccess = false;
+    branchFromBus = false;
     transfers = 0;
     readsMemory = false;
     control = false;
@@ -542,6 +543,7 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
     bool branched_to = false;
     if (control || taken) {
         const bool fold_with_previous = fold == 1 && can_fold;
+        branchFromBus = onBus(at) && busFifoOn();
         // A branch a load makes takes the load's time first; any other's
         // basic time is none.
         const Cycles basic = readsMemory ? c : Cycles(0);
@@ -663,6 +665,14 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
             busFetchGate = busFree + Cycles(1);
         busTransfers = 0;
         busStore = false;
+    }
+    // A conditional branch a PC-relative address is forwarded for presents
+    // its target speculatively, which costs a fetch slot if it is not taken.
+    if (branchFromBus && !taken && whole->isDirectCtrl() &&
+        (whole->isCondCtrl() || inItBlock(emi))) {
+        const Cycles slot = std::max({busFree, busNextFetch});
+        busFree = slot + Cycles(1);
+        busNextFetch = slot + busFetchCycles;
     }
     if (taken)
         busQueueEmpty = true;
