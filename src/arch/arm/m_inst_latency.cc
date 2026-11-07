@@ -464,6 +464,7 @@ MProfileInstLatency::access(Addr paddr, unsigned size, Cycles latency,
         if (fetch && word != busFetchWord) {
             ++busFetches;
             busFetchWord = word;
+            lastBusWord = word;
         } else if (!fetch) {
             busTransfers += transfersOf(paddr, size, pieces);
             busStore = busStore || inFlightStore;
@@ -563,7 +564,7 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
             ++stats.takenBranches;
             // The target is fetched anew, even from the same word.
             busFetchWord = MaxAddr;
-            if (fetchAhead) {
+            if (fetchAhead && !branchFromBus) {
                 // The word after the one the branch ends in
                 aheadPending = true;
                 aheadAddr = ((at + width - 1) & ~Addr(3)) + 4;
@@ -674,8 +675,33 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
         busFree = slot + Cycles(1);
         busNextFetch = slot + busFetchCycles;
     }
-    if (taken)
+    // A taken branch from the bus. One whose target is forwarded from decode
+    // (PC-relative or BX LR): the sequential fetches under way go on, one
+    // every busFetchCycles until the refill's first cycle, and the target
+    // comes in the next slot, or in the last of those if that word is the
+    // target's. Any other is known only once it has executed, a slot's fetch
+    // after the fetch it finds under way.
+    if (taken && !branchFromBus)
         busQueueEmpty = true;
+    if (branchFromBus && taken) {
+        const bool forwarded = !readsMemory && !(cls && cls->branchExtra > 0);
+        if (forwarded) {
+            // Its own cycles, then the registered fetch's cycle of latency.
+            const Cycles refill = issue + c + Cycles(1);
+            Cycles slot = busNextFetch > busFetchCycles
+                ? Cycles(busNextFetch - busFetchCycles) : Cycles(0);
+            Addr word = lastBusWord;
+            while (slot + busFetchCycles <= refill) {
+                slot = slot + busFetchCycles;
+                word += 4;
+            }
+            const Addr target = next.instAddr() & ~Addr(3);
+            const bool kept = word == target && slot >= refill;
+            busNextFetch = kept ? slot : slot + busFetchCycles;
+        } else {
+            busNextFetch = std::max(busNextFetch, issue + c) + busFetchCycles;
+        }
+    }
     if (taken) {
         for (Cycles &w : busWordIssue)
             w = Cycles(0);

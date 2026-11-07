@@ -141,7 +141,12 @@ class MProfileInstLatency(BaseInstLatency):
         "data first (the Cortex-M3 and M4's system bus): a fetch from it "
         "starts once the bus is free and bus_fetch_cycles after the fetch "
         "before and holds it a cycle, a data transfer to it holds it "
-        "bus_data_cycles",
+        "bus_data_cycles. With bus_word_fifo the fetches run ahead through "
+        "the queue, nothing goes on the bus beside the address phase of LDM, "
+        "STM, LDRD and STRD or the cycle after a store's or an unaligned "
+        "access's data, a conditional branch not taken gives up a fetch slot, "
+        "and a taken branch's target comes in the fetch slot after those "
+        "under way",
     )
     bus_fetch_cycles = Param.Cycles(
         2, "cycles from a fetch from bus_ranges to the next one"

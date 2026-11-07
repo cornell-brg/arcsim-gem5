@@ -133,8 +133,10 @@ def make_board(
             from latency import f405_inst_latency  # this directory's latency.py
 
             # Flash: the latency the accelerator (or the flash) returns. SRAM: the
-            # system bus, which its code's fetches share with data [DDI0439D 2.3.1:
-            # a system-bus fetch is registered, two cycles, never back to back].
+            # system bus, which its code's fetches share with data [DDI0439C 2.2.1, data
+            # first; DDI0337G 12.5.6, the Cortex-M3's: a system-bus fetch is registered,
+            # two cycles, never back to back; DDI0337G 1.4 and the DDI0439C glossary's
+            # Prefetch Unit: three words of fetch queue].
             cpu.inst_latency = f405_inst_latency(
                 timed_ranges=[FLASH], bus_ranges=[SRAM], bus_word_fifo=3, unaligned_pieces=True
             )
