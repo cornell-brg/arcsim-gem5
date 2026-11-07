@@ -50,7 +50,8 @@ hazard3_test(test_dma)
 hazard3_test(test_vvadd --hwpe vvadd)
 hazard3_test(test_fast_cell
              --hwpe fast-with-scoring-wide-multicycle-cell-best-k)
-hazard3_test(test_optical_flow --hwpe optical-flow)  # TODO update
+hazard3_test(test_optical_flow --hwpe optical-flow)
+hazard3_test(test_optical_flow_rotated --hwpe optical-flow-rotated)
 # soc's test_fp.c, built for F and for Zfinx
 hazard3_test(test_fp_f)
 hazard3_test(test_fp_zfinx --zfinx)

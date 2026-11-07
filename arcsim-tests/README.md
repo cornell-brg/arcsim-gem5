@@ -12,7 +12,7 @@ directory only lists them (`CMakeLists.txt`) and runs them on gem5.
 source setup-arcsim.sh                     # in an arcsim clone: sets ARCSIM_TEST_HOME
 module load arcsim-soc                     # sets ARCSIM_SOC_HOME
 make -C $ARCSIM_SOC_HOME/tests build       # the test ELFs
-scons build/RISCV/gem5.opt -j32            # in .., gem5
+scons build/RISCV/gem5.opt -j32            # in .., gem5, with ARCSIM_KERNELS_HOME set
 make check                                 # run them on gem5, one line per test
 ```
 
@@ -22,6 +22,9 @@ arcsim-gem5-tests
   hazard3_test_memory                      passed (20/20 test cases passed)
   ...
 ```
+
+`setup-arcsim.sh` sets `ARCSIM_KERNELS_HOME` when kernels is checked out. Without it
+the build leaves out `HWPELk`, and the optical-flow tests stop with an error saying so.
 
 - `make check-verbose`: also prints each run's output.
 - `make check-rebuild`: builds soc's tests first.
@@ -46,8 +49,11 @@ because the gem5 board doesn't model everything rtl-sim does yet:
 - `test_vvadd`: on the vvadd HWPE (`--hwpe vvadd`).
 - `test_fast_cell`: on the FAST cell HWPE
   (`--hwpe fast-with-scoring-wide-multicycle-cell-best-k`).
+- `test_optical_flow` and `test_optical_flow_rotated`: on the optical-flow HWPEs
+  (`--hwpe optical-flow`, `--hwpe optical-flow-rotated`).
 - `test_fp_f` and `test_fp_zfinx`: soc's `test_fp.c` built for F and for
   Zfinx; the Zfinx one runs with `--zfinx`.
+- `test_fpu`: with `--zfinx`. soc builds it for `FPU=zfinx`, which needs `ZFINX_LIBS` set.
 
 The other tests run on the board's default HWPE (vvadd). soc builds an HWPE's
 test program only for the HWPE its tests are configured with, so

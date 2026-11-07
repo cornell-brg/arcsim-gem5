@@ -41,6 +41,7 @@ soc-tests:
 	@$(MAKE) --no-print-directory -C $(ARCSIM_SOC_HOME)/tests build \
 	         HWPE=fast-with-scoring-wide-multicycle-cell-best-k FPU=zfinx
 	@$(MAKE) --no-print-directory -C $(ARCSIM_SOC_HOME)/tests build HWPE=optical-flow FPU=zfinx
+	@$(MAKE) --no-print-directory -C $(ARCSIM_SOC_HOME)/tests build HWPE=optical-flow-rotated FPU=zfinx
 
 check-rebuild: soc-tests
 	@$(MAKE) --no-print-directory check

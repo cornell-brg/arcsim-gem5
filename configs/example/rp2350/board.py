@@ -674,6 +674,10 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         for name, cls, params, offset in OPTICAL_FLOW:
             if name == "lk" and hwpe == "optical-flow-rotated":
                 params = OPTICAL_FLOW_ROTATED_LK
+            if not hasattr(m5.objects, cls):
+                raise ValueError(
+                    f"--hwpe {hwpe} needs {cls}, which this gem5 was built without: "
+                    "build it with ARCSIM_KERNELS_HOME set")
             engine = getattr(m5.objects, cls)(
                 pio_latency="1ns", pio_addr=0x50800000 + offset, pio_size=0x1000,
                 timed_in_atomic=hwpe_timed_in_atomic, **params)
