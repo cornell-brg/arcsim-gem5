@@ -138,10 +138,15 @@ class MProfileInstLatency : public BaseInstLatency
     std::vector<AddrRange> busRanges;
     const Cycles busFetchCycles;
     const Cycles busDataCycles;
+    const unsigned busWordFifo;
+    const bool unalignedPieces;
     const bool divideBySize;
 
     /** Whether an address is on the shared bus. */
     bool onBus(Addr paddr) const;
+
+    /** Whether fetches over the shared bus run ahead through a queue. */
+    bool busFifoOn() const { return busWordFifo > 0; }
 
     /** The instruction in flight's fetches from the shared bus and its
      *  data transfers to it. */
@@ -152,6 +157,12 @@ class MProfileInstLatency : public BaseInstLatency
     Cycles busNextFetch{0};
     /** The word the last fetch over the shared bus read. */
     Addr busFetchWord = MaxAddr;
+    /** Nothing is queued: the next fetch starts from now. */
+    bool busQueueEmpty = true;
+    /** When each queued word's first instruction issued, oldest at the
+     *  head. */
+    std::array<Cycles, 8> busWordIssue{};
+    unsigned busWordHead = 0;
 
     // The instruction in flight: what its micro-ops did so far.
     /** The OpClass it is classed by: its first memory micro-op's, else
@@ -160,6 +171,8 @@ class MProfileInstLatency : public BaseInstLatency
     bool hasMemOp = false;
     /** Whether it loads or stores several registers (micro-ops). */
     bool severalRegs = false;
+    /** An access is not a multiple of its size. */
+    bool unalignedAccess = false;
     /** Its data accesses' aligned transfers on the 32-bit bus, a cycle
      *  each. */
     unsigned transfers = 0;
