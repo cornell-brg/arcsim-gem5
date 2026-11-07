@@ -53,6 +53,13 @@ class RiscvBareMetal(Workload):
         "Use bootloader entry point as reset vector. "
         "If `auto_reset_vect` is true, the `reset_vect` parameter is ignored.",
     )
+    # A symbol of the bootloader's: a {stack pointer, entry} pair of 32-bit
+    # words that every hart after the first starts from in place of the reset
+    # vector, as a boot ROM launching it would. Empty: every hart starts from
+    # the reset vector.
+    secondary_launch = Param.String(
+        "", "Symbol of the {SP, entry} pair harts after the first start from"
+    )
 
 
 class RiscvLinux(KernelWorkload):
