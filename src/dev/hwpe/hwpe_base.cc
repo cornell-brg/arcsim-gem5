@@ -84,6 +84,7 @@ HWPEBase::HWPEBase(const Params &p)
       startLatency(p.start_latency),
       doneLatency(p.done_latency),
       atomicLatency(p.atomic_latency),
+      timedInAtomic(p.timed_in_atomic),
       generic(p.num_generic_regs, 0),
       io(p.num_contexts, std::vector<uint32_t>(p.num_io_regs, 0)),
       startEvent([this] { start(); }, name() + ".start"),
@@ -389,7 +390,7 @@ HWPEBase::pulseIrq()
 bool
 HWPEBase::atomicMode() const
 {
-    return sys->isAtomicMode();
+    return sys->isAtomicMode() && !timedInAtomic;
 }
 
 Tick

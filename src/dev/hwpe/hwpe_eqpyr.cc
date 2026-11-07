@@ -101,7 +101,7 @@ HWPEEqpyr::make(unsigned l, unsigned y, unsigned x, uint8_t value)
     pack[l].push_back(value);
     if (pack[l].size() == per_word) {
         due.push_back(
-            {when + cyclesToTicks(Cycles(outCycles + l * pyrCycles)), l,
+            {after(when, Cycles(outCycles + l * pyrCycles)), l,
              pack[l]});
         pack[l].clear();
     }
@@ -173,7 +173,7 @@ HWPEEqpyr::startJob(const std::vector<uint32_t> &io)
         phase = Phase::Table;
         DPRINTF(HWPE, "eqpyr: new frame, table %#x, ring %#x of %d\n",
                 tablePtr, ringPtr, ringStripes);
-        schedule(frameEvent, clockEdge(frameCycles));
+        schedule(frameEvent, after(clockEdge(), frameCycles));
         return;
     } else {
         const uint32_t slot_bytes = stripeRows * width;
@@ -241,12 +241,12 @@ HWPEEqpyr::compute()
             for (unsigned i = 0; i < beatBytes; ++i)
                 lut[taken * 4 + i] = data[i];
             taken += beatBytes / 4;
-            when += cyclesToTicks(Cycles(tableCycles * (beatBytes / 4)));
+            when = after(when, Cycles(tableCycles * (beatBytes / 4)));
             nextTake = when;
             words.pop();
         }
         if (taken == total && tailDone == MaxTick)
-            tailDone = std::max(nextTake, cycle) + cyclesToTicks(tailCycles);
+            tailDone = after(std::max(nextTake, cycle), tailCycles);
     } else if (phase == Phase::Stripe) {
         // A stripe's pixels, one each pixel_cycles: equalized as level 0,
         // and the pixels of levels 1 and 2 each completes. A word goes to
@@ -263,7 +263,7 @@ HWPEEqpyr::compute()
                 const uint8_t raw = data[i];
                 ++hist[raw];
                 make(0, y, x, lut[raw]);
-                when += cyclesToTicks(pixelCycles);
+                when = after(when, pixelCycles);
             }
             taken += beatBytes;
             nextTake = when;
@@ -272,7 +272,7 @@ HWPEEqpyr::compute()
         flush();
         if (taken == total && due.empty() && tailDone == MaxTick) {
             stripeRow += stripeRows;
-            tailDone = std::max(nextTake, cycle) + cyclesToTicks(
+            tailDone = after(std::max(nextTake, cycle),
                 stripeRow == height ? histLatency : tailCycles);
         }
     } else if (phase == Phase::Hist) {
@@ -285,7 +285,7 @@ HWPEEqpyr::compute()
             }
             histOut.push(beat.data(), beatBytes);
             ++histBeats;
-            nextTake = std::max(nextTake, cycle) + cyclesToTicks(histCycles);
+            nextTake = after(std::max(nextTake, cycle), histCycles);
         }
         if (histBeats == 256 * 4 / beatBytes && histOut.done()) {
             histWritten = true;

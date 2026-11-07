@@ -1,5 +1,6 @@
 #include "dev/hwpe/hwpe_lk.hh"
 
+#include <algorithm>
 #include <cstring>
 
 #include "base/logging.hh"
@@ -35,7 +36,7 @@ HWPELk::at(Cycles n, std::function<void()> f)
     const Tick edge = clockEdge();
     const Tick cycle = edge == curTick() ? edge : edge - clockPeriod();
     next = std::move(f);
-    schedule(stepEvent, cycle + cyclesToTicks(n));
+    schedule(stepEvent, std::max(curTick(), after(cycle, n)));
 }
 
 void

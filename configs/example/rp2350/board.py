@@ -626,7 +626,7 @@ def _add_hazard3_core(board, n, *, cpu, zfinx, accessible):
 def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
                 scratch_bank_bandwidth, sram_model, dma, xip_model, cpu,
                 hwpe, zfinx, switch_cpu=None, clock=CLOCK, cores=1,
-                inst_latency=False):
+                inst_latency=False, hwpe_timed_in_atomic=False):
     from m5.objects import RiscvSystem
     from m5.objects.RiscvFsWorkload import RiscvBareMetal
     from m5.objects.RiscvSemihosting import RiscvSemihosting
@@ -674,9 +674,9 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         for name, cls, params, offset in OPTICAL_FLOW:
             if name == "lk" and hwpe == "optical-flow-rotated":
                 params = OPTICAL_FLOW_ROTATED_LK
-            engine = getattr(m5.objects, cls)(pio_latency="1ns",
-                                              pio_addr=0x50800000 + offset,
-                                              pio_size=0x1000, **params)
+            engine = getattr(m5.objects, cls)(
+                pio_latency="1ns", pio_addr=0x50800000 + offset, pio_size=0x1000,
+                timed_in_atomic=hwpe_timed_in_atomic, **params)
             setattr(board, f"hwpe_{name}", engine)
             engines.append(engine)
         board.hwpe_select = HWPESelect(pio_latency="1ns")
@@ -688,8 +688,9 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
         board.hwpe_mux.cpu_side_ports = [e.tcdm_port for e in engines[:-1]]
     else:
         hwpe_class, hwpe_params = HWPES[hwpe]
-        board.hwpe = getattr(m5.objects, hwpe_class)(pio_latency="1ns",
-                                                     **hwpe_params)
+        board.hwpe = getattr(m5.objects, hwpe_class)(
+            pio_latency="1ns", timed_in_atomic=hwpe_timed_in_atomic,
+            **hwpe_params)
         board.hwpe.pio = board.sram_bus.mem_side_ports
         # Its registers are in mem_ranges, as the placeholder memory there
         # was, so runners that place stand-ins outside mem_ranges leave them
@@ -776,7 +777,7 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                sram_model=None, arm_timing="tuned", dma=None,
                xip_model=None, model="legacy", cpu="minor", hwpe="vvadd",
                zfinx=False, switch_cpu=None, clock=CLOCK,
-               inst_latency=False, cores=1):
+               inst_latency=False, cores=1, hwpe_timed_in_atomic=False):
     """Return a board of cores cores with the RP2350 memory baseline.
     board.cpu is core 0, board.cpu1 core 1, and board._cores lists them.
 
@@ -860,5 +861,6 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                            xip_model=xip_model, cpu=cpu, hwpe=hwpe,
                            zfinx=zfinx, switch_cpu=switch_cpu,
                            clock=clock, cores=cores,
-                           inst_latency=inst_latency)
+                           inst_latency=inst_latency,
+                           hwpe_timed_in_atomic=hwpe_timed_in_atomic)
     raise ValueError(f"Unknown RP2350 core selector: {core}")  

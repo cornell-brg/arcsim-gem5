@@ -61,6 +61,9 @@ parser.add_argument("--xip-model", choices=("legacy", "qmi", "soc"),
 parser.add_argument("--hwpe", choices=tuple(HWPES), default="vvadd",
                     help="The HWPE on the Hazard3 board, as arcsim-soc's "
                     "CONFIG_HWPE")
+parser.add_argument("--hwpe-timed-in-atomic", action="store_true",
+                    help="With --cpu atomic, the HWPE's jobs still take the cycles "
+                    "they take with a timing CPU")
 parser.add_argument("--zfinx", action="store_true",
                     help="Zfinx on the hazard3-proxy: floats in the x "
                     "registers instead of F and D")
@@ -95,6 +98,7 @@ board = make_board(
     dma=args.dma,
     xip_model=args.xip_model,
     hwpe=args.hwpe,
+    hwpe_timed_in_atomic=args.hwpe_timed_in_atomic,
     zfinx=args.zfinx,
     cpu=args.cpu,
     cores=args.cores,
