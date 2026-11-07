@@ -679,8 +679,8 @@ class MFpCvtS : public MFpOp
 // Handles the four #imm-fbits encodings (Armv7-M ARM A7.7.219):
 //   VCVT.F32.S<w>   Sd, Sd, #fbits  (signed fixed → float)    opc2=0xa
 //   VCVT.F32.U<w>   Sd, Sd, #fbits  (unsigned fixed → float)  opc2=0xb
-//   VCVT.S<w>.F32   Sd, Sd, #fbits  (float → signed fixed)    opc2=0xf
-//   VCVT.U<w>.F32   Sd, Sd, #fbits  (float → unsigned fixed)  opc2=0xe
+//   VCVT.S<w>.F32   Sd, Sd, #fbits  (float → signed fixed)    opc2=0xe
+//   VCVT.U<w>.F32   Sd, Sd, #fbits  (float → unsigned fixed)  opc2=0xf
 // where w = intWidth ∈ {16, 32} (sx flag = bit 7).
 //
 // Replaces the A-profile VcvtSFixedFpS / VcvtUFixedFpS / VcvtFpSFixedS /

@@ -1269,8 +1269,8 @@ MDecoder::decodeMProfileVfp(ExtMachInst mach_inst)
                 //   opc2  direction    sign        mnemonic
                 //   0xa   fixed→float  signed      VCVT.F32.S<w>
                 //   0xb   fixed→float  unsigned    VCVT.F32.U<w>
-                //   0xe   float→fixed  unsigned    VCVT.U<w>.F32
-                //   0xf   float→fixed  signed      VCVT.S<w>.F32
+                //   0xe   float→fixed  signed      VCVT.S<w>.F32
+                //   0xf   float→fixed  unsigned    VCVT.U<w>.F32
                 // Form: VCVT ... Sd, Sd, #fbits
                 //
                 // bits[7] = sx: 0 → 16-bit fixed, 1 → 32-bit fixed.
@@ -1284,7 +1284,7 @@ MDecoder::decodeMProfileVfp(ExtMachInst mach_inst)
                 // on M-profile (ArmMSystem inherits from System, not
                 // ArmSystem) and segfaults inside ArmSystem::haveEL.
                 const bool toFloat  = (opc2 == 0xa) || (opc2 == 0xb);
-                const bool isSigned = (opc2 == 0xa) || (opc2 == 0xf);
+                const bool isSigned = (opc2 == 0xa) || (opc2 == 0xe);
                 const uint8_t intWidth = bits(inst, 7) ? 32 : 16;
                 const uint32_t imm5 =
                     bits(inst, 5) | (bits(inst, 3, 0) << 1);
