@@ -1526,7 +1526,8 @@ SingleStageFetch1::evaluate()
     if (!prediction.isBubble() || !fetch2->scanNextForBranch()) {
         /* Nothing more of the stream is fetched while its kept target
          *  line is on its way: on the Crazyflie's system bus a fetch never
-         *  follows another back to back (DDI0439D 2.3.1), and a sequential
+         *  follows another back to back (the Cortex-M3's DDI0337B 14.4.6; the
+         *  M4's manual gives no fetch timing), and a sequential
          *  fetch beside the kept one delays the next branch's target from
          *  SRAM (micro/fetch br_back_0: 714 cycles with one, 616 without,
          *  the board 608) */
