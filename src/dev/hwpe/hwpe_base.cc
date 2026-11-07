@@ -6,6 +6,7 @@
 #include "base/logging.hh"
 #include "base/trace.hh"
 #include "debug/HWPE.hh"
+#include "debug/HWPETrace.hh"
 #include "mem/packet_access.hh"
 #include "sim/serialize.hh"
 #include "sim/system.hh"
@@ -29,8 +30,19 @@ HWPEBase::TcdmPort::send(PacketPtr pkt)
         hwpe.recvTcdmRespFromPort(pkt);
         return;
     }
+    const Addr addr = pkt->getAddr();
+    const bool read = pkt->isRead();
+    std::string data;
+    if (!read && debug::HWPETrace) {
+        for (unsigned i = pkt->getSize(); i-- > 0;)
+            data += csprintf("%02x", pkt->getConstPtr<uint8_t>()[i]);
+    }
     if (!sendTimingReq(pkt))
         held = pkt;
+    else if (read)
+        DPRINTF(HWPETrace, "%d read %08x\n", hwpe.curCycle(), addr);
+    else
+        DPRINTF(HWPETrace, "%d write %08x %s\n", hwpe.curCycle(), addr, data);
 }
 
 PacketPtr
@@ -72,6 +84,7 @@ HWPEBase::HWPEBase(const Params &p)
       startLatency(p.start_latency),
       doneLatency(p.done_latency),
       atomicLatency(p.atomic_latency),
+      timedInAtomic(p.timed_in_atomic),
       generic(p.num_generic_regs, 0),
       io(p.num_contexts, std::vector<uint32_t>(p.num_io_regs, 0)),
       startEvent([this] { start(); }, name() + ".start"),
@@ -285,6 +298,7 @@ HWPEBase::trigger()
         return;
     }
     DPRINTF(HWPE, "Triggered: context %d\n", pointerContext);
+    DPRINTF(HWPETrace, "%d trigger\n", curCycle());
     acquired = false;
     pointerContext = (pointerContext + 1) % numContexts;
     ++pending;
@@ -312,6 +326,7 @@ void
 HWPEBase::finish()
 {
     DPRINTF(HWPE, "Job done: context %d\n", runningContext);
+    DPRINTF(HWPETrace, "%d done\n", curCycle());
     running = false;
     runningContext = (runningContext + 1) % numContexts;
     --pending;
@@ -320,6 +335,7 @@ HWPEBase::finish()
     pulseIrq();
     if (pending)
         schedule(startEvent, clockEdge(jobStartLatency()));
+    checkDrained();
 }
 
 void
@@ -341,8 +357,7 @@ HWPEBase::softClear(bool registers)
         delete pkt->popSenderState();
         --outstanding;
         clearedTcdmResp(pkt);
-        if (drainState() == DrainState::Draining && outstanding == 0)
-            signalDrainDone();
+        checkDrained();
     }
     pointerContext = 0;
     runningContext = 0;
@@ -375,7 +390,7 @@ HWPEBase::pulseIrq()
 bool
 HWPEBase::atomicMode() const
 {
-    return sys->isAtomicMode();
+    return sys->isAtomicMode() && !timedInAtomic;
 }
 
 Tick
@@ -387,7 +402,7 @@ HWPEBase::after(Tick from, Cycles cycles) const
 bool
 HWPEBase::canSendTcdm() const
 {
-    return !tcdmPort.waiting() && drainState() != DrainState::Draining;
+    return !tcdmPort.waiting();
 }
 
 void
@@ -429,8 +444,7 @@ HWPEBase::recvTcdmRespFromPort(PacketPtr pkt)
         clearedTcdmResp(pkt);
     else
         recvTcdmResp(pkt);
-    if (drainState() == DrainState::Draining && outstanding == 0)
-        signalDrainDone();
+    checkDrained();
 }
 
 void
@@ -444,7 +458,19 @@ HWPEBase::tcdmRetriedFromPort()
 DrainState
 HWPEBase::drain()
 {
-    return outstanding == 0 ? DrainState::Drained : DrainState::Draining;
+    // Jobs triggered run to their end, sending what they need
+    if (pending || outstanding || startEvent.scheduled() ||
+        doneEvent.scheduled())
+        return DrainState::Draining;
+    return DrainState::Drained;
+}
+
+void
+HWPEBase::checkDrained()
+{
+    if (drainState() == DrainState::Draining &&
+        drain() == DrainState::Drained)
+        signalDrainDone();
 }
 
 void

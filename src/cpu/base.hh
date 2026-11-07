@@ -525,7 +525,7 @@ class BaseCPU : public ClockedObject
      * @param macro The macro-op inst is a micro-op of, when the CPU model
      *              keeps it (null otherwise)
      * @param eff_addr The address of inst's memory access, when it made one
-     *                 and the CPU model reports it
+     *                 and the CPU model reports it (atomic and Minor)
      */
     virtual void probeInstCommit(const StaticInstPtr &inst, Addr pc,
                                  const StaticInstPtr &macro,
@@ -539,8 +539,8 @@ class BaseCPU : public ClockedObject
      * micro-op of (null when it is not a micro-op, or when the CPU model
      * does not keep it), its PC and the address of its memory access (the
      * last one, as the execution trace's ExecEffAddr shows it; empty when
-     * it made none or the CPU model does not report it, which only the
-     * atomic CPU does).
+     * it made none or the CPU model does not report it, which the atomic
+     * and Minor CPUs do).
      */
     struct CommittedOp
     {

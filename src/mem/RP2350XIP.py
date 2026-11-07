@@ -6,19 +6,21 @@ class RP2350XIP(AbstractMemory):
     """The RP2350's flash execute-in-place path: its XIP cache in front of
     the QSPI memory interface (QMI), holding the flash contents.
 
-    The cache is 16 KiB, two-way, of 8-byte lines (datasheet 4.4.1). A hit
+    The cache is 16 KiB, two-way, of 8-byte lines (datasheet 4.4.1); its
+    shape can be changed (`cache_size`, `assoc`, `line_bytes`). A hit
     answers in the cycle it is asked, as an SRAM read does. A miss reads
     its whole line from flash as one serial transfer and takes a way at
-    random. The lines of even and odd line addresses are two banks. A bank
-    takes one bus manager's accesses a cycle: when two managers ask in the
-    same cycle, a core's fetch and its load of a literal for one, the
-    other's access waits, the managers taking turns (datasheet 2.1.1).
-    While a bank waits for a line from flash, every other access to that
-    bank waits with it, and the other bank goes on answering hits. A bank
-    gives those that waited one 32-bit word a cycle, again in turn, and a
-    manager with an access waiting makes no other: so a core that asks for
-    whole lines, several ahead, gets them at the rate of one that fetches
-    a word at a time.
+    random (or, with `replacement` "lru", an empty way, else the one
+    looked up longest ago). The lines of even and odd line addresses are
+    two banks. A bank takes one bus manager's accesses a cycle: when two
+    managers ask in the same cycle, a core's fetch and its load of a
+    literal for one, the other's access waits, the managers taking turns
+    (datasheet 2.1.1). While a bank waits for a line from flash, every
+    other access to that bank waits with it, and the other bank goes on
+    answering hits. A bank gives those that waited one 32-bit word a
+    cycle, again in turn, and a manager with an access waiting makes no
+    other: so a core that asks for whole lines, several ahead, gets them
+    at the rate of one that fetches a word at a time.
 
     A read made on speculation (one whose request is flagged a prefetch,
     as the core's early fetch of a branch target is) reads no line from
@@ -37,6 +39,14 @@ class RP2350XIP(AbstractMemory):
 
     Cache maintenance writes (the window at `maintenance_base`) invalidate
     lines; pinning and cleaning are not modelled.
+
+    In atomic mode accesses take no cache or flash time. With `track_tags`
+    the cache's tags still follow them, each line looked up and filled on a
+    miss as in timing mode (and XIP_CTRL's counters count them), so that a
+    switch to a timing CPU finds the cache as the accesses so far left it.
+    With `atomic_latency` too, an atomic access returns the cycles its
+    misses take from flash, by the timing mode's rules for the transfer
+    before it, and a hit none (an atomic CPU's inst_latency charges them).
     """
 
     type = "RP2350XIP"
@@ -58,7 +68,31 @@ class RP2350XIP(AbstractMemory):
     cooldown_cycles = Param.Cycles(
         64, "How long the chip select is held after a transfer"
     )
+    track_tags = Param.Bool(
+        False, "In atomic mode, look up and fill the cache's tags"
+    )
+    atomic_latency = Param.Bool(
+        False,
+        "With track_tags, an atomic access returns the cycles its misses "
+        "take from flash (as in timing mode: fresh, chained or after a "
+        "reselect), none for a hit, in place of one cycle for any",
+    )
     page_break = Param.MemorySize(
         "1KiB", "Boundary at which a transfer ends and the chip select is"
         " released; 0 for none"
+    )
+    cache_size = Param.MemorySize("16KiB", "The cache's capacity")
+    assoc = Param.Unsigned(2, "The cache's ways a set")
+    line_bytes = Param.Unsigned(
+        8, "Bytes a line: a power of two, at least 8; even and odd lines are"
+        " the two banks"
+    )
+    replacement = Param.String(
+        "random", "Which way a miss fills: random (as the chip) or lru"
+    )
+    extra_word_cycles = Param.Cycles(
+        24,
+        "Added to a miss for each 32-bit word of its line past the first"
+        " two: 8 SCK cycles of quad data at the SDK's CLKDIV 3 (M0_TIMING),"
+        " which the transfer goes on to clock out",
     )

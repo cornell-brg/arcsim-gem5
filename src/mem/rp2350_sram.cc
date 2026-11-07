@@ -77,14 +77,17 @@ RP2350SRAM::MemoryPort::recvRespRetry()
 
 RP2350SRAM::RP2350SRAM(const RP2350SRAMParams &p)
     : AbstractMemory(p), window(p.window), latency(p.latency),
-      queueDepth(p.queue_depth),
+      queueDepth(p.queue_depth), oneBank(p.one_bank),
       arbitrateEvent([this] { arbitrate(); }, name() + ".arbitrate", false,
                      Event::CPU_Tick_Pri + 1),
       completeEvent([this] { completeBeats(); }, name() + ".complete"),
       sramStats(*this)
 {
-    fatal_if(range.start() != 0x20000000 || range.size() != 520 * 1024 ||
-             range.interleaved(), "RP2350SRAM requires the 520 KiB SRAM range");
+    fatal_if(!oneBank && (range.start() != 0x20000000 ||
+                          range.size() != 520 * 1024 || range.interleaved()),
+             "RP2350SRAM requires the 520 KiB SRAM range, unless one_bank");
+    fatal_if(oneBank && range.interleaved(),
+             "RP2350SRAM with one_bank needs a range that is not interleaved");
     fatal_if(queueDepth == 0 || p.port_priority.empty(),
              "Invalid RP2350 SRAM queue parameters");
     lastWinner.fill(InvalidPortID);
@@ -123,6 +126,8 @@ RP2350SRAM::init()
 unsigned
 RP2350SRAM::bankFor(Addr address) const
 {
+    if (oneBank)
+        return 0;
     if (address < 0x20080000)
         return ((address - range.start()) / 0x40000) * 4 +
                ((address >> 2) & 3);

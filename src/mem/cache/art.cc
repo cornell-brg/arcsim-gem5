@@ -34,6 +34,8 @@ ART::ART(const ARTCacheParams &p)
       staleReturnEvent(
           [this]{ retryStaleReturn(); },
           name() + ".staleReturn"),
+      atomicLatency(p.atomic_latency),
+      atomicLineCycles(p.atomic_line_cycles),
       prefetchBuffer(pfBlkSize),
       currentBuffer(pfBlkSize),
       nextPfAddr(0),
@@ -55,6 +57,77 @@ ART::ART(const ARTCacheParams &p)
             enablePrefetch ? "true" : "false",
             prefetchOnCacheHit ? "true" : "false", pfBlkSize, flashStartAddr,
             flashEndAddr);
+}
+
+// -------------------------------------------------------------------
+//  Atomic mode
+// -------------------------------------------------------------------
+
+Tick
+ART::recvAtomic(PacketPtr pkt)
+{
+    if (!atomicLatency)
+        return NoncoherentCache::recvAtomic(pkt);
+
+    const Addr addr = pkt->getAddr();
+    if (!pkt->isRead() || addr < flashStartAddr || addr > flashEndAddr)
+        return NoncoherentCache::recvAtomic(pkt);
+
+    const Addr line = addr & ~Addr(pfBlkSize - 1);
+    const Tick now = curTick();
+    const Tick read = clockPeriod() * atomicLineCycles;
+    const bool cache_on = !directMemoryMode;
+    const bool hit =
+        cache_on && tags->findBlock({addr, pkt->isSecure()}) != nullptr;
+
+    // When the fetch's line is there, and whether it goes into the cache:
+    // a line that missed the cache, the current line and the prefetched
+    // one does, as does a prefetched line the fetch had to wait for (as
+    // fillCacheWithPrefetchData in timing mode).
+    Tick ready = now;
+    bool fill = false;
+    if (hit || line == atomicCurLine) {
+        // served at once
+    } else if (enablePrefetch && line == atomicPfLine) {
+        ready = std::max(now, atomicPfReady);
+        fill = ready > now;
+        atomicCurLine = line;
+        atomicPfLine = MaxAddr;
+    } else {
+        const Tick start = std::max(now, atomicFlashFree);
+        ready = start + read;
+        atomicFlashFree = ready;
+        fill = true;
+        atomicCurLine = line;
+        atomicPfLine = MaxAddr;
+    }
+
+    // The data: through the cache where it hits or fills, else from the
+    // flash directly, so that no line is evicted.
+    if (cache_on && (hit || fill))
+        NoncoherentCache::recvAtomic(pkt);
+    else
+        memSidePort.sendAtomic(pkt);
+
+    // Read the next line once the flash is free, unless it is the current
+    // or the prefetched line or in the cache. A cache hit starts it only
+    // with prefetch_on_cache_hit.
+    if (enablePrefetch && (!hit || prefetchOnCacheHit)) {
+        const Addr next = line + pfBlkSize;
+        const bool cached =
+            cache_on && tags->findBlock({next, pkt->isSecure()}) != nullptr;
+        if (next <= flashEndAddr && next != atomicCurLine &&
+            next != atomicPfLine && !cached) {
+            atomicPfLine = next;
+            atomicPfReady = std::max(ready, atomicFlashFree) + read;
+            atomicFlashFree = atomicPfReady;
+        }
+    }
+
+    DPRINTF(ARTCache, "atomic %#x: line %#x %s, waits %d cycles\n", addr,
+            line, hit ? "hit" : (ready > now ? "read" : "buffer"),
+            (int)((ready - now) / clockPeriod()));
+    return ready - now;
 }
 
 // -------------------------------------------------------------------

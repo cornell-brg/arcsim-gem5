@@ -47,6 +47,7 @@
 #define __CPU_MINOR_DYN_INST_HH__
 
 #include <iostream>
+#include <optional>
 
 #include "arch/generic/isa.hh"
 #include "base/named.hh"
@@ -168,6 +169,15 @@ class MinorDynInst : public RefCounted
 
   public:
     const StaticInstPtr staticInst;
+
+    /** The macro-op a micro-op came from, null for an instruction that is
+     *  not split; for the CommittedOps probe point, as the atomic CPU
+     *  reports it. */
+    StaticInstPtr staticInstMacro;
+
+    /** The address of its memory access, when it made one, for the
+     *  CommittedOps probe point */
+    std::optional<Addr> effAddr;
 
     InstId id;
 

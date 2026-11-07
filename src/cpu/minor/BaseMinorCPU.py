@@ -378,6 +378,15 @@ class BaseMinorCPU(BaseCPU):
         " memory system may decline with an error, and a declined line is"
         " fetched again once it is sure to be wanted",
     )
+    fetchKeepTargetInFlight = Param.Bool(
+        False,
+        "With fetchBranchTargetAtDecode: when Execute takes a branch whose"
+        " target line is still on its way (fetched while the branch was in"
+        " Decode, not on speculation), that request is kept and starts the"
+        " new stream when it arrives, where otherwise it is given up and the"
+        " same line fetched again; this matters only where a fetch takes"
+        " longer than the branch's Decode cycle (code over a slower bus)",
+    )
     fetchRegisterTargetAtDecode = Param.Bool(
         False,
         "With fetchBranchTargetAtDecode: a branch to the value of its one"
@@ -555,6 +564,14 @@ class BaseMinorCPU(BaseCPU):
         " commits, the cycle of its address phase",
     )
 
+    executeWaitedLoadHoldsInsts = Param.Bool(
+        False,
+        "A load sent to memory that is not answered within its cycle keeps"
+        " Execute from committing or issuing until it is, as on a core"
+        " whose pipeline stalls while its bus makes a load wait, so that no"
+        " later access starts its address phase in the meantime",
+    )
+
     executeDynamicLatencyHoldsInst = Param.Bool(
         False,
         "An FU's data-dependent extra latency (dynamicExtraLatency, e.g. an"
@@ -601,6 +618,27 @@ class BaseMinorCPU(BaseCPU):
         " byte past a word boundary), as on cores that split unaligned"
         " accesses, and those of more than a word, on a 32-bit bus",
     )
+
+    executeHalfwordWideMemCycles = Param.Cycles(
+        0,
+        "Cycles a 32-bit instruction waits to issue when it follows, in"
+        " sequence, a 32-bit load or store at an address two bytes into a"
+        " word (0: none), as on a core whose prefetch drains under such"
+        " loads: every other time when it is itself a load or store, and"
+        " not for the first executeHalfwordWideMemGrace of them after the"
+        " stream last broke, nor after an access of several transfers"
+        " (executeAlignedTransfers).  32-bit: executeWideInstMask/Match",
+    )
+    executeHalfwordWideMemGrace = Param.Unsigned(
+        3,
+        "see executeHalfwordWideMemCycles: the occurrences after a break in"
+        " the stream that cost nothing",
+    )
+    executeWideInstMask = Param.UInt64(
+        0, "ExtMachInst bits that, compared with executeWideInstMatch, mark"
+        " a 32-bit instruction"
+    )
+    executeWideInstMatch = Param.UInt64(0, "see executeWideInstMask")
 
     enableIdling = Param.Bool(
         True, "Enable cycle skipping when the processor is idle\n"

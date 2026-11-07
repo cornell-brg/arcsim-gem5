@@ -129,6 +129,33 @@ class Execute : public Named
      *  transfers is still making them */
     Cycles issueHeldUntil{0};
 
+    /** See executeHalfwordWideMemCycles in BaseMinorCPU.py */
+    Cycles halfwordWideMemCycles;
+    unsigned int halfwordWideMemGrace;
+    uint64_t wideInstMask;
+    uint64_t wideInstMatch;
+
+    /** For halfwordWideMemCycles: the last instruction issued (its address
+     *  and size, and whether it was a 32-bit load or store two bytes into a
+     *  word), the occurrences still free since the stream broke, whether the
+     *  next one followed by a load or store costs, and the instruction last
+     *  decided */
+    Addr hwLastPc = 0;
+    unsigned int hwLastSize = 0;
+    bool hwLastWideMem = false;
+    unsigned int hwGraceLeft = 0;
+    bool hwToggle = false;
+    InstSeqNum hwDecidedSeq = 0;
+
+    bool isWideInst(const MinorDynInstPtr &inst) const;
+
+    /** Under halfwordWideMemCycles, does inst, next to issue, wait (setting
+     *  issueHeldUntil)?  Decided once for each instruction */
+    bool halfwordWideMemHolds(const MinorDynInstPtr &inst);
+
+    /** Under halfwordWideMemCycles, note an instruction issued */
+    void halfwordWideMemIssued(const MinorDynInstPtr &inst);
+
     /** The commit pass for instructions issued this cycle is running */
     bool committingAtIssue = false;
 

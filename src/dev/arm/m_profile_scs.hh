@@ -133,6 +133,8 @@ class MProfileSCS : public BasicPioDevice
     uint8_t priorityBits;
     uint8_t irqpriorityMask;
     uint8_t numSysticks;
+    /** The context id of the core this SCS belongs to. */
+    const unsigned core;
     bool hasBasePri;
 
     // -- Exception masking state --
@@ -297,6 +299,8 @@ class MProfileSCS : public BasicPioDevice
 
     void init() override;
     void startup() override;
+    // A CPU swap (m5.switchCpus) replaces thread 0: take it again on resume.
+    void drainResume() override;
     void serialize(CheckpointOut &cp) const override;
     void unserialize(CheckpointIn &cp) override;
 

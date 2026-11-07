@@ -78,8 +78,8 @@ class HWPEBase : public BasicPioDevice
 
     uint32_t genericReg(unsigned index) const { return generic[index]; }
 
-    // The system runs in atomic memory mode: TCDM accesses are atomic and
-    // the streamer makes all of a job's at one tick
+    // The system runs in atomic memory mode, unless timed_in_atomic: TCDM
+    // accesses are atomic and the streamer makes all of a job's at one tick
     bool atomicMode() const;
     // For a subclass's own timing: the tick 'cycles' cycles after 'from';
     // in atomic mode, where a job takes no time, 'from' itself
@@ -169,6 +169,7 @@ class HWPEBase : public BasicPioDevice
     const Cycles startLatency;
     const Cycles doneLatency;
     const Cycles atomicLatency;
+    const bool timedInAtomic;
 
     std::vector<uint32_t> generic;
     std::vector<std::vector<uint32_t>> io;  // [context][register]
@@ -205,6 +206,8 @@ class HWPEBase : public BasicPioDevice
     void start();
     void finish();
     void pulseIrq();
+    // Drain done, once drain() is Drained while draining
+    void checkDrained();
     void unmodelled(Addr offset, bool is_write);
 
     // Called by tcdmPort; they forward to the virtual hooks above

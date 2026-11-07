@@ -20,9 +20,6 @@ namespace gem5::memory
 class RP2350XIP : public AbstractMemory
 {
   private:
-    static constexpr unsigned LineBytes = 8;
-    static constexpr unsigned NumSets = 1024;
-    static constexpr unsigned NumWays = 2;
     static constexpr unsigned NumBanks = 2;
 
     // An access on its way through the cache: the lines it still needs.
@@ -38,6 +35,8 @@ class RP2350XIP : public AbstractMemory
         RequestorID requestor = 0;
         // It has had to wait for a bank or for flash
         bool waited = false;
+        // A line it needed was read from flash
+        bool missed = false;
         // Words of its present line still to come from a bank that is
         // serving those that waited; 0 before its first
         unsigned beatsLeft = 0;
@@ -63,6 +62,8 @@ class RP2350XIP : public AbstractMemory
     {
         bool valid = false;
         Addr line = 0;
+        // With LRU replacement: when it was last looked up or filled
+        uint64_t lastUse = 0;
     };
 
     // One of the cache's two banks: the lines of even or of odd line
@@ -105,8 +106,20 @@ class RP2350XIP : public AbstractMemory
     const Cycles reselectCycles;
     const Cycles cooldownCycles;
     const Addr pageBreak;
+    const bool trackTags;
+    const bool atomicLatency;
+    // The cache's shape: bytes a line, ways a set, sets; LRU or random
+    // replacement; the cycles each 32-bit word of a line past its first two
+    // adds to its transfer
+    const unsigned lineBytes;
+    const unsigned numWays;
+    const unsigned numSets;
+    const bool lru;
+    const Cycles extraWordCycles;
 
-    std::array<std::array<Way, NumWays>, NumSets> sets;
+    // The ways of set s at [s * numWays, (s + 1) * numWays)
+    std::vector<Way> sets;
+    uint64_t useCount = 0;
     std::array<Bank, NumBanks> banks;
     std::map<RequestorID, Manager> managers;
     mutable Random::RandomPtr rng = Random::genRandom();
@@ -138,16 +151,17 @@ class RP2350XIP : public AbstractMemory
         XIPStats(RP2350XIP &xip);
     } xipStats;
 
-    static Addr lineOf(Addr addr) { return addr & ~Addr(LineBytes - 1); }
-    static unsigned bankOf(Addr line) { return (line / LineBytes) % NumBanks; }
-    static unsigned setOf(Addr line) { return (line / LineBytes) % NumSets; }
+    Addr lineOf(Addr addr) const { return addr & ~Addr(lineBytes - 1); }
+    unsigned bankOf(Addr line) const { return (line / lineBytes) % NumBanks; }
+    unsigned setOf(Addr line) const { return (line / lineBytes) % numSets; }
+    Way *setWays(Addr line) { return &sets[setOf(line) * numWays]; }
     Way *lookup(Addr line);
     void fill(Addr line);
 
     bool receive(PacketPtr pkt);
     void maintain(PacketPtr pkt);
     // The 32-bit words of `line` the access covers
-    static unsigned wordsIn(const Access &access, Addr line);
+    unsigned wordsIn(const Access &access, Addr line) const;
     // Takes the access through the lines it still needs, until one must
     // wait.
     void advance(const AccessPtr &access);
@@ -162,14 +176,29 @@ class RP2350XIP : public AbstractMemory
     void respond(const AccessPtr &access);
     void release();
     void startQmi(Tick start);
+    // A miss's cycles when its transfer starts at `start`, by the last
+    // transfer's end and line (counting a chained one)
+    Cycles missCost(Tick start, Addr line);
     void finishQmi();
     // The clock edge after now, and the one the present cycle began at
     Tick nextCycle() const;
     Tick thisCycle() const;
     void serve(unsigned bank);
+    // Atomic mode: the tags follow an access; with atomicLatency, returns
+    // the ticks its misses take from flash, else none
+    Tick track(PacketPtr pkt);
+
+    // XIP_CTRL's CTR_HIT and CTR_ACC (RP2350XipCtrl): saturating, one
+    // count per access answered, and per one that read no line from flash
+    uint32_t ctrHit = 0;
+    uint32_t ctrAcc = 0;
 
   public:
     explicit RP2350XIP(const RP2350XIPParams &p);
+    uint32_t counterHit() const { return ctrHit; }
+    uint32_t counterAcc() const { return ctrAcc; }
+    void clearCounterHit() { ctrHit = 0; }
+    void clearCounterAcc() { ctrAcc = 0; }
     Port &getPort(const std::string &name, PortID id = InvalidPortID) override;
     void init() override;
     DrainState drain() override;

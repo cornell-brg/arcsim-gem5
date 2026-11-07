@@ -155,6 +155,7 @@ MProfileSCS::MProfileSCS(const Params &p)
     priorityBits(std::min(p.priority_bits, MAX_PRIR_BITS)),
     irqpriorityMask(0),
     numSysticks(std::min(p.num_systick, MAX_NUM_SYSTICKS)),
+    core(p.core),
     hasBasePri(p.has_basepri)
 {
     // Priority mask: only the top N bits of the 8-bit priority field
@@ -180,7 +181,7 @@ MProfileSCS::MProfileSCS(const Params &p)
     }
 
     // Register with ArmMSystem so MProfileInterrupts can discover us
-    // via mSystem->getSCS() during BaseCPU::init().
+    // via mSystem->getSCS(core) during BaseCPU::init().
     // Must happen in the constructor (not init()) because
     // MProfileInterrupts::setThreadContext() is called during
     // BaseCPU::init(), which may run before MProfileSCS::init().
@@ -188,7 +189,7 @@ MProfileSCS::MProfileSCS(const Params &p)
     mSystem = dynamic_cast<ArmMSystem *>(sys);
     assert(mSystem && "MProfileSCS must be attached to an ArmMSystem, "
                       "not a generic System.");
-    mSystem->setSCS(this);
+    mSystem->setSCS(core, this);
 }
 
 // -- Exception mask interface --
@@ -249,6 +250,13 @@ MProfileSCS::init()
 }
 
 void
+MProfileSCS::drainResume()
+{
+    BasicPioDevice::drainResume();
+    tc = sys->threads[core];
+}
+
+void
 MProfileSCS::startup()
 {
     BasicPioDevice::startup();
@@ -257,8 +265,8 @@ MProfileSCS::startup()
     // Done in startup() (not constructor/init()) because threads
     // are fully registered only after all init() calls complete
     // (BaseCPU::init() calls registerThreadContexts()).
-    // Single-core MVP: always thread 0.
-    tc = sys->threads[0];
+    // The thread of the core this SCS belongs to (its core parameter).
+    tc = sys->threads[core];
 
     // CPUID from platform — not needed until firmware reads
     // 0xE000ED00, but safe to cache here.

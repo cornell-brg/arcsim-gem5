@@ -1,5 +1,7 @@
 #include "arch/riscv/xh3irq.hh"
 
+#include <algorithm>
+
 #include "arch/riscv/faults.hh"
 #include "arch/riscv/regs/misc.hh"
 #include "base/bitfield.hh"
@@ -298,6 +300,10 @@ Xh3irqLine::Xh3irqLine(const Params &p)
       delay(p.delay), pin(name() + ".pin", 0, this),
       deliverEvent([this] { deliver(); }, name() + ".deliver")
 {
+    if (p.controller &&
+            std::find(controllers.begin(), controllers.end(),
+                      p.controller) == controllers.end())
+        controllers.push_back(p.controller);
 }
 
 void

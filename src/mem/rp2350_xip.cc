@@ -43,12 +43,17 @@ RP2350XIP::XipPort::getAddrRanges() const
 Tick
 RP2350XIP::XipPort::recvAtomic(PacketPtr pkt)
 {
-    // Atomic mode has no cache or flash timing.
-    if (xip.maintenanceRange.contains(pkt->getAddr()))
+    // Atomic mode has no cache or flash timing, unless atomicLatency
+    // returns the misses'.
+    Tick latency = 0;
+    if (xip.maintenanceRange.contains(pkt->getAddr())) {
         xip.maintain(pkt);
-    else
+    } else {
+        if (xip.trackTags)
+            latency = xip.track(pkt);
         xip.access(pkt);
-    return xip.clockPeriod();
+    }
+    return xip.atomicLatency ? latency : xip.clockPeriod();
 }
 
 void
@@ -71,7 +76,13 @@ RP2350XIP::RP2350XIP(const RP2350XIPParams &p)
                        p.maintenance_base + p.range.size()),
       missCycles(p.miss_cycles), chainedCycles(p.chained_cycles),
       reselectCycles(p.reselect_cycles), cooldownCycles(p.cooldown_cycles),
-      pageBreak(p.page_break),
+      pageBreak(p.page_break), trackTags(p.track_tags),
+      atomicLatency(p.atomic_latency), lineBytes(p.line_bytes),
+      numWays(p.assoc),
+      numSets(p.assoc && p.line_bytes
+              ? p.cache_size / (p.assoc * p.line_bytes) : 0),
+      lru(p.replacement == "lru"), extraWordCycles(p.extra_word_cycles),
+      sets(numSets * numWays),
       qmiEvent([this] { finishQmi(); }, name() + ".qmi"),
       releaseEvent([this] { release(); }, name() + ".release"),
       grantEvent([this] { grant(); }, name() + ".grant"),
@@ -79,8 +90,18 @@ RP2350XIP::RP2350XIP(const RP2350XIPParams &p)
                    {[this] { serve(1); }, name() + ".serve1"}}},
       xipStats(*this)
 {
-    fatal_if(pageBreak % LineBytes != 0,
+    fatal_if(lineBytes < 8 || (lineBytes & (lineBytes - 1)) != 0,
+             "RP2350XIP: line_bytes must be a power of two of at least 8");
+    fatal_if(numWays == 0 || numSets == 0 ||
+             numSets * numWays * lineBytes != p.cache_size,
+             "RP2350XIP: cache_size must be a whole number of sets of assoc "
+             "lines");
+    fatal_if(p.replacement != "random" && p.replacement != "lru",
+             "RP2350XIP: replacement is random or lru, not %s", p.replacement);
+    fatal_if(pageBreak % lineBytes != 0,
              "RP2350XIP: page_break must be a whole number of lines");
+    fatal_if(atomicLatency && !trackTags,
+             "RP2350XIP: atomic_latency needs track_tags");
 }
 
 Port &
@@ -116,22 +137,82 @@ RP2350XIP::thisCycle() const
 RP2350XIP::Way *
 RP2350XIP::lookup(Addr line)
 {
-    for (Way &way : sets[setOf(line)]) {
-        if (way.valid && way.line == line)
-            return &way;
+    Way *ways = setWays(line);
+    for (unsigned i = 0; i < numWays; ++i) {
+        if (ways[i].valid && ways[i].line == line) {
+            if (lru)
+                ways[i].lastUse = ++useCount;
+            return &ways[i];
+        }
     }
     return nullptr;
 }
 
-// The way is chosen at random even when the other holds nothing, as a
-// Pico 2 does: of two lines read into an empty set, the first is gone half
-// the time.
+// With random replacement the way is chosen at random even when another holds
+// nothing, as a Pico 2 does: of two lines read into an empty set, the first is
+// gone half the time. With LRU, an empty way, else the one looked up longest
+// ago.
 void
 RP2350XIP::fill(Addr line)
 {
-    Way &way = sets[setOf(line)][rng->random<unsigned>(0, NumWays - 1)];
-    way.valid = true;
-    way.line = line;
+    Way *ways = setWays(line);
+    Way *way = ways;
+    if (lru) {
+        for (unsigned i = 0; i < numWays; ++i) {
+            if (!ways[i].valid) {
+                way = &ways[i];
+                break;
+            }
+            if (ways[i].lastUse < way->lastUse)
+                way = &ways[i];
+        }
+        way->lastUse = ++useCount;
+    } else {
+        way = &ways[rng->random<unsigned>(0, numWays - 1)];
+    }
+    way->valid = true;
+    way->line = line;
+}
+
+// As receive(), grant() and respond() do in timing mode: a read made on
+// speculation that misses leaves the tags and counters alone; any other
+// access looks up each line it covers, fills those that miss, and counts.
+Tick
+RP2350XIP::track(PacketPtr pkt)
+{
+    const Addr first = lineOf(pkt->getAddr());
+    const Addr last = lineOf(pkt->getAddr() + pkt->getSize() - 1);
+    if (pkt->req->isPrefetch()) {
+        for (Addr line = first; line <= last; line += lineBytes) {
+            if (!lookup(line)) {
+                ++xipStats.declined;
+                return 0;
+            }
+        }
+    }
+    bool missed = false;
+    Tick latency = 0;
+    for (Addr line = first; line <= last; line += lineBytes) {
+        if (lookup(line)) {
+            ++xipStats.hits;
+        } else {
+            ++xipStats.misses;
+            missed = true;
+            fill(line);
+            if (atomicLatency) {
+                // One transfer after another, as the QMI reads them
+                const Tick start = curTick() + latency;
+                latency += missCost(start, line) * clockPeriod();
+                qmiLastEnd = curTick() + latency;
+                qmiNextLine = line + lineBytes;
+            }
+        }
+    }
+    if (ctrAcc != UINT32_MAX)
+        ++ctrAcc;
+    if (!missed && ctrHit != UINT32_MAX)
+        ++ctrHit;
+    return latency;
 }
 
 void
@@ -141,8 +222,17 @@ RP2350XIP::maintain(PacketPtr pkt)
         const Addr target = pkt->getAddr() - maintenanceRange.start();
         const unsigned op = target & 0x7;
         if (op == 0) {
-            // Invalidate by set and way
-            Way &way = sets[setOf(target)][(target >> 13) & 1];
+            // The SDK steps over the chip's 16 KiB of set and way addresses,
+            // which a cache of another shape does not match
+            warn_if_once(lineBytes != 8 || numWays != 2 || numSets != 1024,
+                         "RP2350XIP: maintenance by set and way on a cache "
+                         "shape other than the chip's 16 KiB, 2 ways, 8-byte "
+                         "lines: software that walks the chip's sets and ways "
+                         "leaves lines it did not reach");
+            // Invalidate by set and way: the way from the address bits above
+            // the set's (bit 13 for 16 KiB of two ways)
+            Way &way = setWays(target)[
+                (target / (Addr(numSets) * lineBytes)) % numWays];
             xipStats.invalidations += way.valid;
             way.valid = false;
         } else if (op == 2) {
@@ -189,7 +279,7 @@ RP2350XIP::receive(PacketPtr pkt)
     // answered at once as not there.
     if (pkt->req->isPrefetch()) {
         for (Addr line = access->nextLine; line <= access->endLine;
-             line += LineBytes)
+             line += lineBytes)
         {
             if (!lookup(line)) {
                 ++xipStats.declined;
@@ -215,11 +305,11 @@ RP2350XIP::receive(PacketPtr pkt)
 }
 
 unsigned
-RP2350XIP::wordsIn(const Access &access, Addr line)
+RP2350XIP::wordsIn(const Access &access, Addr line) const
 {
     const Addr start = std::max(access.pkt->getAddr(), line);
     const Addr last = std::min<Addr>(
-        access.pkt->getAddr() + access.pkt->getSize(), line + LineBytes) - 1;
+        access.pkt->getAddr() + access.pkt->getSize(), line + lineBytes) - 1;
     return (last >> 2) - (start >> 2) + 1;
 }
 
@@ -235,6 +325,7 @@ RP2350XIP::startMiss(unsigned index, const AccessPtr &access, Addr line)
 {
     Bank &bank = banks[index];
     ++xipStats.misses;
+    access->missed = true;
     markWaited(access);
     bank.busy = true;
     bank.owner = access;
@@ -327,7 +418,7 @@ RP2350XIP::grant()
             } else if (lookup(line)) {
                 ++xipStats.hits;
                 // Its next line is the other bank's.
-                access->nextLine += LineBytes;
+                access->nextLine += lineBytes;
                 advance(access);
             } else {
                 startMiss(index, access, line);
@@ -347,10 +438,15 @@ RP2350XIP::respond(const AccessPtr &access)
 {
     PacketPtr pkt = access->pkt;
     const bool needs_response = pkt->needsResponse();
-    if (access->maintenance)
+    if (access->maintenance) {
         maintain(pkt);
-    else
+    } else {
         this->access(pkt);
+        if (ctrAcc != UINT32_MAX)
+            ++ctrAcc;
+        if (!access->missed && ctrHit != UINT32_MAX)
+            ++ctrHit;
+    }
     // A hit that has not waited is answered in the cycle it is asked.
     if (needs_response)
         port.schedTimingResp(pkt, curTick());
@@ -394,10 +490,9 @@ RP2350XIP::release()
 }
 
 // The front of the queue goes out on the serial interface from `start`.
-void
-RP2350XIP::startQmi(Tick start)
+Cycles
+RP2350XIP::missCost(Tick start, Addr line)
 {
-    const Addr line = banks[qmiQueue.front()].missLine;
     // The chip select stays low for the cooldown after a transfer, unless
     // the transfer ended at a page break.
     Cycles cost = missCycles;
@@ -416,8 +511,20 @@ RP2350XIP::startQmi(Tick start)
             cost = missCycles + reselectCycles;
         }
     }
+    // A line longer than 8 bytes takes its further words in the same
+    // transfer, after the 8 bytes the cycles above cover
+    cost = Cycles(uint64_t(cost) +
+                  uint64_t(extraWordCycles) * ((lineBytes - 8) / 4));
     DPRINTF(RP2350XIP, "line %#x from flash, %d cycles\n", line,
             static_cast<uint64_t>(cost));
+    return cost;
+}
+
+void
+RP2350XIP::startQmi(Tick start)
+{
+    const Addr line = banks[qmiQueue.front()].missLine;
+    const Cycles cost = missCost(start, line);
     qmiBusy = true;
     schedule(qmiEvent, start + cost * clockPeriod());
 }
@@ -430,7 +537,7 @@ RP2350XIP::finishQmi()
     Bank &bank = banks[index];
     fill(bank.missLine);
     qmiLastEnd = curTick();
-    qmiNextLine = bank.missLine + LineBytes;
+    qmiNextLine = bank.missLine + lineBytes;
     qmiBusy = false;
 
     AccessPtr owner = bank.owner;
@@ -448,7 +555,7 @@ RP2350XIP::finishQmi()
         owner->beatsLeft = words - 1;
         bank.waiting.push_front(owner);
     } else {
-        owner->nextLine += LineBytes;
+        owner->nextLine += lineBytes;
         advance(owner);
     }
     // The accesses that waited follow from the next cycle.
@@ -483,7 +590,7 @@ RP2350XIP::serve(unsigned index)
     }
     if (--access->beatsLeft == 0) {
         bank.waiting.erase(chosen);
-        access->nextLine += LineBytes;
+        access->nextLine += lineBytes;
         advance(access);
     }
     if (!bank.busy && !bank.waiting.empty() &&
@@ -503,16 +610,16 @@ RP2350XIP::serialize(CheckpointOut &cp) const
     AbstractMemory::serialize(cp);
     std::vector<uint8_t> valid;
     std::vector<Addr> lines;
-    for (const auto &set : sets) {
-        for (const Way &way : set) {
-            valid.push_back(way.valid);
-            lines.push_back(way.line);
-        }
+    for (const Way &way : sets) {
+        valid.push_back(way.valid);
+        lines.push_back(way.line);
     }
     SERIALIZE_CONTAINER(valid);
     SERIALIZE_CONTAINER(lines);
     SERIALIZE_SCALAR(qmiLastEnd);
     SERIALIZE_SCALAR(qmiNextLine);
+    SERIALIZE_SCALAR(ctrHit);
+    SERIALIZE_SCALAR(ctrAcc);
 }
 
 void
@@ -523,18 +630,16 @@ RP2350XIP::unserialize(CheckpointIn &cp)
     std::vector<Addr> lines;
     UNSERIALIZE_CONTAINER(valid);
     UNSERIALIZE_CONTAINER(lines);
-    fatal_if(valid.size() != NumSets * NumWays || lines.size() != valid.size(),
+    fatal_if(valid.size() != sets.size() || lines.size() != valid.size(),
              "RP2350XIP: checkpoint of another cache geometry");
-    size_t i = 0;
-    for (auto &set : sets) {
-        for (Way &way : set) {
-            way.valid = valid[i];
-            way.line = lines[i];
-            ++i;
-        }
+    for (size_t i = 0; i < sets.size(); ++i) {
+        sets[i].valid = valid[i];
+        sets[i].line = lines[i];
     }
     UNSERIALIZE_SCALAR(qmiLastEnd);
     UNSERIALIZE_SCALAR(qmiNextLine);
+    UNSERIALIZE_OPT_SCALAR(ctrHit);
+    UNSERIALIZE_OPT_SCALAR(ctrAcc);
 }
 
 } // namespace gem5::memory

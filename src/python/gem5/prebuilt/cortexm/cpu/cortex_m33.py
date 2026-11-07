@@ -485,8 +485,10 @@ class CortexM33CPU(ArmMMinorCPU):
     executeBranchAtIssue = True
     # One execute stage: a multi-cycle instruction (SDIV, LDM, a load
     # the bus makes wait) holds up the next one, except that loads and
-    # stores pipeline behind each other and the floating-point unit works
-    # beside the pipeline (M33FPU).
+    # stores the bus answers in their cycle pipeline behind each other and
+    # the floating-point unit works beside the pipeline (M33FPU). The
+    # board sets executeWaitedLoadHoldsInsts and executeWaitedStoreHoldsInsts
+    # with the banked SRAM.
     executeInOrderCompletion = True
     # A load takes one cycle: its address phase is its execute cycle, and
     # the instruction behind it executes in its data phase [RP2350

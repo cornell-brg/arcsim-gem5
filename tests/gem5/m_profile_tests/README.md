@@ -152,9 +152,12 @@ after the core halts at the test's `bkpt` read the result with
 `mdw 0x20000100 2`. Nothing is written to flash. A Pico 2 (Cortex-M33 r1p0)
 passes all 18 subtests.
 
-`test_rp2350_dma.elf` and `test_rp2350_store_wait.elf` are already linked
-for SRAM and run the same way; a Pico 2 passes all 16 subtests of the first
-and all 5 of the second.
+`test_rp2350_dma.elf`, `test_rp2350_store_wait.elf` and
+`test_rp2350_load_wait.elf` are already linked for SRAM and run the same way;
+a Pico 2 passes all 16 subtests of the first, all 5 of the second and all 14
+of the third. The third prints each subtest's cycles through semihosting
+(OpenOCD's `arm semihosting enable`); without it, the core halts at the first
+print with the cycles already at 0x20000110.
 
 `test_rp2350_xip.elf` times loads from flash, so it needs the flash
 interface as the Pico SDK sets it up, which `reset halt` stops the board

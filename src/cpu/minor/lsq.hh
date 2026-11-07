@@ -170,6 +170,10 @@ class LSQ : public Named
          *  buffer; MaxTick before that */
         Tick storeSentTick = MaxTick;
 
+        /** When memory was first asked for a packet of this load; MaxTick
+         *  before that */
+        Tick loadSentTick = MaxTick;
+
         enum LSQRequestState
         {
             NotIssued, /* Newly created */
@@ -659,7 +663,7 @@ class LSQ : public Named
         unsigned int requests_queue_size, unsigned int transfers_queue_size,
         unsigned int store_buffer_size,
         unsigned int store_buffer_cycle_store_limit,
-        bool waited_store_holds_insts);
+        bool waited_store_holds_insts, bool waited_load_holds_insts);
 
     virtual ~LSQ();
 
@@ -706,6 +710,18 @@ class LSQ : public Named
      *  instructions this cycle? */
     bool storeHoldsInsts() const
     { return waitedStoreHoldsInsts && storeBuffer.hasWaitedStore(); }
+
+    /** See executeWaitedLoadHoldsInsts in BaseMinorCPU.py */
+    const bool waitedLoadHoldsInsts;
+
+    /** Is a load that was sent to memory in an earlier cycle still without
+     *  its answer? */
+    bool hasWaitedLoad() const;
+
+    /** Is the bus making a load wait, so that Execute must hold its
+     *  instructions this cycle? */
+    bool loadHoldsInsts() const
+    { return waitedLoadHoldsInsts && hasWaitedLoad(); }
 
     /** Are there any accesses other than normal cached loads in the
      *  memory system or having received responses which need to be
