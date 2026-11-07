@@ -157,6 +157,10 @@ class MProfileInstLatency : public BaseInstLatency
     Cycles busNextFetch{0};
     /** The word the last fetch over the shared bus read. */
     Addr busFetchWord = MaxAddr;
+    /** When the next fetch can start after a store's data phase. */
+    Cycles busFetchGate{0};
+    /** The instruction in flight stores over the shared bus. */
+    bool busStore = false;
     /** Nothing is queued: the next fetch starts from now. */
     bool busQueueEmpty = true;
     /** When each queued word's first instruction issued, oldest at the

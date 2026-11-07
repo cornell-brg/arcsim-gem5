@@ -463,8 +463,10 @@ MProfileInstLatency::access(Addr paddr, unsigned size, Cycles latency,
         if (fetch && word != busFetchWord) {
             ++busFetches;
             busFetchWord = word;
-        } else if (!fetch)
+        } else if (!fetch) {
             busTransfers += transfersOf(paddr, size, pieces);
+            busStore = busStore || inFlightStore;
+        }
     }
     for (const AddrRange &range : timedRanges) {
         if (range.contains(paddr)) {
@@ -605,7 +607,7 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
         if (busFifoOn() && !busQueueEmpty)
             start = Cycles(0);
         for (unsigned i = 0; i < busFetches; ++i) {
-            start = std::max({start, busFree, busNextFetch});
+            start = std::max({start, busFree, busFetchGate, busNextFetch});
             if (busFifoOn())
                 start = std::max(start,
                                  busWordIssue[(busWordHead + i) % busWordFifo]);
@@ -648,11 +650,19 @@ MProfileInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
         }
     }
     // Its data transfers over the shared bus, from when it issues, ahead
-    // of the next fetch.
+    // of the next fetch. With a fetch queue: LDM, STM, LDRD and STRD cannot
+    // be pipelined with what is around them, so their address phase holds
+    // the bus too, and the next fetch cannot start in the data phase of a
+    // store or an unaligned access.
     if (busTransfers > 0) {
+        const bool blocking =
+            busFifoOn() && (severalRegs || transfers > 1);
         busFree = std::max(busFree, issue) +
-            Cycles(busTransfers * busDataCycles);
+            Cycles(busTransfers * busDataCycles + (blocking ? 1 : 0));
+        if (busFifoOn() && (busStore || unalignedAccess))
+            busFetchGate = busFree + Cycles(1);
         busTransfers = 0;
+        busStore = false;
     }
     if (taken)
         busQueueEmpty = true;
