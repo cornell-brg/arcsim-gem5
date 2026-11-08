@@ -62,6 +62,11 @@ SOC_CONFIGS = {
     "dual-core-zfinx-fpu-optical-flow-xcel": dict(
         desc="Two Hazard3 with Zfinx FPU, optical-flow accelerator",
         cores=2, hwpe="optical-flow", zfinx=True, sram4_7=False, differs=""),
+    "dual-core-zfinx-fpu-optical-flow-rotated-xcel": dict(
+        desc="Two Hazard3 with Zfinx FPU, optical-flow accelerator with the "
+             "rotated LK engine",
+        cores=2, hwpe="optical-flow-rotated", zfinx=True, sram4_7=False,
+        differs=""),
 }
 
 

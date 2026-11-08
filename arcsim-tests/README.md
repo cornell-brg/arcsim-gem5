@@ -62,3 +62,16 @@ configs as on rtl-sim, with two differences:
 Every test runs with `--model accurate --sram-model banked` (`SOC_GEM5_ARGS`).
 To add a test, add it in soc (`add_soc_test`); to add a SoC config, add it to soc's
 `rtl-sim/soc-configs` and to `soc_configs.py`.
+
+## Known failures
+
+These fail on gem5 because its board models the SoC differently from the RTL:
+
+- `test_sio`: gem5's SIO model reads `GPIO_IN` as all ones instead of 0, and it
+  answers its whole 64 KiB window, where the RTL faults above `+0x4000`.
+- `test_xip_ctrl`: `--model accurate` puts the Pico 2's flash and XIP cache in
+  front of flash, whose counters count; rtl-sim has no XIP cache, so they stay 0
+  (`--xip-model soc`, the RTL's code memory, passes).
+- `test_interconnect` on the optical-flow configs (case 8): the RTL repeats the
+  accelerator's 16 KiB register window across the 1 MiB HWPE slot, but gem5 maps
+  only the four 4 KiB windows, so the slot's last word (`0x508ffffc`) faults.
