@@ -337,6 +337,9 @@ class Fetch1 : public Named
     /** Line fetches are flagged as prefetches, which the memory system
      *  may decline with an error */
     bool sendOnSpeculation = false;
+    /** See fetchStreamOnSpeculation in BaseMinorCPU.py: whether a read
+     *  of the stream made on speculation is flagged */
+    const bool streamOnSpeculation;
     /** Number of requests inside the ITLB rather than in the queues.
      *  All requests so located *must* have reserved space in the
      *  transfers queue */

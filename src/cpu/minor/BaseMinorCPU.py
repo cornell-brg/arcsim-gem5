@@ -384,6 +384,14 @@ class BaseMinorCPU(BaseCPU):
         " memory system may decline with an error, and a declined line is"
         " fetched again once it is sure to be wanted",
     )
+    fetchStreamOnSpeculation = Param.Bool(
+        True,
+        "With fetchBranchSpeculation: what is fetched of the sequential"
+        " stream behind a branch Execute has yet to complete is flagged a"
+        " prefetch, which the memory system may decline.  Off, only target"
+        " lines are, and the stream is read as any other fetch, as on a core"
+        " whose bus reads cannot be taken back once issued",
+    )
     fetchKeepTargetInFlight = Param.Bool(
         False,
         "With fetchBranchTargetAtDecode: when Execute takes a branch whose"

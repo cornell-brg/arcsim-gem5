@@ -84,6 +84,7 @@ Fetch1::Fetch1(const std::string &name_,
     icacheState(IcacheRunning),
     lineSeqNum(InstId::firstLineSeqNum),
     numFetchesInMemorySystem(0),
+    streamOnSpeculation(params.fetchStreamOnSpeculation),
     numFetchesInITLB(0)
 {
     for (auto &info: fetchInfo)
@@ -321,7 +322,7 @@ Fetch1::tryToSendToTransfers(FetchRequestPtr request)
         }
 
         /* The memory system may decline a read made on speculation */
-        if (sendOnSpeculation)
+        if (sendOnSpeculation && streamOnSpeculation)
             request->request->setFlags(Request::PREFETCH);
 
         if (!request->packet)

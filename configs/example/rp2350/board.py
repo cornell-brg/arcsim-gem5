@@ -521,12 +521,14 @@ def _configure_hazard3_minor(core):
     core.executeBranchAtIssue = True
     core.fetchBranchTargetAtDecode = True
     core.fetchRegisterTargetAtDecode = True
-    # Those target fetches, and what is fetched behind a branch not yet
-    # resolved, are made on speculation: RP2350XIP reads no line from
-    # flash for one, so a branch that is not taken starts no flash read
-    # Hazard3 would not make. A fall-through miss behind such a branch
-    # waits the cycle or two until it resolves.
+    # Those target fetches are made on speculation: RP2350XIP reads no
+    # line from flash for one, so a branch that is not taken starts no
+    # flash read Hazard3 would not make. What is fetched behind a branch
+    # not yet resolved is an ordinary read, as Hazard3's is: an AHB
+    # address phase, once accepted, cannot be taken back, and the XIP
+    # cache fills the line.
     core.fetchBranchSpeculation = True
+    core.fetchStreamOnSpeculation = False
     # Hazard3's branch predictor (BRANCH_PREDICTOR = 1): the last
     # conditional branch taken backward is predicted taken as it is
     # fetched, unless it starts in the word a branch from X went to.
