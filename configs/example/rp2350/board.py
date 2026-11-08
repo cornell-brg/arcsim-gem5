@@ -26,6 +26,36 @@ XIP_MODELS = ("legacy", "qmi", "soc", "soc-no-cache")
 XIP_BASE = 0x10000000
 XIP_SIZE = "16MiB"  # flash
 
+
+def xip_costs(clock):
+    """RP2350XIP's (miss_cycles, chained_cycles, reselect_cycles) at a core
+    clock ("150MHz" or a period such as "3333ps"), for the flash timing that
+    arcsim-bench's operating_point.c sets there and the boot ROM's at 150 MHz
+    and below. As measured on a Pico 2 at 150, 200, 250 and 300 MHz: a fresh
+    or chained transfer takes a cycle more once RXDELAY (round(f * 12 ns))
+    reaches 3, and the reselect is MIN_DESELECT (ceil(7 f / 150 MHz)) plus 3.
+    Above 300 MHz the flash divider is past 3, which was not measured."""
+    from m5.util.convert import toFrequency, toLatency
+
+    text = str(clock)
+    if text.endswith("s") and not text.endswith("Hz"):
+        hz = 1 / toLatency(text)
+    else:
+        hz = toFrequency(text)
+    # The period string is rounded to a picosecond (3333 ps): the image's
+    # clock is a whole number of MHz
+    mhz = round(hz / 1e6)
+    if mhz <= 150:
+        return 110, 50, 10
+    if mhz > 300:
+        raise ValueError(
+            f"RP2350XIP's flash costs are measured up to 300 MHz, not {mhz} MHz"
+        )
+    rxdelay = (mhz * 12 + 500) // 1000
+    deselect = (7 * mhz + 149) // 150
+    extra = (rxdelay - 2 + 1) // 2
+    return 110 + extra, 50 + extra, deselect + 3
+
 # Physical windows; the legacy model lumps each striped group together.
 SRAM_REGIONS = (
     ("sram0_3", 0x20000000, "256KiB"),
@@ -166,9 +196,13 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
         board.xip_front.mem_side_ports = board.flash.port
     elif xip_model == "qmi":
         # The cache's two banks and the flash interface's serial transfers,
-        # with a Pico 2's timing (RP2350XIP); xip_miss_ns is not used.
+        # with a Pico 2's timing at the core clock (RP2350XIP, xip_costs);
+        # xip_miss_ns is not used.
         from m5.objects import RP2350XIP
-        board.flash = RP2350XIP(range=xip_range, clk_domain=board.clk_domain)
+        miss, chained, reselect = xip_costs(clock)
+        board.flash = RP2350XIP(range=xip_range, clk_domain=board.clk_domain,
+                                miss_cycles=miss, chained_cycles=chained,
+                                reselect_cycles=reselect)
         board.xip_front.mem_side_ports = board.flash.port
     else:
         # Cache geometry matches RP2350; gem5 hit and QMI miss timing are

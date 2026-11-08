@@ -71,7 +71,10 @@ class RP2350XIP(AbstractMemory):
         10, "Added to a miss that must first end the last transfer"
     )
     cooldown_cycles = Param.Cycles(
-        64, "How long the chip select is held after a transfer"
+        63,
+        "How long the chip select is held after a transfer (a Pico 2's at "
+        "150 to 300 MHz: its last chained load follows the one before by 61 "
+        "nops)",
     )
     track_tags = Param.Bool(
         False, "In atomic mode, look up and fill the cache's tags"
