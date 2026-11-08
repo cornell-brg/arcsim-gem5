@@ -876,6 +876,7 @@ SingleStageFetch2::SingleStageFetch2(const std::string &name,
         next_stage_input_buffer),
     branchTargetAtDecode(params.fetchBranchTargetAtDecode),
     branchSpeculation(params.fetchBranchSpeculation),
+    hazard3FifoEnabled(params.fetchHazard3Fifo),
     predictLastBackwardBranch(params.fetchPredictLastBackwardBranch),
     registerTargetAtDecode(params.fetchRegisterTargetAtDecode),
     decodedBranchTid(InvalidThreadID)
@@ -918,13 +919,19 @@ SingleStageFetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
             /* Decode starts again at the target's line, not after the
              *  branch should its line end with it */
             thread.havePC = false;
-            /* The fall-through line is fetched from Decode as a direct
+            /* In the legacy path, the fall-through line is fetched from
+             *  Decode as a direct
              *  branch's target is, to start from should Execute not take
              *  the branch: Hazard3 sends that address from X */
-            set(decodedBranchTarget, *inst->pc);
-            static_inst->advancePC(*decodedBranchTarget);
-            decodedBranchTid = inst->id.threadId;
-            decodedBranch = inst;
+            if (!hazard3FifoEnabled) {
+                set(decodedBranchTarget, *inst->pc);
+                static_inst->advancePC(*decodedBranchTarget);
+                decodedBranchTid = inst->id.threadId;
+                decodedBranch = inst;
+            }
+            // Hazard3 requests the fall-through from X only when the
+            // predicted branch is not taken. Preparing it speculatively
+            // here would occupy a real word-fetch slot every iteration.
             DPRINTF(Fetch, "SF2: predicted backward branch pc=%#x"
                 " target=%#x\n", line_in->predictedBranchPC,
                 inst->predictedTarget->instAddr());
@@ -1091,8 +1098,8 @@ SingleStageFetch2::updateBackwardBranch(const BranchData &executeBranch)
                 backwardBranchValid = true;
                 backwardBranchPC = pc;
                 set(backwardBranchTarget, executeBranch.target);
-                backwardBranchOverhangs =
-                    next->instAddr() - pc == 4 && (pc & 2);
+                backwardBranchIs32Bit = next->instAddr() - pc == 4;
+                backwardBranchOverhangs = backwardBranchIs32Bit && (pc & 2);
             }
         } else if (!inst->staticInst->isControl()) {
             /* A trap leaves for its handler, where the forced branch of
@@ -1140,6 +1147,18 @@ SingleStageFetch2::runDecodeCore(BranchData &prediction_out,
 
     discardStaleLines();
     decodeInstructions(prediction_out);
+    decodedHalfwords = 0;
+    if (hazard3FifoEnabled) {
+        const ForwardInstData &decoded = *out.inputWire;
+        for (unsigned i = 0; i < decoded.width(); ++i) {
+            const MinorDynInstPtr &inst = decoded.insts[i];
+            if (!inst->isInst())
+                continue;
+            std::unique_ptr<PCStateBase> next(inst->pc->clone());
+            inst->staticInst->advancePC(*next);
+            decodedHalfwords += (next->instAddr() - inst->pc->instAddr()) / 2;
+        }
+    }
     postDecode(Pipeline::Fetch1StageId);
 }
 

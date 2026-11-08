@@ -590,6 +590,7 @@ Fetch1::processResponse(Fetch1::FetchRequestPtr response,
     line.fetchAddr = response->pc;
     line.predictedBranch = response->predictedBranch;
     line.predictedBranchPC = response->predictedBranchPC;
+    line.validHalfwords = response->validHalfwords;
     /* Set the lineBase, which is a sizeof(MachInst) aligned address <=
      *  pc.instAddr() */
     line.lineBaseAddr = response->request->getVaddr();
@@ -878,6 +879,8 @@ Fetch1::minorTrace() const
 bool
 SingleStageFetch1::recvTimingResp(PacketPtr pkt)
 {
+    if (hazard3FifoEnabled)
+        ++returnedSinceEvaluate;
     DPRINTF(Fetch, "recvTimingResp %d\n", numFetchesInMemorySystem);
 
     FetchRequestPtr fetch_request = safe_cast<FetchRequestPtr>
@@ -903,8 +906,10 @@ SingleStageFetch1::recvTimingResp(PacketPtr pkt)
                 pkt->getAddr());
         }
 
-        /* Fetch waits for a kept target line: it goes on now */
-        if (fetch_request == keptTargetRequest)
+        // A request held by the Hazard3 outstanding-fetch bound can now
+        // issue, even when this response belongs to an abandoned target.
+        // Also resume an upstream fetch waiting for its kept target line.
+        if (hazard3FifoEnabled || fetch_request == keptTargetRequest)
             cpu.wakeupOnEventImmediate(Pipeline::Fetch1StageId);
 
         return true;
@@ -972,6 +977,9 @@ SingleStageFetch1::recvReqRetry()
 void
 SingleStageFetch1::resendDeclined(bool on_speculation)
 {
+    if (hazard3FifoEnabled && (hazard3Stalled || requestedThisCycle() ||
+                             numFetchesInMemorySystem >= 2))
+        return;
     for (FetchRequestPtr request : transfers.getQueue()) {
         if (!request->declined)
             continue;
@@ -990,6 +998,9 @@ SingleStageFetch1::resendDeclined(bool on_speculation)
                 request->declined = false;
                 request->state = FetchRequest::RequestIssuing;
                 numFetchesInMemorySystem++;
+                recordRequest();
+                if (hazard3FifoEnabled)
+                    break;
             } else {
                 /* The port now owes a retry and takes nothing before
                  *  it */
@@ -1025,6 +1036,9 @@ void
 SingleStageFetch1::fetchBranchTarget(ThreadID tid, Addr target_addr,
     const MinorDynInstPtr &branch)
 {
+    if (hazard3FifoEnabled &&
+        (requestedThisCycle() || numFetchesInMemorySystem >= 2))
+        return;
     Fetch1ThreadInfo &thread = fetchInfo[tid];
     Addr aligned = target_addr & ~((Addr) lineSnap - 1);
     unsigned int request_size = maxLineWidth - (aligned % lineSnap);
@@ -1080,6 +1094,7 @@ SingleStageFetch1::fetchBranchTarget(ThreadID tid, Addr target_addr,
         request->packet = NULL;
         request->state = FetchRequest::RequestIssuing;
         numFetchesInMemorySystem++;
+        recordRequest();
     } else {
         /* The port is busy: the target is fetched after the redirect.
          *  The port now owes a retry and takes nothing before it */
@@ -1146,6 +1161,7 @@ SingleStageFetch1::takeTargetLine(FetchRequestPtr &target_request,
     set(line_out.pc, thread.pc);
     line_out.fetchAddr = target_addr;
     line_out.lineBaseAddr = line_base;
+    line_out.validHalfwords = (target_addr & 2) ? 1 : 2;
     line_out.adoptPacketData(packet);
     target_request->packet = NULL;
 
@@ -1232,8 +1248,46 @@ SingleStageFetch1::SingleStageFetch1(const std::string &name_,
     targetRequest(NULL),
     olderTargetRequest(NULL),
     readAheadLimit(params.fetchReadAheadLimit),
-    keepTargetInFlight(params.fetchKeepTargetInFlight)
+    keepTargetInFlight(params.fetchKeepTargetInFlight),
+    hazard3FifoEnabled(params.fetchHazard3Fifo)
 {
+    fatal_if(hazard3FifoEnabled &&
+             (cpu.numThreads != 1 || maxLineWidth != 4 || lineSnap != 4 ||
+              params.decodeInputWidth != 1 || params.fetch1FetchLimit != 2 ||
+              !params.fetchFoldMasks.empty() || !params.singleFetchStage),
+             "Hazard3 FIFO requires one thread, four-byte fetches, two in-flight "
+             "requests and single-instruction decode without folding");
+}
+
+void
+SingleStageFetch1::recordRequest()
+{
+    if (!hazard3FifoEnabled)
+        return;
+    if (lastRequestEdge != cpu.clockEdge())
+        requestsThisTick = 0;
+    lastRequestEdge = cpu.clockEdge();
+    ++requestsThisTick;
+}
+
+bool
+SingleStageFetch1::tryToSend(FetchRequestPtr request)
+{
+    if (hazard3FifoEnabled &&
+        (requestedThisCycle() || numFetchesInMemorySystem >= 2))
+        return false;
+    bool sent = Fetch1::tryToSend(request);
+    if (sent)
+        recordRequest();
+    return sent;
+}
+
+unsigned
+SingleStageFetch1::validHalfwords(const ForwardLineData &line) const
+{
+    if (line.isBubble())
+        return 0;
+    return line.validHalfwords;
 }
 
 bool
@@ -1261,6 +1315,7 @@ SingleStageFetch1::readAheadFull()
 void
 SingleStageFetch1::lineRequested(FetchRequestPtr request)
 {
+    request->validHalfwords = (request->pc & 2) ? 1 : 2;
     if (!fetch2->predictLastBackwardBranch)
         return;
 
@@ -1291,6 +1346,12 @@ SingleStageFetch1::lineRequested(FetchRequestPtr request)
     }
 
     if (match) {
+        if (fetch2->backwardBranchOverhangs ||
+            (!(fetch2->backwardBranchPC & 2) &&
+             !fetch2->backwardBranchIs32Bit))
+        {
+            request->validHalfwords = 1;
+        }
         request->predictedBranch = true;
         request->predictedBranchPC = fetch2->backwardBranchPC;
         thread.predictionSeqNum++;
@@ -1322,6 +1383,20 @@ SingleStageFetch1::isStale(const InstId &id) const
 void
 SingleStageFetch1::evaluate()
 {
+    // Include responses arriving on this edge: RTL pending_fetches is a
+    // register, so today's data phase cannot free an address slot early.
+    unsigned pending = numFetchesInMemorySystem + returnedSinceEvaluate;
+    returnedSinceEvaluate = 0;
+    if (lastRequestEdge == cpu.clockEdge())
+        pending -= requestsThisTick;
+    else
+        requestsThisTick = 0;
+    hazard3Stalled = hazard3FifoEnabled && hazard3Fifo.stalled(pending);
+    if (hazard3FifoEnabled) {
+        DPRINTF(Fetch, "H3 FIFO words=%u assembly=%u pending=%u stall=%d\n",
+                hazard3Fifo.fifoWords(), hazard3Fifo.assemblyHalfwords(),
+                pending, hazard3Stalled);
+    }
     /* --- Fetch1 phase: I-cache management --- */
 
     /* Check back-pressure from Decode (the real next stage) */
@@ -1353,6 +1428,8 @@ SingleStageFetch1::evaluate()
     bool have_target_line = false;
 
     if (exec_branch.isStreamChange()) {
+        if (hazard3FifoEnabled)
+            hazard3Fifo.flush();
         /* A line kept for the stream before this one is no longer wanted */
         abandonTargetRequest(keptTargetRequest);
         have_target_line =
@@ -1449,6 +1526,7 @@ SingleStageFetch1::evaluate()
                 set(line.pc, keptPC);
                 line.fetchAddr = keptFetchAddr;
                 line.lineBaseAddr = keptLineBase;
+                line.validHalfwords = (keptFetchAddr & 2) ? 1 : 2;
                 line.adoptPacketData(packet);
                 keptTargetRequest->packet = NULL;
 
@@ -1530,8 +1608,22 @@ SingleStageFetch1::evaluate()
          *  fetch beside the kept one delays the next branch's target from
          *  SRAM (micro/fetch br_back_0: 714 cycles with one, 616 without,
          *  the board 608) */
-        if (!fetch2->sureBranch && !readAheadFull() && !keptTargetRequest)
+        if (!fetch2->sureBranch && !keptTargetRequest &&
+            (hazard3FifoEnabled ?
+                (exec_branch.isStreamChange() || !hazard3Stalled) &&
+                    !requestedThisCycle() :
+                !readAheadFull()))
             tryToFetch();
+    }
+
+    if (hazard3FifoEnabled) {
+        unsigned consumed = exec_branch.isStreamChange() ? 0 :
+            assemblyConsumed;
+        hazard3Fifo.advance(consumed,
+            validHalfwords(have_target_line ? target_line : line));
+        // Minor's decoder can use a response immediately. In the RTL it
+        // enters CIR at the edge and is consumed in the following cycle.
+        assemblyConsumed = fetch2->decodedHalfwords;
     }
 
     /* --- Post-evaluate --- */

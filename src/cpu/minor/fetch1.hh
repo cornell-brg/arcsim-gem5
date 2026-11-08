@@ -53,6 +53,7 @@
 #include "cpu/base.hh"
 #include "cpu/minor/buffers.hh"
 #include "cpu/minor/cpu.hh"
+#include "cpu/minor/hazard3_fetch_fifo.hh"
 #include "cpu/minor/pipe_data.hh"
 #include "mem/packet.hh"
 
@@ -157,6 +158,7 @@ class Fetch1 : public Named
          *  (fetchPredictLastBackwardBranch) */
         bool predictedBranch = false;
         Addr predictedBranchPC = 0;
+        unsigned validHalfwords = 2;
 
         /** The thread's PC as the request was made, for the line's PC
          *  where the PC may move on before the response; null to take
@@ -385,7 +387,7 @@ class Fetch1 : public Named
     /** Try to send (or resend) a memory request's next/only packet to
      *  the memory system.  Returns true if the fetch was successfully
      *  sent to memory */
-    bool tryToSend(FetchRequestPtr request);
+    virtual bool tryToSend(FetchRequestPtr request);
 
     /** Move a request between queues */
     void moveFromRequestsToTransfers(FetchRequestPtr request);
@@ -536,6 +538,21 @@ class SingleStageFetch1 : public Fetch1
      *  fetching, keep the request as keptTargetRequest and return true */
     bool keepTargetLine(FetchRequestPtr &target_request,
         const BranchData &execute_branch);
+
+    const bool hazard3FifoEnabled;
+    Hazard3FetchFifo hazard3Fifo;
+    unsigned returnedSinceEvaluate = 0;
+    Tick lastRequestEdge = MaxTick;
+    unsigned requestsThisTick = 0;
+    bool hazard3Stalled = false;
+    unsigned assemblyConsumed = 0;
+
+    bool requestedThisCycle() const
+    { return lastRequestEdge == cpu.clockEdge() && requestsThisTick != 0; }
+    void recordRequest();
+
+    unsigned validHalfwords(const ForwardLineData &line) const;
+    bool tryToSend(FetchRequestPtr request) override;
 
     /** Is the stream fetched as far ahead of decode as readAheadLimit
      *  allows? */

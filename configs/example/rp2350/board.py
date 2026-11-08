@@ -460,6 +460,7 @@ def _configure_hazard3_minor(core):
     core.fetch1ToFetch2ForwardDelay = 0  # bypassed with singleFetchStage
     core.fetch1ToFetch2BackwardDelay = 0
     core.fetchReadAheadLimit = 8
+    core.fetchHazard3Fifo = True
     core.executeBranchDelay = 1
     # A taken branch or jump costs 2 cycles, as Hazard3's X to F loop
     # (instruction_timings.adoc): a branch redirects fetch in its
@@ -482,6 +483,7 @@ def _configure_hazard3_minor(core):
     # A load's address phase is its X cycle, and the instruction after
     # it is in X during the load's data phase.
     core.executeLoadAccessAtIssue = True
+    core.executeUnbufferedStores = True
     # The FP ops on blocking units in place of Minor's float/SIMD unit, which would pipeline them (and takes
     # an FP op whenever a blocking unit is busy, so it is left out; Hazard3 has no SIMD): an op takes its unit
     # for its whole latency, as the SoC's FPU takes one op at a time. Then fresh copies of Minor's other
