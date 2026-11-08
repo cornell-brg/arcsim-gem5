@@ -226,6 +226,7 @@ class RP2350XIP : public AbstractMemory
     void setCachedLinePairs(
         const std::vector<std::pair<uint32_t, unsigned>> &lines);
 
+    PARAMS(RP2350XIP);
     explicit RP2350XIP(const RP2350XIPParams &p);
     uint32_t counterHit() const { return ctrHit; }
     uint32_t counterAcc() const { return ctrAcc; }
