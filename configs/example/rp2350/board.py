@@ -21,6 +21,8 @@ from m5.objects import (
 # The core clock (board.clk_domain): the CPU, its cycle counter, RP2350XIP and
 # the banked SRAM. make_board(clock=) sets another.
 CLOCK = "150MHz"
+# make_board's xip_model values (run.py's --xip-model, and bench's runner asks for them)
+XIP_MODELS = ("legacy", "qmi", "soc", "soc-no-cache")
 XIP_BASE = 0x10000000
 XIP_SIZE = "16MiB"  # flash
 
@@ -822,7 +824,7 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                                                 xip_model)
     if sram_model not in ("legacy", "banked"):
         raise ValueError(f"Unknown SRAM model: {sram_model}")
-    if xip_model not in ("legacy", "qmi", "soc", "soc-no-cache"):
+    if xip_model not in XIP_MODELS:
         raise ValueError(f"Unknown XIP model: {xip_model}")
     if xip_model in ("soc", "soc-no-cache") and core != "hazard3-proxy":
         raise ValueError(f"xip_model {xip_model} is arcsim-soc's, for the "
