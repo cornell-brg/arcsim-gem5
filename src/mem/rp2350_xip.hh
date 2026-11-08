@@ -5,6 +5,8 @@
 #include <deque>
 #include <map>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "base/random.hh"
@@ -193,7 +195,37 @@ class RP2350XIP : public AbstractMemory
     uint32_t ctrHit = 0;
     uint32_t ctrAcc = 0;
 
+    // Why the cache's lines cannot be read or written now, or ""
+    std::string notParked() const;
+
   public:
+    // A line the cache holds: its offset in flash (bytes from the XIP
+    // window's base, line-aligned) and the way it is in. Its set follows from
+    // the offset.
+    struct CachedLine
+    {
+        uint32_t offset;
+        uint8_t way;
+    };
+
+    // The cache's lines, read and written outside simulated time, so that a
+    // hop can carry them to another model of the chip. Each returns "" or why
+    // it refused: an access in flight, tags that do not follow an atomic CPU
+    // (no track_tags), or a line it cannot place.
+    //
+    // cachedLines lists every valid way, by set and way; with LRU, the one
+    // used longest ago first.
+    std::string cachedLines(std::vector<CachedLine> &lines) const;
+    // Invalidates every way, then makes each line valid in its way, in the
+    // list's order: with LRU, the last is the one used most recently. The
+    // random replacement's generator is left alone. On a refusal nothing
+    // changes.
+    std::string setCachedLines(const std::vector<CachedLine> &lines);
+    // The same as (offset, way) pairs, for Python; a refusal is fatal.
+    std::vector<std::pair<uint32_t, unsigned>> cachedLinePairs() const;
+    void setCachedLinePairs(
+        const std::vector<std::pair<uint32_t, unsigned>> &lines);
+
     explicit RP2350XIP(const RP2350XIPParams &p);
     uint32_t counterHit() const { return ctrHit; }
     uint32_t counterAcc() const { return ctrAcc; }

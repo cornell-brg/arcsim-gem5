@@ -1,5 +1,6 @@
 from m5.objects.AbstractMemory import AbstractMemory
 from m5.params import *
+from m5.SimObject import PyBindMethod
 
 
 class RP2350XIP(AbstractMemory):
@@ -52,6 +53,10 @@ class RP2350XIP(AbstractMemory):
     type = "RP2350XIP"
     cxx_header = "mem/rp2350_xip.hh"
     cxx_class = "gem5::memory::RP2350XIP"
+    cxx_exports = [
+        PyBindMethod("cachedLinePairs"),
+        PyBindMethod("setCachedLinePairs"),
+    ]
     port = ResponsePort("The XIP path's bus interface")
     maintenance_base = Param.Addr(
         0x18000000, "Base of the cache maintenance window"

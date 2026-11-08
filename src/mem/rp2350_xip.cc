@@ -5,8 +5,10 @@
 
 #include "base/logging.hh"
 #include "base/trace.hh"
+#include "base/cprintf.hh"
 #include "debug/RP2350XIP.hh"
 #include "mem/packet.hh"
+#include "sim/system.hh"
 
 namespace gem5::memory
 {
@@ -596,6 +598,107 @@ RP2350XIP::serve(unsigned index)
     if (!bank.busy && !bank.waiting.empty() &&
         !serveEvents[index].scheduled())
         schedule(serveEvents[index], curTick() + clockPeriod());
+}
+
+std::string
+RP2350XIP::notParked() const
+{
+    if (outstanding || qmiBusy || !qmiQueue.empty())
+        return csprintf("%s: %d accesses in flight", name(), outstanding);
+    for (const Bank &bank : banks)
+        if (bank.busy)
+            return csprintf("%s: a bank is waiting for flash", name());
+    return "";
+}
+
+std::string
+RP2350XIP::cachedLines(std::vector<CachedLine> &lines) const
+{
+    lines.clear();
+    std::string why = notParked();
+    if (!why.empty())
+        return why;
+    if (!trackTags && system() && system()->isAtomicMode())
+        return csprintf("%s: in atomic mode without track_tags the tags do "
+                        "not follow the CPU", name());
+    std::vector<std::pair<uint64_t, CachedLine>> found;
+    for (size_t i = 0; i < sets.size(); ++i) {
+        const Way &way = sets[i];
+        if (!way.valid)
+            continue;
+        found.push_back({lru ? way.lastUse : i,
+                         {uint32_t(way.line - range.start()),
+                          uint8_t(i % numWays)}});
+    }
+    std::stable_sort(found.begin(), found.end(),
+                     [](const auto &a, const auto &b) {
+                         return a.first < b.first;
+                     });
+    for (const auto &f : found)
+        lines.push_back(f.second);
+    return "";
+}
+
+std::string
+RP2350XIP::setCachedLines(const std::vector<CachedLine> &lines)
+{
+    std::string why = notParked();
+    if (!why.empty())
+        return why;
+    // Every line checked before any way changes
+    std::vector<uint8_t> taken(sets.size(), 0);
+    for (const CachedLine &l : lines) {
+        if (l.way >= numWays)
+            return csprintf("%s: way %d of a %d-way cache", name(), l.way,
+                            numWays);
+        if (l.offset % lineBytes != 0 || l.offset >= range.size())
+            return csprintf("%s: offset %#x is not a line of the flash",
+                            name(), l.offset);
+        const Addr line = range.start() + l.offset;
+        const size_t base = setOf(line) * numWays;
+        if (taken[base + l.way])
+            return csprintf("%s: two lines in set %d, way %d", name(),
+                            setOf(line), l.way);
+        taken[base + l.way] = 1;
+        for (const CachedLine &m : lines)
+            if (&m != &l && m.offset == l.offset)
+                return csprintf("%s: line %#x given twice", name(), l.offset);
+    }
+    for (Way &way : sets)
+        way = Way();
+    for (const CachedLine &l : lines) {
+        const Addr line = range.start() + l.offset;
+        Way &way = sets[setOf(line) * numWays + l.way];
+        way.valid = true;
+        way.line = line;
+        way.lastUse = ++useCount;
+    }
+    return "";
+}
+
+std::vector<std::pair<uint32_t, unsigned>>
+RP2350XIP::cachedLinePairs() const
+{
+    std::vector<CachedLine> lines;
+    const std::string why = cachedLines(lines);
+    fatal_if(!why.empty(), "%s", why);
+    std::vector<std::pair<uint32_t, unsigned>> out;
+    for (const CachedLine &l : lines)
+        out.push_back({l.offset, l.way});
+    return out;
+}
+
+void
+RP2350XIP::setCachedLinePairs(
+    const std::vector<std::pair<uint32_t, unsigned>> &pairs)
+{
+    std::vector<CachedLine> lines;
+    for (const auto &p : pairs) {
+        fatal_if(p.second > 255, "%s: way %d", name(), p.second);
+        lines.push_back({p.first, uint8_t(p.second)});
+    }
+    const std::string why = setCachedLines(lines);
+    fatal_if(!why.empty(), "%s", why);
 }
 
 DrainState
