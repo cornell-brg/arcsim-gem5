@@ -1,5 +1,5 @@
 /* Zfinx FP op timing on Hazard3 with arcsim-soc's FPU, one binary for the SoC's rtl_sim and gem5's
- * hazard3-proxy (--zfinx --xip-model soc): each case is timed by mcycle reads on either side and printed as
+ * hazard3-proxy (--zfinx --xip-model soc-no-cache): each case is timed by mcycle reads on either side and printed as
  * name=<cycles, hex> through the testbench IO (0xc0000000 print, 0xc0000008 exit), after the empty case's
  * cycles are taken off. Reset at 0x10000040 as the SoC's RESET_VECTOR; traps park at 0x10000000.
  *   riscv32-unknown-elf-gcc -march=rv32imac_zicsr_zfinx -mabi=ilp32 -nostdlib -Wl,-Ttext=0x10000000 \

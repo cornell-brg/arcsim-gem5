@@ -15,7 +15,7 @@
  *   riscv32-unknown-elf-gcc -march=rv32imac_zicsr -mabi=ilp32 -nostdlib -T riscv.ld \
  *     riscv_latency.S -o riscv_latency.elf
  *   gem5.opt configs/example/rp2350/run.py --core hazard3-proxy --firmware riscv_latency.elf \
- *     --cpu atomic --inst-latency --xip-model soc
+ *     --cpu atomic --inst-latency --xip-model soc-no-cache
  * (soc: code memory without misses, so a case's cycles are its instructions' alone) */
     .option rvc
     .macro start
