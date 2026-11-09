@@ -30,6 +30,13 @@ class RP2350SRAM(AbstractMemory):
     latency = Param.Latency("1ns", "From a bank's grant to the data, within the clock cycle")
     queue_depth = Param.Unsigned(8, "Outstanding packets per manager, including responses")
     port_priority = VectorParam.Unsigned([0], "Per-manager priority, 0 or 1; last entry repeats")
+    sram4_7 = Param.Bool(
+        True,
+        "SRAM4-7 (0x20040000-0x2007ffff) present; without them the ports"
+        " claim only SRAM0-3 and SRAM8-9, so a crossbar sends SRAM4-7's"
+        " accesses to its default, as arcsim-soc's soc.v without"
+        " SRAM4_7_PRESENT",
+    )
     one_bank = Param.Bool(
         False,
         "One bank over the whole range, which may then be any range: a"

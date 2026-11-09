@@ -1,49 +1,51 @@
-# Runs soc's tests (built in $ARCSIM_SOC_HOME/tests) on gem5's RP2350 board,
-# with arcsim's test framework, as soc/tests does on rtl-sim. The build tree is
-# ./build. Needs ARCSIM_TEST_HOME (source setup-arcsim.sh in an arcsim clone),
-# ARCSIM_SOC_HOME (module load arcsim-soc) and a gem5 RISC-V build
-# (scons build/RISCV/gem5.opt in ..).
+# Runs soc's tests ($ARCSIM_SOC_HOME/tests) on gem5's RP2350 board: each of
+# soc's SoC configs is a simulator gem5-<config> (run.py --soc-config <config>,
+# ../configs/example/rp2350/soc_configs.py), and soc's tests run each test on
+# every one whose manifest has what the test needs, as on rtl-sim's. Needs
+# ARCSIM_TEST_HOME (source setup-arcsim.sh in an arcsim clone), ARCSIM_SOC_HOME
+# (module load arcsim-soc) and a gem5 RISC-V build (scons build/RISCV/gem5.opt
+# in ..).
 #
-#   make check            run the tests on gem5, one line per test
+#   make sims             write build/sims/gem5-<config>/soc-config.cmake for
+#                         each SoC config, after checking soc_configs.py
+#                         against soc's rtl-sim/soc-configs
+#   make check            make sims, then soc's make check on them, one line
+#                         per test
 #   make check-verbose    the same, with each run's full output first
-#   make check-rebuild    build soc's tests first (make soc-tests)
-#   make soc-tests        build soc's tests (make -C $ARCSIM_SOC_HOME/tests
-#                         build), once for each HWPE that has a test program
 #   make clean
 #
+# SOC_CONFIGS (default: all) runs on these SoC configs only, e.g.
+#   make check SOC_CONFIGS="single-core dual-core-vvadd-xcel"
 # GEM5 (default ../build/RISCV/gem5.opt) is the gem5 binary, e.g.
 #   make check GEM5=../build/RISCV/gem5.debug
-# SOC_TESTS (default $ARCSIM_SOC_HOME/tests/build) holds soc's test ELFs.
-# JOBS (default 1) is how many tests run at once.
+# TICK_LIMIT is every run's --tick-limit. JOBS (default 1) is how many tests
+# (and soc's builds) run at a time.
 
 BUILD ?= build
 GEM5 ?= $(CURDIR)/../build/RISCV/gem5.opt
-SOC_TESTS ?= $(ARCSIM_SOC_HOME)/tests/build
+SOC_CONFIGS ?=
 TICK_LIMIT ?= 100000000000
 JOBS ?= 1
 
-.PHONY: configure check check-verbose check-rebuild soc-tests clean
-configure:
+SOC_CONFIGS_PY := $(CURDIR)/../configs/example/rp2350/soc_configs.py
+SIMS := $(abspath $(BUILD))/sims
+# soc's ids of the simulators: gem5-<config>
+IDS := $(addprefix gem5-,$(or $(SOC_CONFIGS),$(shell python3 $(SOC_CONFIGS_PY) --names)))
+SOC_CHECK = $(MAKE) --no-print-directory -C $(ARCSIM_SOC_HOME)/tests JOBS=$(JOBS) SOC_CONFIGS="$(IDS)"
+
+.PHONY: sims check check-verbose clean
+sims:
 	@test -x $(GEM5) || { echo "$(GEM5) not built: scons build/RISCV/gem5.opt in .."; exit 1; }
-	@cmake -S . -B $(BUILD) -DGEM5_RISCV=$(abspath $(GEM5)) \
-	       -DSOC_TESTS=$(abspath $(SOC_TESTS)) -DTICK_LIMIT=$(TICK_LIMIT) -Wno-dev >/dev/null
+	@python3 $(SOC_CONFIGS_PY) --check $(ARCSIM_SOC_HOME)/rtl-sim/soc-configs
+	@rm -rf $(SIMS)
+	@python3 $(SOC_CONFIGS_PY) --manifests $(SIMS) --gem5 $(abspath $(GEM5)) \
+	         --tick-limit $(TICK_LIMIT) $(SOC_CONFIGS)
 
-check: configure
-	@CTEST_PARALLEL_LEVEL=$(JOBS) sh $(ARCSIM_TEST_HOME)/bin/arcsim-test-check $(BUILD)
+check: sims
+	@$(SOC_CHECK) check
 
-check-verbose: configure
-	@CTEST_PARALLEL_LEVEL=$(JOBS) sh $(ARCSIM_TEST_HOME)/bin/arcsim-test-check -v $(BUILD)
-
-# soc builds an HWPE's test program only for the HWPE it is configured with, and
-# keeps the ELFs of earlier ones; vvadd, its default, last.
-soc-tests:
-	@$(MAKE) --no-print-directory -C $(ARCSIM_SOC_HOME)/tests build HWPE=vvadd FPU=zfinx
-	@$(MAKE) --no-print-directory -C $(ARCSIM_SOC_HOME)/tests build \
-	         HWPE=fast-with-scoring-wide-multicycle-cell-best-k FPU=zfinx
-	@$(MAKE) --no-print-directory -C $(ARCSIM_SOC_HOME)/tests build HWPE=optical-flow FPU=zfinx
-
-check-rebuild: soc-tests
-	@$(MAKE) --no-print-directory check
+check-verbose: sims
+	@$(SOC_CHECK) check-verbose
 
 clean:
 	rm -rf $(BUILD)
