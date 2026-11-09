@@ -103,6 +103,44 @@ _start:                         /* 0x10000040, RESET_VECTOR */
     .endr
     stop alu
 
+    /* vvadd's inner loop and its parts (bench examples/vvadd, Zfinx): data at sp - 1024 */
+    addi t5, sp, -1024
+    start
+    .rept 8
+    fadd.s a5, a1, a2
+    sw a5, 0(t5)
+    .endr
+    stop add_store
+    start
+    .rept 8
+    lw a4, 0(t5)
+    addi t4, t4, 4
+    fadd.s a5, a5, a4
+    .endr
+    stop load_add
+    .irp pass, 1, 2
+    mv a0, t5
+    addi a3, t5, 32
+    start
+1:  lw a5, 0(a0)
+    lw a4, 64(a0)
+    addi a0, a0, 4
+    fadd.s a5, a5, a4
+    sw a5, 124(a0)
+    bne a0, a3, 1b
+    stop vvadd_loop\pass
+    mv a0, t5
+    addi a3, t5, 32
+    start
+1:  lw a5, 0(a0)
+    lw a4, 64(a0)
+    addi a0, a0, 4
+    add a5, a5, a4
+    sw a5, 124(a0)
+    bne a0, a3, 1b
+    stop int_loop\pass
+    .endr
+
     li t0, 0
     sw t0, 8(s0)                /* exit 0 */
 1:  j 1b
@@ -144,3 +182,9 @@ name_lt: .asciz "flt x8"
 name_sgnj: .asciz "fsgnj x8"
 name_add_use: .asciz "fadd+add x8"
 name_alu: .asciz "add x8"
+name_add_store: .asciz "fadd+sw x8"
+name_load_add: .asciz "lw+addi+fadd x8"
+name_vvadd_loop1: .asciz "vvadd loop x8, first"
+name_int_loop1: .asciz "vvadd loop with add x8, first"
+name_vvadd_loop2: .asciz "vvadd loop x8, again"
+name_int_loop2: .asciz "vvadd loop with add x8, again"
