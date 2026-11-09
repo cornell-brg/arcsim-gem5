@@ -532,10 +532,11 @@ def _configure_hazard3_minor(core):
     core.executeLoadAccessAtIssue = True
     # The FP ops on blocking units in place of Minor's float/SIMD unit, which would pipeline them (and takes
     # an FP op whenever a blocking unit is busy, so it is left out; Hazard3 has no SIMD): an op takes its unit
-    # for its whole latency, as the SoC's FPU takes one op at a time. Then fresh copies of Minor's other
+    # for its whole latency, as the SoC's FPU takes one op at a time, and holds issue until its result, as
+    # the SoC holds the core: nothing issues beside an FP op. Then fresh copies of Minor's other
     # default units (a new pool, so that every unit is its child).
     fp_units = [
-        MinorFU(opClasses=minorMakeOpClassSet(classes), opLat=cycles, issueLat=cycles,
+        MinorFU(opClasses=minorMakeOpClassSet(classes), opLat=cycles, issueLat=cycles, holdsIssue=True,
                 timings=[MinorFUTiming(description="Hazard3Fpu", srcRegsRelativeLats=[1])])
         for classes, cycles in ((HAZARD3_FP_OPS, HAZARD3_FP_CYCLES), (["FloatDiv"], HAZARD3_FP_DIV_CYCLES),
                                 (["FloatSqrt"], HAZARD3_FP_SQRT_CYCLES))

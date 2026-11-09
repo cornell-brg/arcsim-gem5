@@ -187,6 +187,9 @@ class MinorFU : public SimObject
     /** Results outlive commit: see BaseMinorCPU.py */
     bool resultAfterCommit;
 
+    /** Holds issue until its result: see BaseMinorCPU.py */
+    bool holdsIssue;
+
   public:
     MinorFU(const MinorFUParams &params) :
         SimObject(params),
@@ -195,7 +198,8 @@ class MinorFU : public SimObject
         issueLat(params.issueLat),
         cantForwardFromFUIndices(params.cantForwardFromFUIndices),
         timings(params.timings),
-        resultAfterCommit(params.resultAfterCommit)
+        resultAfterCommit(params.resultAfterCommit),
+        holdsIssue(params.holdsIssue)
     { }
 
     /** Compute data-dependent extra latency at commit time.

@@ -831,6 +831,15 @@ Execute::issue(ThreadID thread_id)
                                 fu->description.opLat + dynExtra);
                         }
 
+                        /* Nothing else issues until this one's result */
+                        if (fu->description.holdsIssue) {
+                            const Cycles until = cpu.curCycle() +
+                                fu->description.opLat +
+                                extra_dest_retire_lat;
+                            if (until > issueHeldUntil)
+                                issueHeldUntil = until;
+                        }
+
                         /* Mark the destinations for this instruction as
                          *  busy */
                         Cycles result_cycle = cpu.curCycle() +

@@ -162,6 +162,12 @@ class MinorFU(SimObject):
         " result are not held up (out-of-order completion, such as an"
         " iterative divider working beside the pipeline)",
     )
+    holdsIssue = Param.Bool(
+        False,
+        "An instruction on this FU stops all issue until its result is due"
+        " (opLat plus any data-dependent extra latency): nothing else issues"
+        " beside it, as on a core held while a coprocessor works",
+    )
 
 
 class DynamicLatencyIntDivFU(MinorFU):
