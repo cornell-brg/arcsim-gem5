@@ -51,6 +51,10 @@ class RP2350XIP(AbstractMemory):
     """
 
     type = "RP2350XIP"
+    # The suffixes of the per-core statistics (cache.missesCore0, ...), for
+    # configs that name them before instantiate; a gem5 without them lacks it.
+    _per_core_stats = ("Core0", "Core1")
+
     cxx_header = "mem/rp2350_xip.hh"
     cxx_class = "gem5::memory::RP2350XIP"
     cxx_exports = [
