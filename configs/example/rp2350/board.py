@@ -561,7 +561,7 @@ def _hazard3_cpu(board, n, kind, zfinx, accessible, switched_out=False):
     core.clk_domain = board.clk_domain
     core.isa = [RiscvISA(
         # M and U modes, as Hazard3 on the RP2350 and in arcsim-soc
-        # (U_MODE = 1 in config_rp2350_default.vh).
+        # (U_MODE = 1 in every SoC config's rtl/config_*.vh).
         riscv_type="RV32", enable_rvv=False, privilege_mode_set="MU",
         enable_Zicbom_fs=False, enable_Zicboz_fs=False,
         # Hazard3 has Zcmp (cm.push/cm.pop) and no FPU; gem5 decodes Zcmp only
@@ -616,7 +616,7 @@ def _add_hazard3_core(board, n, *, cpu, zfinx, accessible):
         if board._banked_sram:
             icode.mem_side_ports = board.sram.port
     # Hazard3's interrupt controller, one per core, with the RP2350's 52 IRQs
-    # and 4 priority bits (arcsim-soc's config_rp2350_default.vh). Devices
+    # and 4 priority bits (every arcsim-soc SoC config's rtl/config_*.vh). Devices
     # reach it through Xh3irqLine.
     _core_child(board, "xh3irq", n, Xh3irq(hart_id=n, num_irqs=52,
                                            priority_bits=4))
