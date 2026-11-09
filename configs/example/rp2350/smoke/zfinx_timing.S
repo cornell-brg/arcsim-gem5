@@ -139,6 +139,45 @@ _start:                         /* 0x10000040, RESET_VECTOR */
     sw a5, 124(a0)
     bne a0, a3, 1b
     stop int_loop\pass
+    mv a0, t5
+    addi a3, t5, 32
+    start
+1:  lw a5, 0(a0)
+    lw a4, 64(a0)
+    addi a0, a0, 4
+    fadd.s a5, a5, a4
+    bne a0, a3, 1b
+    stop vv_nostore\pass
+    mv a0, t5
+    addi a3, t5, 32
+    start
+1:  lw a5, 0(a0)
+    lw a4, 64(a0)
+    addi a0, a0, 4
+    fadd.s a6, a1, a2
+    sw a5, 124(a0)
+    bne a0, a3, 1b
+    stop vv_indep\pass
+    mv a0, t5
+    addi a3, t5, 32
+    start
+1:  lw a5, 0(a0)
+    lw a4, 64(a0)
+    addi a0, a0, 4
+    fadd.s a5, a5, a4
+    sw a6, 124(a0)
+    bne a0, a3, 1b
+    stop vv_storeother\pass
+    mv a0, t5
+    start
+    .rept 8
+    lw a5, 0(a0)
+    lw a4, 64(a0)
+    addi a0, a0, 4
+    fadd.s a5, a5, a4
+    sw a5, 124(a0)
+    .endr
+    stop vv_unrolled\pass
     .endr
 
     li t0, 0
@@ -188,3 +227,11 @@ name_vvadd_loop1: .asciz "vvadd loop x8, first"
 name_int_loop1: .asciz "vvadd loop with add x8, first"
 name_vvadd_loop2: .asciz "vvadd loop x8, again"
 name_int_loop2: .asciz "vvadd loop with add x8, again"
+name_vv_nostore1: .asciz "vvadd loop without sw x8, first"
+name_vv_indep1: .asciz "vvadd loop, fadd on other regs x8, first"
+name_vv_storeother1: .asciz "vvadd loop, sw of another reg x8, first"
+name_vv_unrolled1: .asciz "vvadd body unrolled x8, first"
+name_vv_nostore2: .asciz "vvadd loop without sw x8, again"
+name_vv_indep2: .asciz "vvadd loop, fadd on other regs x8, again"
+name_vv_storeother2: .asciz "vvadd loop, sw of another reg x8, again"
+name_vv_unrolled2: .asciz "vvadd body unrolled x8, again"
