@@ -124,6 +124,13 @@ class RP2350XIP : public AbstractMemory
     uint64_t useCount = 0;
     std::array<Bank, NumBanks> banks;
     std::map<RequestorID, Manager> managers;
+
+    /** Which core a requestor belongs to, for the per-core counts: 0, 1, or
+     *  2 for any other (a DMA channel, a debugger). */
+    std::map<RequestorID, unsigned> requestorCores;
+    unsigned coreOf(RequestorID requestor);
+    void countHit(RequestorID requestor);
+    void countMiss(RequestorID requestor);
     mutable Random::RandomPtr rng = Random::genRandom();
 
     // The QMI: the banks whose lines are to be read, oldest first; the one
@@ -150,6 +157,18 @@ class RP2350XIP : public AbstractMemory
         statistics::Scalar bankWaits;
         statistics::Scalar declined;
         statistics::Scalar invalidations;
+        statistics::Scalar fresh;
+        statistics::Scalar reselected;
+        statistics::Scalar transferCycles;
+        statistics::Scalar holdCycles;
+        statistics::Scalar hitsCore0;
+        statistics::Scalar hitsCore1;
+        statistics::Scalar missesCore0;
+        statistics::Scalar missesCore1;
+        statistics::Scalar chainedCore0;
+        statistics::Scalar chainedCore1;
+        statistics::Scalar reselectedCore0;
+        statistics::Scalar reselectedCore1;
         XIPStats(RP2350XIP &xip);
     } xipStats;
 
@@ -180,7 +199,7 @@ class RP2350XIP : public AbstractMemory
     void startQmi(Tick start);
     // A miss's cycles when its transfer starts at `start`, by the last
     // transfer's end and line (counting a chained one)
-    Cycles missCost(Tick start, Addr line);
+    Cycles missCost(Tick start, Addr line, RequestorID requestor);
     void finishQmi();
     // The clock edge after now, and the one the present cycle began at
     Tick nextCycle() const;

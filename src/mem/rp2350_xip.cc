@@ -26,8 +26,76 @@ RP2350XIP::XIPStats::XIPStats(RP2350XIP &xip)
       ADD_STAT(declined, statistics::units::Count::get(),
                "Speculative reads of lines not in the cache, not made"),
       ADD_STAT(invalidations, statistics::units::Count::get(),
-               "Lines invalidated by maintenance writes")
+               "Lines invalidated by maintenance writes"),
+      ADD_STAT(fresh, statistics::units::Count::get(),
+               "Lines read by a transfer that sent its command and address "
+               "with the chip select already released and recovered"),
+      ADD_STAT(reselected, statistics::units::Count::get(),
+               "Lines read by a transfer that first reselected the chip: "
+               "another line while the chip select was held, or any line "
+               "within reselect_cycles of its release"),
+      ADD_STAT(transferCycles, statistics::units::Cycle::get(),
+               "Cycles the QMI spent reading lines from flash"),
+      ADD_STAT(holdCycles, statistics::units::Cycle::get(),
+               "Cycles the chip select was held after a transfer with no "
+               "transfer under way, up to the next transfer's start"),
+      ADD_STAT(hitsCore0, statistics::units::Count::get(),
+               "hits by core 0's requestors"),
+      ADD_STAT(hitsCore1, statistics::units::Count::get(),
+               "hits by core 1's requestors"),
+      ADD_STAT(missesCore0, statistics::units::Count::get(),
+               "misses by core 0's requestors"),
+      ADD_STAT(missesCore1, statistics::units::Count::get(),
+               "misses by core 1's requestors"),
+      ADD_STAT(chainedCore0, statistics::units::Count::get(),
+               "chained by core 0's requestors"),
+      ADD_STAT(chainedCore1, statistics::units::Count::get(),
+               "chained by core 1's requestors"),
+      ADD_STAT(reselectedCore0, statistics::units::Count::get(),
+               "reselected by core 0's requestors"),
+      ADD_STAT(reselectedCore1, statistics::units::Count::get(),
+               "reselected by core 1's requestors")
 {
+}
+
+// A requestor's core from its name: board.cpu1's ports are core 1's, any
+// other CPU's (board.cpu, a switched-in CPU) core 0's.
+unsigned
+RP2350XIP::coreOf(RequestorID requestor)
+{
+    auto it = requestorCores.find(requestor);
+    if (it != requestorCores.end())
+        return it->second;
+    const std::string name = system()->getRequestorName(requestor);
+    unsigned core = 2;
+    if (name.find("cpu1") != std::string::npos)
+        core = 1;
+    else if (name.find("cpu") != std::string::npos)
+        core = 0;
+    requestorCores.emplace(requestor, core);
+    return core;
+}
+
+void
+RP2350XIP::countHit(RequestorID requestor)
+{
+    ++xipStats.hits;
+    switch (coreOf(requestor)) {
+      case 0: ++xipStats.hitsCore0; break;
+      case 1: ++xipStats.hitsCore1; break;
+      default: break;
+    }
+}
+
+void
+RP2350XIP::countMiss(RequestorID requestor)
+{
+    ++xipStats.misses;
+    switch (coreOf(requestor)) {
+      case 0: ++xipStats.missesCore0; break;
+      case 1: ++xipStats.missesCore1; break;
+      default: break;
+    }
 }
 
 RP2350XIP::XipPort::XipPort(const std::string &name, RP2350XIP &_xip)
@@ -196,15 +264,16 @@ RP2350XIP::track(PacketPtr pkt)
     Tick latency = 0;
     for (Addr line = first; line <= last; line += lineBytes) {
         if (lookup(line)) {
-            ++xipStats.hits;
+            countHit(pkt->requestorId());
         } else {
-            ++xipStats.misses;
+            countMiss(pkt->requestorId());
             missed = true;
             fill(line);
             if (atomicLatency) {
                 // One transfer after another, as the QMI reads them
                 const Tick start = curTick() + latency;
-                latency += missCost(start, line) * clockPeriod();
+                latency += missCost(start, line, pkt->requestorId()) *
+                           clockPeriod();
                 qmiLastEnd = curTick() + latency;
                 qmiNextLine = line + lineBytes;
             }
@@ -326,7 +395,7 @@ void
 RP2350XIP::startMiss(unsigned index, const AccessPtr &access, Addr line)
 {
     Bank &bank = banks[index];
-    ++xipStats.misses;
+    countMiss(access->requestor);
     access->missed = true;
     markWaited(access);
     bank.busy = true;
@@ -418,7 +487,7 @@ RP2350XIP::grant()
             if (bank.busy) {
                 wait(index, access);
             } else if (lookup(line)) {
-                ++xipStats.hits;
+                countHit(access->requestor);
                 // Its next line is the other bank's.
                 access->nextLine += lineBytes;
                 advance(access);
@@ -493,30 +562,57 @@ RP2350XIP::release()
 
 // The front of the queue goes out on the serial interface from `start`.
 Cycles
-RP2350XIP::missCost(Tick start, Addr line)
+RP2350XIP::missCost(Tick start, Addr line, RequestorID requestor)
 {
     // The chip select stays low for the cooldown after a transfer, unless
     // the transfer ended at a page break.
     Cycles cost = missCycles;
+    enum { Fresh, Chained, Reselected } kind = Fresh;
     if (qmiLastEnd != MaxTick) {
         const bool at_break = pageBreak && qmiNextLine % pageBreak == 0;
         const Tick released =
             at_break ? qmiLastEnd : qmiLastEnd + cooldownCycles * clockPeriod();
+        const Tick held_to = std::min(start, released);
+        if (held_to > qmiLastEnd)
+            xipStats.holdCycles += (held_to - qmiLastEnd) / clockPeriod();
         if (start < released) {
             if (line == qmiNextLine) {
                 cost = chainedCycles;
-                ++xipStats.chained;
+                kind = Chained;
             } else {
                 cost = missCycles + reselectCycles;
+                kind = Reselected;
             }
         } else if (start < released + reselectCycles * clockPeriod()) {
             cost = missCycles + reselectCycles;
+            kind = Reselected;
         }
+    }
+    const unsigned core = coreOf(requestor);
+    switch (kind) {
+      case Fresh:
+        ++xipStats.fresh;
+        break;
+      case Chained:
+        ++xipStats.chained;
+        if (core == 0)
+            ++xipStats.chainedCore0;
+        else if (core == 1)
+            ++xipStats.chainedCore1;
+        break;
+      case Reselected:
+        ++xipStats.reselected;
+        if (core == 0)
+            ++xipStats.reselectedCore0;
+        else if (core == 1)
+            ++xipStats.reselectedCore1;
+        break;
     }
     // A line longer than 8 bytes takes its further words in the same
     // transfer, after the 8 bytes the cycles above cover
     cost = Cycles(uint64_t(cost) +
                   uint64_t(extraWordCycles) * ((lineBytes - 8) / 4));
+    xipStats.transferCycles += cost;
     DPRINTF(RP2350XIP, "line %#x from flash, %d cycles\n", line,
             static_cast<uint64_t>(cost));
     return cost;
@@ -525,8 +621,8 @@ RP2350XIP::missCost(Tick start, Addr line)
 void
 RP2350XIP::startQmi(Tick start)
 {
-    const Addr line = banks[qmiQueue.front()].missLine;
-    const Cycles cost = missCost(start, line);
+    const Bank &bank = banks[qmiQueue.front()];
+    const Cycles cost = missCost(start, bank.missLine, bank.owner->requestor);
     qmiBusy = true;
     schedule(qmiEvent, start + cost * clockPeriod());
 }
@@ -587,7 +683,7 @@ RP2350XIP::serve(unsigned index)
             startMiss(index, access, line);
             return;
         }
-        ++xipStats.hits;
+        countHit(access->requestor);
         access->beatsLeft = wordsIn(*access, line);
     }
     if (--access->beatsLeft == 0) {
