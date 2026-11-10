@@ -41,7 +41,7 @@ RP2350SRAM::MemoryPort::MemoryPort(const std::string &name,
 AddrRangeList
 RP2350SRAM::MemoryPort::getAddrRanges() const
 {
-    return {memory.getAddrRange()};
+    return memory.claimedRanges();
 }
 
 Tick
@@ -78,6 +78,7 @@ RP2350SRAM::MemoryPort::recvRespRetry()
 RP2350SRAM::RP2350SRAM(const RP2350SRAMParams &p)
     : AbstractMemory(p), window(p.window), latency(p.latency),
       queueDepth(p.queue_depth), oneBank(p.one_bank),
+      sram4_7(p.sram4_7),
       arbitrateEvent([this] { arbitrate(); }, name() + ".arbitrate", false,
                      Event::CPU_Tick_Pri + 1),
       completeEvent([this] { completeBeats(); }, name() + ".complete"),
@@ -88,6 +89,8 @@ RP2350SRAM::RP2350SRAM(const RP2350SRAMParams &p)
              "RP2350SRAM requires the 520 KiB SRAM range, unless one_bank");
     fatal_if(oneBank && range.interleaved(),
              "RP2350SRAM with one_bank needs a range that is not interleaved");
+    fatal_if(oneBank && !sram4_7,
+             "RP2350SRAM without SRAM4-7 has the SRAM's banks, not one_bank");
     fatal_if(queueDepth == 0 || p.port_priority.empty(),
              "Invalid RP2350 SRAM queue parameters");
     lastWinner.fill(InvalidPortID);
@@ -134,6 +137,26 @@ RP2350SRAM::bankFor(Addr address) const
     return 8 + ((address - 0x20080000) / 0x1000);
 }
 
+AddrRangeList
+RP2350SRAM::claimedRanges() const
+{
+    if (sram4_7)
+        return {range};
+    // SRAM0-3 and SRAM8-9; SRAM4-7 (0x20040000-0x2007ffff) go to the
+    // crossbar's default, as arcsim-soc's soc.v without SRAM4_7_PRESENT
+    return {AddrRange(0x20000000, 0x20040000),
+            AddrRange(0x20080000, range.end())};
+}
+
+bool
+RP2350SRAM::claims(const AddrRange &request) const
+{
+    for (const auto &claimed : claimedRanges())
+        if (request.isSubset(claimed))
+            return true;
+    return false;
+}
+
 unsigned
 RP2350SRAM::beatSize(Addr address, unsigned remaining) const
 {
@@ -143,7 +166,7 @@ RP2350SRAM::beatSize(Addr address, unsigned remaining) const
 void
 RP2350SRAM::validate(PacketPtr pkt) const
 {
-    panic_if(pkt->getSize() == 0 || !pkt->getAddrRange().isSubset(range),
+    panic_if(pkt->getSize() == 0 || !claims(pkt->getAddrRange()),
              "SRAM request outside physical memory: %s", pkt->print());
     panic_if(pkt->cacheResponding() || !(pkt->isRead() || pkt->isWrite()),
              "Unsupported SRAM command: %s", pkt->cmdString());
@@ -206,7 +229,7 @@ RP2350SRAM::receive(PacketPtr pkt, PortID id)
 void
 RP2350SRAM::functional(PacketPtr pkt)
 {
-    panic_if(!pkt->getAddrRange().isSubset(range), "Functional SRAM range error");
+    panic_if(!claims(pkt->getAddrRange()), "Functional SRAM range error");
     functionalAccess(pkt);
     // Functional writes update in-flight data, including partial read
     // responses. Functional reads overlay uncompleted writes in acceptance
