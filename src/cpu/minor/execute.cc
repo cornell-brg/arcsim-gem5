@@ -922,14 +922,9 @@ Execute::issue(ThreadID thread_id)
             if (!discarded && !inst->isBubble() && trackIssuedNext &&
                 inst->isInst())
             {
-                /* The instruction after it, for fetchFifoWords */
-                issuedNextPC.reset(inst->pc->clone());
-                if (inst->predictedTaken && inst->predictedTarget)
-                    set(issuedNextPC, *inst->predictedTarget);
-                else if (!inst->staticInst->isMicroop() ||
-                    inst->staticInst->isLastMicroop())
-                    inst->staticInst->advancePC(*issuedNextPC);
-                issuedNextStream = inst->id.streamSeqNum;
+                /* The instruction, for fetchFifoWords */
+                issuedPC.reset(inst->pc->clone());
+                issuedStream = inst->id.streamSeqNum;
             }
 
             if (!discarded && !inst->isBubble() && !inst->freeMicroop) {

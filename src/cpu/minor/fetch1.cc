@@ -1270,41 +1270,28 @@ SingleStageFetch1::fifoFull()
     if (fifoWordsLimit == 0 || thread.state != FetchRunning)
         return false;
 
-    /* The next to issue: the head of Execute's input, or while issue is
-     *  held, the instruction after the last issued, which may still be on
-     *  its way to Execute */
-    bool held = execute.issueHeldNextCycle();
-    MinorDynInstPtr head = execute.nextToIssue(tid);
+    /* The instruction in the decode register, whose words the FIFO is
+     *  counted from: while issue is held (an FP op holding the core), the
+     *  one holding it; otherwise the next to issue, the head of Execute's
+     *  input */
     std::unique_ptr<PCStateBase> front;
-    if (head) {
-        if (head->id.streamSeqNum != thread.streamSeqNum)
+    if (execute.issueHeldNextCycle()) {
+        InstSeqNum stream;
+        const PCStateBase *held = execute.lastIssued(stream);
+        if (!held || stream != thread.streamSeqNum)
+            return false;
+        front.reset(held->clone());
+    } else {
+        MinorDynInstPtr head = execute.nextToIssue(tid);
+        if (!head || head->id.streamSeqNum != thread.streamSeqNum)
             return false;
         front.reset(head->pc->clone());
-    } else if (held) {
-        InstSeqNum stream;
-        const PCStateBase *next = execute.afterLastIssued(stream);
-        if (!next || stream != thread.streamSeqNum)
-            return false;
-        front.reset(next->clone());
-    } else {
-        /* Nothing waits for Execute */
-        return false;
     }
 
-    /* The words before the next to issue's have gone */
+    /* The words before its word have gone */
     Addr head_word = front->instAddr() & ~Addr(3);
     while (!fifoWords.empty() && fifoWords.front() != head_word)
         fifoWords.pop_front();
-
-    /* The instruction Execute takes next, in the decode register: past
-     *  the next to issue unless issue is held into the next cycle */
-    if (!held) {
-        if (head->predictedTaken && head->predictedTarget)
-            set(front, *head->predictedTarget);
-        else if (!head->staticInst->isMicroop() ||
-            head->staticInst->isLastMicroop())
-            head->staticInst->advancePC(*front);
-    }
 
     /* The words past its first 4 bytes are in the FIFO or on their way */
     Addr first = (front->instAddr() + 4) & ~Addr(3);
