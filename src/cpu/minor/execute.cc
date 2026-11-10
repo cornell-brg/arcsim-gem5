@@ -96,7 +96,8 @@ Execute::Execute(const std::string &name_, MinorCPU &cpu_,
           params.executeLSQStoreBufferSize,
           params.executeLSQMaxStoreBufferStoresPerCycle,
           params.executeWaitedStoreHoldsInsts,
-          params.executeWaitedLoadHoldsInsts),
+          params.executeWaitedLoadHoldsInsts,
+          params.executeUnbufferedStores),
       executeInfo(params.numThreads,
                   ExecuteThreadInfo(params.executeCommitLimit)),
       lastCompleted(params.numThreads, 0),
@@ -1484,15 +1485,18 @@ Execute::canAccessAtIssue(ThreadID thread_id)
     const MinorDynInstPtr &inst = ex_info.inFUMemInsts->front().inst;
 
     if (inst->isBubble() || inst->isFault() || inst->inLSQ ||
-        !inst->canEarlyIssue || !inst->staticInst->isLoad() ||
+        !inst->canEarlyIssue ||
+        !(inst->staticInst->isLoad() ||
+          (lsq.unbufferedStores && inst->staticInst->isStore() &&
+           instIsHeadInst(inst))) ||
         inst->id.streamSeqNum != ex_info.streamSeqNum ||
         inst->fuIndex >= numFuncUnits)
     {
         return false;
     }
 
-    /* Only a load pushed into a single-cycle FU this cycle, with the
-     *  instructions its address depends on complete */
+    /* Only a memory reference pushed into a single-cycle FU this cycle,
+     *  with the instructions its address depends on complete. */
     FUPipeline *fu = funcUnits[inst->fuIndex];
 
     return fu->description.opLat == Cycles(1) &&
@@ -1698,8 +1702,8 @@ Execute::commit(ThreadID thread_id, bool only_commit_microops, bool discard,
                 } else if (loadAccessAtIssue &&
                     canAccessAtIssue(thread_id))
                 {
-                    /* Use this, possibly out of order, load as the one
-                     *  to send to the LSQ */
+                    /* Loads may go early; an unbuffered store must be
+                     *  the head instruction before starting its access. */
                     inst = ex_info.inFUMemInsts->front().inst;
 
                     DPRINTF(MinorExecute, "Issuing mem ref at issue"
@@ -2076,9 +2080,10 @@ Execute::evaluate()
             }
         }
 
-        /* A store's address phase is in the cycle it commits, and a load
-         *  that waited behind it for the store buffer follows it out */
-        if (lsq.waitedStoreHoldsInsts)
+        /* Retry requests released by this cycle's retirement. For an
+         *  unbuffered store, its response releases a following load; a
+         *  retiring older load can also release a head-only store. */
+        if (lsq.waitedStoreHoldsInsts || lsq.unbufferedStores)
             lsq.step();
     }
 

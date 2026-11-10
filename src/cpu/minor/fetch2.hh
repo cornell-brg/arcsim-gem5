@@ -275,6 +275,7 @@ class SingleStageFetch2 : public Fetch2
 
     /** See fetchBranchSpeculation in BaseMinorCPU.py */
     bool branchSpeculation;
+    const bool hazard3FifoEnabled;
 
   public:
     /** See fetchPredictLastBackwardBranch in BaseMinorCPU.py */
@@ -287,6 +288,8 @@ class SingleStageFetch2 : public Fetch2
     Addr backwardBranchPC = 0;
     std::unique_ptr<PCStateBase> backwardBranchTarget;
     bool backwardBranchOverhangs = false;
+    bool backwardBranchIs32Bit = false;
+    unsigned decodedHalfwords = 0;
 
     /** Has decode gone past the prediction of a line with this id? */
     bool predictionPassed(const InstId &id) const;

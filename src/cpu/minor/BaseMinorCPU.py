@@ -428,6 +428,12 @@ class BaseMinorCPU(BaseCPU):
         " waited for without the limit if this is at least the bytes it"
         " can take in the cycles a fetch needs",
     )
+    fetchHazard3Fifo = Param.Bool(
+        False,
+        "Hazard3 single-stage fetch: registered two-word FIFO admission "
+        "and a separate three-halfword instruction assembly register; "
+        "replaces fetchReadAheadLimit (one thread, four-byte fetches)",
+    )
     fetch1FetchLimit = Param.Unsigned(
         1, "Number of line fetches allowable in flight at once"
     )
@@ -570,6 +576,16 @@ class BaseMinorCPU(BaseCPU):
         " Execute from committing or issuing until it is, as on a core"
         " whose pipeline stalls while its bus makes a load wait, so that no"
         " later access starts its address phase in the meantime",
+    )
+
+    executeUnbufferedStores = Param.Bool(
+        False,
+        "Issue data accesses only at the head of the instruction queue. "
+        "Send stores directly to memory "
+        "and retire them only after their response. A waiting store holds "
+        "Execute, and loads cannot be satisfied by store-buffer forwarding. "
+        "With executeLoadAccessAtIssue, single-cycle stores also start their "
+        "access in their issue cycle",
     )
 
     executeDynamicLatencyHoldsInst = Param.Bool(

@@ -663,7 +663,8 @@ class LSQ : public Named
         unsigned int requests_queue_size, unsigned int transfers_queue_size,
         unsigned int store_buffer_size,
         unsigned int store_buffer_cycle_store_limit,
-        bool waited_store_holds_insts, bool waited_load_holds_insts);
+        bool waited_store_holds_insts, bool waited_load_holds_insts,
+        bool unbuffered_stores);
 
     virtual ~LSQ();
 
@@ -706,10 +707,12 @@ class LSQ : public Named
     /** See executeWaitedStoreHoldsInsts in BaseMinorCPU.py */
     const bool waitedStoreHoldsInsts;
 
+    /** Stores bypass the store buffer; all data accesses reach memory in order. */
+    const bool unbufferedStores;
+
     /** Is the bus making a store wait, so that Execute must hold its
      *  instructions this cycle? */
-    bool storeHoldsInsts() const
-    { return waitedStoreHoldsInsts && storeBuffer.hasWaitedStore(); }
+    bool storeHoldsInsts() const;
 
     /** See executeWaitedLoadHoldsInsts in BaseMinorCPU.py */
     const bool waitedLoadHoldsInsts;

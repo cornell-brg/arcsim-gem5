@@ -508,7 +508,11 @@ RP2350XIP::missCost(Tick start, Addr line)
                 cost = missCycles + reselectCycles;
             }
         } else if (start < released + reselectCycles * clockPeriod()) {
-            cost = missCycles + reselectCycles;
+            // Time already spent with CS released counts toward recovery.
+            const Tick remaining = released +
+                reselectCycles * clockPeriod() - start;
+            cost = missCycles + Cycles((remaining + clockPeriod() - 1) /
+                                       clockPeriod());
         }
     }
     // A line longer than 8 bytes takes its further words in the same

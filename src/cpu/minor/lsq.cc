@@ -1055,7 +1055,11 @@ LSQ::tryToSendToTransfers(LSQRequestPtr request)
     bool is_release = request->request->isRelease();
     bool is_swap = request->request->isSwap();
     bool is_atomic = request->request->isAtomic();
-    bool bufferable = !(request->request->isStrictlyOrdered() ||
+    // The unbuffered core starts data accesses in order. In particular,
+    // do not let a speculative load beyond an unresolved loop exit reach
+    // memory while an older access is waiting for its response.
+    bool bufferable = !(unbufferedStores ||
+                        request->request->isStrictlyOrdered() ||
                         is_llsc || is_swap || is_atomic || is_release);
 
     if (is_load) {
@@ -1120,7 +1124,7 @@ LSQ::tryToSendToTransfers(LSQRequestPtr request)
 
     if (!is_llsc) {
         /* Check for match in the store buffer */
-        if (is_load) {
+        if (is_load && !unbufferedStores) {
             unsigned int forwarding_slot = 0;
             AddrRangeCoverage forwarding_result =
                 storeBuffer.canForwardDataToLoad(request,
@@ -1441,7 +1445,8 @@ LSQ::LSQ(std::string name_, std::string dcache_port_name_,
     unsigned int requests_queue_size, unsigned int transfers_queue_size,
     unsigned int store_buffer_size,
     unsigned int store_buffer_cycle_store_limit,
-    bool waited_store_holds_insts, bool waited_load_holds_insts) :
+    bool waited_store_holds_insts, bool waited_load_holds_insts,
+    bool unbuffered_stores) :
     Named(name_),
     cpu(cpu_),
     execute(execute_),
@@ -1461,6 +1466,7 @@ LSQ::LSQ(std::string name_, std::string dcache_port_name_,
     retryRequest(NULL),
     cacheBlockMask(~(cpu_.cacheLineSize() - 1)),
     waitedStoreHoldsInsts(waited_store_holds_insts),
+    unbufferedStores(unbuffered_stores),
     waitedLoadHoldsInsts(waited_load_holds_insts)
 {
     if (in_memory_system_limit < 1) {
@@ -1495,6 +1501,26 @@ LSQ::LSQ(std::string name_, std::string dcache_port_name_,
 
 LSQ::~LSQ()
 { }
+
+bool
+LSQ::storeHoldsInsts() const
+{
+    if (unbufferedStores) {
+        // Only the oldest instruction can hold Execute: an early-issued
+        // younger store must still let older loads/instructions complete.
+        auto waiting_store = [this](const LSQQueue &queue) {
+            if (queue.empty())
+                return false;
+            const auto request = queue.front();
+            return request->inst->staticInst->isStore() &&
+                !request->isComplete() &&
+                execute.instIsHeadInst(request->inst);
+        };
+        if (waiting_store(requests) || waiting_store(transfers))
+            return true;
+    }
+    return waitedStoreHoldsInsts && storeBuffer.hasWaitedStore();
+}
 
 LSQ::LSQRequest::~LSQRequest()
 {

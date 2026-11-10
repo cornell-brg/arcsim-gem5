@@ -224,6 +224,7 @@ class ForwardLineData /* : public ReportIF, public BubbleIF */
      *  whose last bytes this line holds */
     bool predictedBranch = false;
     Addr predictedBranchPC = 0;
+    unsigned validHalfwords = 2;
 
   public:
     ForwardLineData() {}
@@ -233,7 +234,8 @@ class ForwardLineData /* : public ReportIF, public BubbleIF */
         lineWidth(other.lineWidth), fault(other.fault), id(other.id),
         line(other.line), packet(other.packet),
         predictedBranch(other.predictedBranch),
-        predictedBranchPC(other.predictedBranchPC)
+        predictedBranchPC(other.predictedBranchPC),
+        validHalfwords(other.validHalfwords)
     {}
     ForwardLineData &
     operator=(const ForwardLineData &other)
@@ -249,6 +251,7 @@ class ForwardLineData /* : public ReportIF, public BubbleIF */
         packet = other.packet;
         predictedBranch = other.predictedBranch;
         predictedBranchPC = other.predictedBranchPC;
+        validHalfwords = other.validHalfwords;
         return *this;
     }
 
