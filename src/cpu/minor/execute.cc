@@ -105,6 +105,8 @@ Execute::Execute(const std::string &name_, MinorCPU &cpu_,
       commitPriority(0),
       issueStats(&cpu_)
 {
+    trackIssuedNext = params.fetchFifoWords != 0;
+
     if (commitLimit < 1) {
         fatal("%s: executeCommitLimit must be >= 1 (%d)\n", name_,
             commitLimit);
@@ -917,6 +919,19 @@ Execute::issue(ThreadID thread_id)
                 num_mem_insts_issued++;
 
             /* A free micro-op is issued beyond the limit */
+            if (!discarded && !inst->isBubble() && trackIssuedNext &&
+                inst->isInst())
+            {
+                /* The instruction after it, for fetchFifoWords */
+                issuedNextPC.reset(inst->pc->clone());
+                if (inst->predictedTaken && inst->predictedTarget)
+                    set(issuedNextPC, *inst->predictedTarget);
+                else if (!inst->staticInst->isMicroop() ||
+                    inst->staticInst->isLastMicroop())
+                    inst->staticInst->advancePC(*issuedNextPC);
+                issuedNextStream = inst->id.streamSeqNum;
+            }
+
             if (!discarded && !inst->isBubble() && !inst->freeMicroop) {
                 halfwordWideMemIssued(inst);
                 num_insts_issued++;

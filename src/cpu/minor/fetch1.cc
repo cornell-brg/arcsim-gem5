@@ -1269,19 +1269,35 @@ SingleStageFetch1::fifoFull()
     if (fifoWordsLimit == 0 || thread.state != FetchRunning)
         return false;
 
-    /* Nothing waits for Execute, or only what a branch will discard */
+    /* The next to issue: the head of Execute's input, or while issue is
+     *  held, the instruction after the last issued, which may still be on
+     *  its way to Execute */
+    bool held = execute.issueHeldNextCycle();
     MinorDynInstPtr head = execute.nextToIssue(tid);
-    if (!head || head->id.streamSeqNum != thread.streamSeqNum)
+    std::unique_ptr<PCStateBase> front;
+    if (head) {
+        if (head->id.streamSeqNum != thread.streamSeqNum)
+            return false;
+        front.reset(head->pc->clone());
+    } else if (held) {
+        InstSeqNum stream;
+        const PCStateBase *next = execute.afterLastIssued(stream);
+        if (!next || stream != thread.streamSeqNum)
+            return false;
+        front.reset(next->clone());
+    } else {
+        /* Nothing waits for Execute */
         return false;
+    }
 
     /* The words before the next to issue's have gone */
-    Addr head_word = head->pc->instAddr() & ~Addr(3);
+    Addr head_word = front->instAddr() & ~Addr(3);
     while (!fifoWords.empty() && fifoWords.front() != head_word)
         fifoWords.pop_front();
 
-    /* The instruction Execute takes next, in the decode register */
-    std::unique_ptr<PCStateBase> front(head->pc->clone());
-    if (!execute.issueHeldNextCycle()) {
+    /* The instruction Execute takes next, in the decode register: past
+     *  the next to issue unless issue is held into the next cycle */
+    if (!held) {
         if (head->predictedTaken && head->predictedTarget)
             set(front, *head->predictedTarget);
         else if (!head->staticInst->isMicroop() ||

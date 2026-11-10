@@ -129,6 +129,11 @@ class Execute : public Named
      *  transfers is still making them */
     Cycles issueHeldUntil{0};
 
+    /** For fetchFifoWords: see afterLastIssued */
+    bool trackIssuedNext = false;
+    std::unique_ptr<PCStateBase> issuedNextPC;
+    InstSeqNum issuedNextStream = 0;
+
     /** See executeHalfwordWideMemCycles in BaseMinorCPU.py */
     Cycles halfwordWideMemCycles;
     unsigned int halfwordWideMemGrace;
@@ -422,6 +427,16 @@ class Execute : public Named
     /** The instruction to issue next, null if none waits in the input
      *  buffer */
     MinorDynInstPtr nextToIssue(ThreadID thread_id);
+
+    /** The instruction after the last issued (its predicted target for
+     *  a branch predicted taken) and its stream, kept for
+     *  fetchFifoWords; null before the first */
+    const PCStateBase *
+    afterLastIssued(InstSeqNum &stream) const
+    {
+        stream = issuedNextStream;
+        return issuedNextPC.get();
+    }
 
     /** Is issue held through the next cycle (issueHeldUntil) */
     bool
