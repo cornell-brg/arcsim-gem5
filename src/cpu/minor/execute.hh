@@ -133,6 +133,7 @@ class Execute : public Named
     bool trackIssuedNext = false;
     std::unique_ptr<PCStateBase> issuedPC;
     InstSeqNum issuedStream = 0;
+    unsigned int issuedSize = 4;
 
     /** See executeHalfwordWideMemCycles in BaseMinorCPU.py */
     Cycles halfwordWideMemCycles;
@@ -428,12 +429,13 @@ class Execute : public Named
      *  buffer */
     MinorDynInstPtr nextToIssue(ThreadID thread_id);
 
-    /** The last instruction issued and its stream, kept for
-     *  fetchFifoWords; null before the first */
+    /** The last instruction issued, its stream and its size in bytes,
+     *  kept for fetchFifoWords; null before the first */
     const PCStateBase *
-    lastIssued(InstSeqNum &stream) const
+    lastIssued(InstSeqNum &stream, unsigned int &size) const
     {
         stream = issuedStream;
+        size = issuedSize;
         return issuedPC.get();
     }
 

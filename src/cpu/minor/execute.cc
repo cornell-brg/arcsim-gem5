@@ -925,6 +925,8 @@ Execute::issue(ThreadID thread_id)
                 /* The instruction, for fetchFifoWords */
                 issuedPC.reset(inst->pc->clone());
                 issuedStream = inst->id.streamSeqNum;
+                issuedSize = inst->staticInst->isMicroop() ? 4 :
+                    inst->staticInst->size();
             }
 
             if (!discarded && !inst->isBubble() && !inst->freeMicroop) {

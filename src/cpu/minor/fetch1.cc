@@ -1275,17 +1275,21 @@ SingleStageFetch1::fifoFull()
      *  one holding it; otherwise the next to issue, the head of Execute's
      *  input */
     std::unique_ptr<PCStateBase> front;
+    unsigned int front_size = 4;
     if (execute.issueHeldNextCycle()) {
         InstSeqNum stream;
-        const PCStateBase *held = execute.lastIssued(stream);
+        const PCStateBase *held = execute.lastIssued(stream, front_size);
         if (!held || stream != thread.streamSeqNum)
             return false;
         front.reset(held->clone());
     } else {
         MinorDynInstPtr head = execute.nextToIssue(tid);
-        if (!head || head->id.streamSeqNum != thread.streamSeqNum)
+        if (!head || head->isFault() ||
+            head->id.streamSeqNum != thread.streamSeqNum)
             return false;
         front.reset(head->pc->clone());
+        if (head->isInst() && !head->staticInst->isMicroop())
+            front_size = head->staticInst->size();
     }
 
     /* The words before its word have gone */
@@ -1293,8 +1297,10 @@ SingleStageFetch1::fifoFull()
     while (!fifoWords.empty() && fifoWords.front() != head_word)
         fifoWords.pop_front();
 
-    /* The words past its first 4 bytes are in the FIFO or on their way */
-    Addr first = (front->instAddr() + 4) & ~Addr(3);
+    /* The decode register holds its halfwords and the rest of the word
+     *  it ends in (Hazard3's three-halfword instruction buffer), so the
+     *  FIFO's words, or those on their way, start at the word after */
+    Addr first = (front->instAddr() + front_size + 3) & ~Addr(3);
     unsigned int words = 0;
     for (auto i = fifoWords.begin(); i != fifoWords.end(); i++) {
         if (*i == first) {
