@@ -10,7 +10,7 @@ from m5.objects import Root
 from m5.stats import dump as stats_dump
 from m5.stats import reset as stats_reset
 
-from board import HWPES, SCRATCH_BANK_BANDWIDTH, make_board, memory_models
+from board import HWPES, SCRATCH_BANK_BANDWIDTH, XIP_MODELS, make_board, memory_models
 from soc_configs import SOC_CONFIGS, list_configs, manifest
 
 # Firmware output (Hazard3TbIO) goes straight to the file descriptor; line
@@ -64,11 +64,13 @@ parser.add_argument("--arm-timing", choices=("tuned", "pre-tuning"),
                     "STM32G474")
 parser.add_argument("--dma", action=argparse.BooleanOptionalAction,
                     help="Add the DMA controller")
-parser.add_argument("--xip-model", choices=("legacy", "qmi", "soc"),
+parser.add_argument("--xip-model",
+                    choices=XIP_MODELS,
                     help="qmi selects the cache banks and flash interface "
                     "timing of a Pico 2; soc (hazard3-proxy) arcsim-soc's RTL "
-                    "code memory, zero wait states; the XIP knobs apply only "
-                    "to legacy")
+                    "with its XIP cache, the same as qmi; soc-no-cache "
+                    "(hazard3-proxy) arcsim-soc's RTL before it, zero wait "
+                    "states; the XIP knobs apply only to legacy")
 parser.add_argument("--hwpe", choices=tuple(HWPES),
                     help="The HWPE on the Hazard3 board, as arcsim-soc's "
                     "CONFIG_HWPE; empty is no HWPE and no TCDM, as "

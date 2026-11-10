@@ -84,6 +84,7 @@ Fetch1::Fetch1(const std::string &name_,
     icacheState(IcacheRunning),
     lineSeqNum(InstId::firstLineSeqNum),
     numFetchesInMemorySystem(0),
+    streamOnSpeculation(params.fetchStreamOnSpeculation),
     numFetchesInITLB(0)
 {
     for (auto &info: fetchInfo)
@@ -321,7 +322,7 @@ Fetch1::tryToSendToTransfers(FetchRequestPtr request)
         }
 
         /* The memory system may decline a read made on speculation */
-        if (sendOnSpeculation)
+        if (sendOnSpeculation && streamOnSpeculation)
             request->request->setFlags(Request::PREFETCH);
 
         if (!request->packet)
@@ -1232,6 +1233,7 @@ SingleStageFetch1::SingleStageFetch1(const std::string &name_,
     targetRequest(NULL),
     olderTargetRequest(NULL),
     readAheadLimit(params.fetchReadAheadLimit),
+    fifoWordsLimit(params.fetchFifoWords),
     keepTargetInFlight(params.fetchKeepTargetInFlight)
 {
 }
@@ -1258,9 +1260,67 @@ SingleStageFetch1::readAheadFull()
     return waiting && thread.fetchAddr >= decode_to + readAheadLimit;
 }
 
+bool
+SingleStageFetch1::fifoFull()
+{
+    /* Only single-threaded M-profile */
+    ThreadID tid = 0;
+    Fetch1ThreadInfo &thread = fetchInfo[tid];
+
+    if (fifoWordsLimit == 0 || thread.state != FetchRunning)
+        return false;
+
+    /* The instruction in the decode register, whose words the FIFO is
+     *  counted from: while issue is held (an FP op holding the core), the
+     *  one holding it; otherwise the next to issue, the head of Execute's
+     *  input */
+    std::unique_ptr<PCStateBase> front;
+    unsigned int front_size = 4;
+    if (execute.issueHeldNextCycle()) {
+        InstSeqNum stream;
+        const PCStateBase *held = execute.lastIssued(stream, front_size);
+        if (!held || stream != thread.streamSeqNum)
+            return false;
+        front.reset(held->clone());
+    } else {
+        MinorDynInstPtr head = execute.nextToIssue(tid);
+        if (!head || head->isFault() ||
+            head->id.streamSeqNum != thread.streamSeqNum)
+            return false;
+        front.reset(head->pc->clone());
+        if (head->isInst() && !head->staticInst->isMicroop())
+            front_size = head->staticInst->size();
+    }
+
+    /* The words before its word have gone */
+    Addr head_word = front->instAddr() & ~Addr(3);
+    while (!fifoWords.empty() && fifoWords.front() != head_word)
+        fifoWords.pop_front();
+
+    /* The decode register holds its halfwords and the rest of the word
+     *  it ends in (Hazard3's three-halfword instruction buffer), so the
+     *  FIFO's words, or those on their way, start at the word after */
+    Addr first = (front->instAddr() + front_size + 3) & ~Addr(3);
+    unsigned int words = 0;
+    for (auto i = fifoWords.begin(); i != fifoWords.end(); i++) {
+        if (*i == first) {
+            words = fifoWords.end() - i;
+            break;
+        }
+    }
+
+    return words >= fifoWordsLimit;
+}
+
 void
 SingleStageFetch1::lineRequested(FetchRequestPtr request)
 {
+    if (fifoWordsLimit != 0) {
+        fifoWords.push_back(request->request->getVaddr() & ~Addr(3));
+        if (fifoWords.size() > 16)
+            fifoWords.pop_front();
+    }
+
     if (!fetch2->predictLastBackwardBranch)
         return;
 
@@ -1363,6 +1423,10 @@ SingleStageFetch1::evaluate()
         bool kept = !have_target_line &&
             (keepTargetLine(olderTargetRequest, exec_branch) ||
              keepTargetLine(targetRequest, exec_branch));
+        /* The FIFO is flushed; a target line taken is its first word */
+        fifoWords.clear();
+        if (have_target_line)
+            fifoWords.push_back(target_line.lineBaseAddr & ~Addr(3));
         abandonTargetRequest(olderTargetRequest);
         abandonTargetRequest(targetRequest);
         fetch2->decodedBranchTarget.reset();
@@ -1526,11 +1590,13 @@ SingleStageFetch1::evaluate()
     if (!prediction.isBubble() || !fetch2->scanNextForBranch()) {
         /* Nothing more of the stream is fetched while its kept target
          *  line is on its way: on the Crazyflie's system bus a fetch never
-         *  follows another back to back (DDI0439D 2.3.1), and a sequential
+         *  follows another back to back (the Cortex-M3's DDI0337B 14.4.6; the
+         *  M4's manual gives no fetch timing), and a sequential
          *  fetch beside the kept one delays the next branch's target from
          *  SRAM (micro/fetch br_back_0: 714 cycles with one, 616 without,
          *  the board 608) */
-        if (!fetch2->sureBranch && !readAheadFull() && !keptTargetRequest)
+        if (!fetch2->sureBranch && !readAheadFull() && !fifoFull() &&
+            !keptTargetRequest)
             tryToFetch();
     }
 

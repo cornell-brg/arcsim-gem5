@@ -139,14 +139,26 @@ class MProfileInstLatency(BaseInstLatency):
         [],
         "memory on a bus that instruction fetches and data accesses share, "
         "data first (the Cortex-M3 and M4's system bus): a fetch from it "
-        "starts once the bus is free and holds it bus_fetch_cycles, a data "
-        "transfer to it holds it bus_data_cycles",
+        "starts once the bus is free and bus_fetch_cycles after the fetch "
+        "before and holds it a cycle, a data transfer to it holds it "
+        "bus_data_cycles",
     )
     bus_fetch_cycles = Param.Cycles(
-        2, "cycles a fetch from bus_ranges holds the bus"
+        2, "cycles from a fetch from bus_ranges to the next one"
     )
     bus_data_cycles = Param.Cycles(
         1, "cycles a data transfer to bus_ranges holds the bus"
+    )
+    bus_word_fifo = Param.Unsigned(
+        0,
+        "words the fetch queue holds for fetches from bus_ranges, which then "
+        "run ahead of the instruction that needs them (0: no queue: a fetch "
+        "waits for the instruction before)",
+    )
+    unaligned_pieces = Param.Bool(
+        False,
+        "an unaligned load splits as a store does, into the naturally aligned "
+        "bytes, halfwords and words it covers, with no address phase for that",
     )
     divide_by_size = Param.Bool(
         False,

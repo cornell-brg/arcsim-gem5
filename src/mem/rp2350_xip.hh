@@ -5,6 +5,8 @@
 #include <deque>
 #include <map>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "base/random.hh"
@@ -122,6 +124,13 @@ class RP2350XIP : public AbstractMemory
     uint64_t useCount = 0;
     std::array<Bank, NumBanks> banks;
     std::map<RequestorID, Manager> managers;
+
+    /** Which core a requestor belongs to, for the per-core counts: 0, 1, or
+     *  2 for any other (a DMA channel, a debugger). */
+    std::map<RequestorID, unsigned> requestorCores;
+    unsigned coreOf(RequestorID requestor);
+    void countHit(RequestorID requestor);
+    void countMiss(RequestorID requestor);
     mutable Random::RandomPtr rng = Random::genRandom();
 
     // The QMI: the banks whose lines are to be read, oldest first; the one
@@ -148,6 +157,18 @@ class RP2350XIP : public AbstractMemory
         statistics::Scalar bankWaits;
         statistics::Scalar declined;
         statistics::Scalar invalidations;
+        statistics::Scalar fresh;
+        statistics::Scalar reselected;
+        statistics::Scalar transferCycles;
+        statistics::Scalar holdCycles;
+        statistics::Scalar hitsCore0;
+        statistics::Scalar hitsCore1;
+        statistics::Scalar missesCore0;
+        statistics::Scalar missesCore1;
+        statistics::Scalar chainedCore0;
+        statistics::Scalar chainedCore1;
+        statistics::Scalar reselectedCore0;
+        statistics::Scalar reselectedCore1;
         XIPStats(RP2350XIP &xip);
     } xipStats;
 
@@ -178,7 +199,7 @@ class RP2350XIP : public AbstractMemory
     void startQmi(Tick start);
     // A miss's cycles when its transfer starts at `start`, by the last
     // transfer's end and line (counting a chained one)
-    Cycles missCost(Tick start, Addr line);
+    Cycles missCost(Tick start, Addr line, RequestorID requestor);
     void finishQmi();
     // The clock edge after now, and the one the present cycle began at
     Tick nextCycle() const;
@@ -193,7 +214,38 @@ class RP2350XIP : public AbstractMemory
     uint32_t ctrHit = 0;
     uint32_t ctrAcc = 0;
 
+    // Why the cache's lines cannot be read or written now, or ""
+    std::string notParked() const;
+
   public:
+    // A line the cache holds: its offset in flash (bytes from the XIP
+    // window's base, line-aligned) and the way it is in. Its set follows from
+    // the offset.
+    struct CachedLine
+    {
+        uint32_t offset;
+        uint8_t way;
+    };
+
+    // The cache's lines, read and written outside simulated time, so that a
+    // hop can carry them to another model of the chip. Each returns "" or why
+    // it refused: an access in flight, tags that do not follow an atomic CPU
+    // (no track_tags), or a line it cannot place.
+    //
+    // cachedLines lists every valid way, by set and way; with LRU, the one
+    // used longest ago first.
+    std::string cachedLines(std::vector<CachedLine> &lines) const;
+    // Invalidates every way, then makes each line valid in its way, in the
+    // list's order: with LRU, the last is the one used most recently. The
+    // random replacement's generator is left alone. On a refusal nothing
+    // changes.
+    std::string setCachedLines(const std::vector<CachedLine> &lines);
+    // The same as (offset, way) pairs, for Python; a refusal is fatal.
+    std::vector<std::pair<uint32_t, unsigned>> cachedLinePairs() const;
+    void setCachedLinePairs(
+        const std::vector<std::pair<uint32_t, unsigned>> &lines);
+
+    PARAMS(RP2350XIP);
     explicit RP2350XIP(const RP2350XIPParams &p);
     uint32_t counterHit() const { return ctrHit; }
     uint32_t counterAcc() const { return ctrAcc; }

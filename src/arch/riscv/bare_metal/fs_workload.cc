@@ -55,6 +55,15 @@ BareMetal::BareMetal(const Params &p) : Workload(p),
     }
 
     loader::debugSymbolTable.insert(bootloaderSymtab);
+
+    if (!p.secondary_launch.empty()) {
+        auto it = bootloaderSymtab.find(p.secondary_launch);
+        fatal_if(it == bootloaderSymtab.end(),
+                 "the firmware has no symbol %s (secondary_launch)",
+                 p.secondary_launch);
+        _hasLaunch = true;
+        _launchAddr = it->address();
+    }
 }
 
 BareMetal::~BareMetal()
@@ -69,6 +78,15 @@ BareMetal::initState()
 
     warn_if(!bootloader->buildImage().write(system->physProxy),
             "Could not load sections to memory.");
+
+    // Read once the image is in memory; Reset::invoke applies it to every
+    // hart after the first, on this reset and any later one.
+    if (_hasLaunch) {
+        _launchSp = system->physProxy.read<uint32_t>(
+            _launchAddr, ByteOrder::little);
+        _launchPc = system->physProxy.read<uint32_t>(
+            _launchAddr + 4, ByteOrder::little);
+    }
 
     for (auto *tc: system->threads) {
         tc->getIsaPtr()->resetThread();

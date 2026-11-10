@@ -1,5 +1,5 @@
 /* Zfinx FP op timing on Hazard3 with arcsim-soc's FPU, one binary for the SoC's rtl_sim and gem5's
- * hazard3-proxy (--zfinx --xip-model soc): each case is timed by mcycle reads on either side and printed as
+ * hazard3-proxy (--zfinx --xip-model soc-no-cache): each case is timed by mcycle reads on either side and printed as
  * name=<cycles, hex> through the testbench IO (0xc0000000 print, 0xc0000008 exit), after the empty case's
  * cycles are taken off. Reset at 0x10000040 as the SoC's RESET_VECTOR; traps park at 0x10000000.
  *   riscv32-unknown-elf-gcc -march=rv32imac_zicsr_zfinx -mabi=ilp32 -nostdlib -Wl,-Ttext=0x10000000 \
@@ -103,6 +103,83 @@ _start:                         /* 0x10000040, RESET_VECTOR */
     .endr
     stop alu
 
+    /* vvadd's inner loop and its parts (bench examples/vvadd, Zfinx): data at sp - 1024 */
+    addi t5, sp, -1024
+    start
+    .rept 8
+    fadd.s a5, a1, a2
+    sw a5, 0(t5)
+    .endr
+    stop add_store
+    start
+    .rept 8
+    lw a4, 0(t5)
+    addi t4, t4, 4
+    fadd.s a5, a5, a4
+    .endr
+    stop load_add
+    .irp pass, 1, 2
+    mv a0, t5
+    addi a3, t5, 32
+    start
+1:  lw a5, 0(a0)
+    lw a4, 64(a0)
+    addi a0, a0, 4
+    fadd.s a5, a5, a4
+    sw a5, 124(a0)
+    bne a0, a3, 1b
+    stop vvadd_loop\pass
+    mv a0, t5
+    addi a3, t5, 32
+    start
+1:  lw a5, 0(a0)
+    lw a4, 64(a0)
+    addi a0, a0, 4
+    add a5, a5, a4
+    sw a5, 124(a0)
+    bne a0, a3, 1b
+    stop int_loop\pass
+    mv a0, t5
+    addi a3, t5, 32
+    start
+1:  lw a5, 0(a0)
+    lw a4, 64(a0)
+    addi a0, a0, 4
+    fadd.s a5, a5, a4
+    bne a0, a3, 1b
+    stop vv_nostore\pass
+    mv a0, t5
+    addi a3, t5, 32
+    start
+1:  lw a5, 0(a0)
+    lw a4, 64(a0)
+    addi a0, a0, 4
+    fadd.s a6, a1, a2
+    sw a5, 124(a0)
+    bne a0, a3, 1b
+    stop vv_indep\pass
+    mv a0, t5
+    addi a3, t5, 32
+    start
+1:  lw a5, 0(a0)
+    lw a4, 64(a0)
+    addi a0, a0, 4
+    fadd.s a5, a5, a4
+    sw a6, 124(a0)
+    bne a0, a3, 1b
+    stop vv_storeother\pass
+    mv a0, t5
+    start
+    .rept 8
+    lw a5, 0(a0)
+    lw a4, 64(a0)
+    addi a0, a0, 4
+    fadd.s a5, a5, a4
+    sw a5, 124(a0)
+    .endr
+    stop vv_unrolled\pass
+    .endr
+
     li t0, 0
     sw t0, 8(s0)                /* exit 0 */
 1:  j 1b
@@ -144,3 +221,17 @@ name_lt: .asciz "flt x8"
 name_sgnj: .asciz "fsgnj x8"
 name_add_use: .asciz "fadd+add x8"
 name_alu: .asciz "add x8"
+name_add_store: .asciz "fadd+sw x8"
+name_load_add: .asciz "lw+addi+fadd x8"
+name_vvadd_loop1: .asciz "vvadd loop x8, first"
+name_int_loop1: .asciz "vvadd loop with add x8, first"
+name_vvadd_loop2: .asciz "vvadd loop x8, again"
+name_int_loop2: .asciz "vvadd loop with add x8, again"
+name_vv_nostore1: .asciz "vvadd loop without sw x8, first"
+name_vv_indep1: .asciz "vvadd loop, fadd on other regs x8, first"
+name_vv_storeother1: .asciz "vvadd loop, sw of another reg x8, first"
+name_vv_unrolled1: .asciz "vvadd body unrolled x8, first"
+name_vv_nostore2: .asciz "vvadd loop without sw x8, again"
+name_vv_indep2: .asciz "vvadd loop, fadd on other regs x8, again"
+name_vv_storeother2: .asciz "vvadd loop, sw of another reg x8, again"
+name_vv_unrolled2: .asciz "vvadd body unrolled x8, again"

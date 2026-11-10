@@ -105,6 +105,8 @@ Execute::Execute(const std::string &name_, MinorCPU &cpu_,
       commitPriority(0),
       issueStats(&cpu_)
 {
+    trackIssuedNext = params.fetchFifoWords != 0;
+
     if (commitLimit < 1) {
         fatal("%s: executeCommitLimit must be >= 1 (%d)\n", name_,
             commitLimit);
@@ -216,6 +218,24 @@ Execute::getInput(ThreadID tid)
     } else {
         return NULL;
     }
+}
+
+MinorDynInstPtr
+Execute::nextToIssue(ThreadID thread_id)
+{
+    const ForwardInstData *insts_in = getInput(thread_id);
+    if (!insts_in)
+        return nullptr;
+
+    unsigned int index = executeInfo[thread_id].inputIndex;
+    if (index >= insts_in->width())
+        return nullptr;
+
+    MinorDynInstPtr inst = insts_in->insts[index];
+    if (!inst || inst->isBubble())
+        return nullptr;
+
+    return inst;
 }
 
 void
@@ -831,6 +851,15 @@ Execute::issue(ThreadID thread_id)
                                 fu->description.opLat + dynExtra);
                         }
 
+                        /* Nothing else issues until this one's result */
+                        if (fu->description.holdsIssue) {
+                            const Cycles until = cpu.curCycle() +
+                                fu->description.opLat +
+                                extra_dest_retire_lat;
+                            if (until > issueHeldUntil)
+                                issueHeldUntil = until;
+                        }
+
                         /* Mark the destinations for this instruction as
                          *  busy */
                         Cycles result_cycle = cpu.curCycle() +
@@ -890,6 +919,16 @@ Execute::issue(ThreadID thread_id)
                 num_mem_insts_issued++;
 
             /* A free micro-op is issued beyond the limit */
+            if (!discarded && !inst->isBubble() && trackIssuedNext &&
+                inst->isInst())
+            {
+                /* The instruction, for fetchFifoWords */
+                issuedPC.reset(inst->pc->clone());
+                issuedStream = inst->id.streamSeqNum;
+                issuedSize = inst->staticInst->isMicroop() ? 4 :
+                    inst->staticInst->size();
+            }
+
             if (!discarded && !inst->isBubble() && !inst->freeMicroop) {
                 halfwordWideMemIssued(inst);
                 num_insts_issued++;

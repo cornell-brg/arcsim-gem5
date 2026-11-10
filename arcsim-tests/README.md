@@ -71,7 +71,7 @@ These fail on gem5 because its board models the SoC differently from the RTL:
   answers its whole 64 KiB window, where the RTL faults above `+0x4000`.
 - `test_xip_ctrl`: `--model accurate` puts the Pico 2's flash and XIP cache in
   front of flash, whose counters count; rtl-sim has no XIP cache, so they stay 0
-  (`--xip-model soc`, the RTL's code memory, passes).
+  (`--xip-model soc-no-cache`, the RTL's code memory, passes).
 - `test_interconnect` on the optical-flow configs (case 8): the RTL repeats the
   accelerator's 16 KiB register window across the 1 MiB HWPE slot, but gem5 maps
   only the four 4 KiB windows, so the slot's last word (`0x508ffffc`) faults.

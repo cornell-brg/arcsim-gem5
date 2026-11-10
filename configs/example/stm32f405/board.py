@@ -133,9 +133,16 @@ def make_board(
             from latency import f405_inst_latency  # this directory's latency.py
 
             # Flash: the latency the accelerator (or the flash) returns. SRAM: the
-            # system bus, which its code's fetches share with data [DDI0439D 2.3.1:
-            # a system-bus fetch is registered, two cycles, never back to back].
-            cpu.inst_latency = f405_inst_latency(timed_ranges=[FLASH], bus_ranges=[SRAM])
+            # system bus, which its code's fetches share with data, data first
+            # [DDI0439D 2.3.1]. A fetch is registered, two cycles, never back to
+            # back [the Cortex-M3's DDI0337B 14.4.6; the M4's manual gives no fetch
+            # timing, and the Crazyflie's micro families behave so]. Fetches run
+            # ahead through the core's three-word fetch queue, and an unaligned load
+            # splits into a byte, a halfword and a byte [DDI0439C glossary, Prefetch
+            # Unit; DDI0439C 3.3.2].
+            cpu.inst_latency = f405_inst_latency(
+                timed_ranges=[FLASH], bus_ranges=[SRAM], bus_word_fifo=3, unaligned_pieces=True
+            )
     else:
         cpu = CrazyflieF405CPU()  # cpu.py: CortexM4CPU with the Crazyflie's own timing
     board.cpu = cpu

@@ -129,6 +129,12 @@ class Execute : public Named
      *  transfers is still making them */
     Cycles issueHeldUntil{0};
 
+    /** For fetchFifoWords: see lastIssued */
+    bool trackIssuedNext = false;
+    std::unique_ptr<PCStateBase> issuedPC;
+    InstSeqNum issuedStream = 0;
+    unsigned int issuedSize = 4;
+
     /** See executeHalfwordWideMemCycles in BaseMinorCPU.py */
     Cycles halfwordWideMemCycles;
     unsigned int halfwordWideMemGrace;
@@ -417,6 +423,27 @@ class Execute : public Named
     lastCompletedFetchSeqNum(ThreadID thread_id) const
     {
         return lastCompleted[thread_id];
+    }
+
+    /** The instruction to issue next, null if none waits in the input
+     *  buffer */
+    MinorDynInstPtr nextToIssue(ThreadID thread_id);
+
+    /** The last instruction issued, its stream and its size in bytes,
+     *  kept for fetchFifoWords; null before the first */
+    const PCStateBase *
+    lastIssued(InstSeqNum &stream, unsigned int &size) const
+    {
+        stream = issuedStream;
+        size = issuedSize;
+        return issuedPC.get();
+    }
+
+    /** Is issue held through the next cycle (issueHeldUntil) */
+    bool
+    issueHeldNextCycle() const
+    {
+        return cpu.curCycle() + Cycles(1) < issueHeldUntil;
     }
 
     /** Has an instruction ahead of inst that writes reg yet to complete */

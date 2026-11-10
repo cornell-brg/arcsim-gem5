@@ -162,6 +162,12 @@ class MinorFU(SimObject):
         " result are not held up (out-of-order completion, such as an"
         " iterative divider working beside the pipeline)",
     )
+    holdsIssue = Param.Bool(
+        False,
+        "An instruction on this FU stops all issue until its result is due"
+        " (opLat plus any data-dependent extra latency): nothing else issues"
+        " beside it, as on a core held while a coprocessor works",
+    )
 
 
 class DynamicLatencyIntDivFU(MinorFU):
@@ -378,6 +384,14 @@ class BaseMinorCPU(BaseCPU):
         " memory system may decline with an error, and a declined line is"
         " fetched again once it is sure to be wanted",
     )
+    fetchStreamOnSpeculation = Param.Bool(
+        True,
+        "With fetchBranchSpeculation: what is fetched of the sequential"
+        " stream behind a branch Execute has yet to complete is flagged a"
+        " prefetch, which the memory system may decline.  Off, only target"
+        " lines are, and the stream is read as any other fetch, as on a core"
+        " whose bus reads cannot be taken back once issued",
+    )
     fetchKeepTargetInFlight = Param.Bool(
         False,
         "With fetchBranchTargetAtDecode: when Execute takes a branch whose"
@@ -427,6 +441,16 @@ class BaseMinorCPU(BaseCPU):
         " a few bytes.  Decode never waits for a line it would not have"
         " waited for without the limit if this is at least the bytes it"
         " can take in the cycles a fetch needs",
+    )
+    fetchFifoWords = Param.Unsigned(
+        0,
+        "With singleFetchStage: no sequential fetch starts while this many"
+        " words, or more, fetched or on their way, lie past the instruction"
+        " Execute takes next, as Hazard3's frontend FIFO behind its decode"
+        " register (0: no limit).  That instruction is the one after the"
+        " next to issue, or the next to issue itself while issue is held"
+        " into the next cycle, so the FIFO frees a word a cycle ahead, as"
+        " Minor's fetch is a stage further from Execute",
     )
     fetch1FetchLimit = Param.Unsigned(
         1, "Number of line fetches allowable in flight at once"
