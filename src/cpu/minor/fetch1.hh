@@ -45,6 +45,7 @@
 #ifndef __CPU_MINOR_FETCH1_HH__
 #define __CPU_MINOR_FETCH1_HH__
 
+#include <deque>
 #include <list>
 #include <vector>
 
@@ -519,6 +520,12 @@ class SingleStageFetch1 : public Fetch1
      *  limit) */
     unsigned int readAheadLimit;
 
+    /** See fetchFifoWords in BaseMinorCPU.py: the limit, and the words of
+     *  the stream requested, from the word of the instruction Execute is
+     *  to issue next */
+    unsigned int fifoWordsLimit;
+    std::deque<Addr> fifoWords;
+
     /** See fetchKeepTargetInFlight in BaseMinorCPU.py */
     bool keepTargetInFlight;
 
@@ -540,6 +547,10 @@ class SingleStageFetch1 : public Fetch1
     /** Is the stream fetched as far ahead of decode as readAheadLimit
      *  allows? */
     bool readAheadFull();
+
+    /** Are fifoWordsLimit words or more past the instruction Execute
+     *  takes next */
+    bool fifoFull();
 
     /** The next line request is the first after a branch from Execute,
      *  made without the predictor's compare (Hazard3's jump_target

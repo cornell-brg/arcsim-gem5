@@ -434,6 +434,16 @@ class BaseMinorCPU(BaseCPU):
         " waited for without the limit if this is at least the bytes it"
         " can take in the cycles a fetch needs",
     )
+    fetchFifoWords = Param.Unsigned(
+        0,
+        "With singleFetchStage: no sequential fetch starts while this many"
+        " words, or more, fetched or on their way, lie past the instruction"
+        " Execute takes next, as Hazard3's frontend FIFO behind its decode"
+        " register (0: no limit).  That instruction is the one after the"
+        " next to issue, or the next to issue itself while issue is held"
+        " into the next cycle, so the FIFO frees a word a cycle ahead, as"
+        " Minor's fetch is a stage further from Execute",
+    )
     fetch1FetchLimit = Param.Unsigned(
         1, "Number of line fetches allowable in flight at once"
     )

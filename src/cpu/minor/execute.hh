@@ -419,6 +419,17 @@ class Execute : public Named
         return lastCompleted[thread_id];
     }
 
+    /** The instruction to issue next, null if none waits in the input
+     *  buffer */
+    MinorDynInstPtr nextToIssue(ThreadID thread_id);
+
+    /** Is issue held through the next cycle (issueHeldUntil) */
+    bool
+    issueHeldNextCycle() const
+    {
+        return cpu.curCycle() + Cycles(1) < issueHeldUntil;
+    }
+
     /** Has an instruction ahead of inst that writes reg yet to complete */
     bool regWritePending(ThreadID thread_id, const RegId &reg,
         const MinorDynInstPtr &inst);

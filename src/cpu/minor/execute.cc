@@ -218,6 +218,24 @@ Execute::getInput(ThreadID tid)
     }
 }
 
+MinorDynInstPtr
+Execute::nextToIssue(ThreadID thread_id)
+{
+    const ForwardInstData *insts_in = getInput(thread_id);
+    if (!insts_in)
+        return nullptr;
+
+    unsigned int index = executeInfo[thread_id].inputIndex;
+    if (index >= insts_in->width())
+        return nullptr;
+
+    MinorDynInstPtr inst = insts_in->insts[index];
+    if (!inst || inst->isBubble())
+        return nullptr;
+
+    return inst;
+}
+
 void
 Execute::popInput(ThreadID tid)
 {

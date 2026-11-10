@@ -508,6 +508,10 @@ def _configure_hazard3_minor(core):
     core.fetch1ToFetch2ForwardDelay = 0  # bypassed with singleFetchStage
     core.fetch1ToFetch2BackwardDelay = 0
     core.fetchReadAheadLimit = 8
+    # Hazard3's FIFO behind its decode register: no fetch starts while two
+    # words are in it or on their way (fetch_stall), so a predicted branch's
+    # target waits while an FP op holds the core with the FIFO full.
+    core.fetchFifoWords = 2
     core.executeBranchDelay = 1
     # A taken branch or jump costs 2 cycles, as Hazard3's X to F loop
     # (instruction_timings.adoc): a branch redirects fetch in its

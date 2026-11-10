@@ -1232,6 +1232,7 @@ SingleStageFetch1::SingleStageFetch1(const std::string &name_,
     targetRequest(NULL),
     olderTargetRequest(NULL),
     readAheadLimit(params.fetchReadAheadLimit),
+    fifoWordsLimit(params.fetchFifoWords),
     keepTargetInFlight(params.fetchKeepTargetInFlight)
 {
 }
@@ -1258,9 +1259,58 @@ SingleStageFetch1::readAheadFull()
     return waiting && thread.fetchAddr >= decode_to + readAheadLimit;
 }
 
+bool
+SingleStageFetch1::fifoFull()
+{
+    /* Only single-threaded M-profile */
+    ThreadID tid = 0;
+    Fetch1ThreadInfo &thread = fetchInfo[tid];
+
+    if (fifoWordsLimit == 0 || thread.state != FetchRunning)
+        return false;
+
+    /* Nothing waits for Execute, or only what a branch will discard */
+    MinorDynInstPtr head = execute.nextToIssue(tid);
+    if (!head || head->id.streamSeqNum != thread.streamSeqNum)
+        return false;
+
+    /* The words before the next to issue's have gone */
+    Addr head_word = head->pc->instAddr() & ~Addr(3);
+    while (!fifoWords.empty() && fifoWords.front() != head_word)
+        fifoWords.pop_front();
+
+    /* The instruction Execute takes next, in the decode register */
+    std::unique_ptr<PCStateBase> front(head->pc->clone());
+    if (!execute.issueHeldNextCycle()) {
+        if (head->predictedTaken && head->predictedTarget)
+            set(front, *head->predictedTarget);
+        else if (!head->staticInst->isMicroop() ||
+            head->staticInst->isLastMicroop())
+            head->staticInst->advancePC(*front);
+    }
+
+    /* The words past its first 4 bytes are in the FIFO or on their way */
+    Addr first = (front->instAddr() + 4) & ~Addr(3);
+    unsigned int words = 0;
+    for (auto i = fifoWords.begin(); i != fifoWords.end(); i++) {
+        if (*i == first) {
+            words = fifoWords.end() - i;
+            break;
+        }
+    }
+
+    return words >= fifoWordsLimit;
+}
+
 void
 SingleStageFetch1::lineRequested(FetchRequestPtr request)
 {
+    if (fifoWordsLimit != 0) {
+        fifoWords.push_back(request->request->getVaddr() & ~Addr(3));
+        if (fifoWords.size() > 16)
+            fifoWords.pop_front();
+    }
+
     if (!fetch2->predictLastBackwardBranch)
         return;
 
@@ -1363,6 +1413,10 @@ SingleStageFetch1::evaluate()
         bool kept = !have_target_line &&
             (keepTargetLine(olderTargetRequest, exec_branch) ||
              keepTargetLine(targetRequest, exec_branch));
+        /* The FIFO is flushed; a target line taken is its first word */
+        fifoWords.clear();
+        if (have_target_line)
+            fifoWords.push_back(target_line.lineBaseAddr & ~Addr(3));
         abandonTargetRequest(olderTargetRequest);
         abandonTargetRequest(targetRequest);
         fetch2->decodedBranchTarget.reset();
@@ -1531,7 +1585,8 @@ SingleStageFetch1::evaluate()
          *  fetch beside the kept one delays the next branch's target from
          *  SRAM (micro/fetch br_back_0: 714 cycles with one, 616 without,
          *  the board 608) */
-        if (!fetch2->sureBranch && !readAheadFull() && !keptTargetRequest)
+        if (!fetch2->sureBranch && !readAheadFull() && !fifoFull() &&
+            !keptTargetRequest)
             tryToFetch();
     }
 
