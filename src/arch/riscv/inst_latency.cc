@@ -6,6 +6,7 @@
 #include "arch/riscv/pcstate.hh"
 #include "base/logging.hh"
 #include "base/trace.hh"
+#include "cpu/e906_divsqrt.hh"
 #include "cpu/static_inst.hh"
 #include "cpu/thread_context.hh"
 #include "debug/RiscvInstLatency.hh"
@@ -103,6 +104,7 @@ RiscvInstLatency::RiscvInstLatency(const Params &p)
       notTakenBranch(p.not_taken_branch),
       predictedBranch(p.predicted_branch), predictor(p.predictor),
       unalignedTarget(p.unaligned_target), entryCycles(p.trap_entry),
+      e906DivSqrt(p.e906_div_sqrt),
       timedRanges(p.timed_ranges), waitRanges(p.wait_ranges),
       waitCycles(p.wait_cycles.begin(), p.wait_cycles.end()),
       waitWriteCycles(p.wait_write_cycles.empty() ? waitCycles
@@ -176,6 +178,7 @@ RiscvInstLatency::clearInFlight()
     hasMemOp = false;
     control = false;
     ops = 0;
+    operandCycles = Cycles(0);
     sources.clear();
     results.clear();
 }
@@ -212,6 +215,16 @@ RiscvInstLatency::beforeOp(const StaticInstPtr &inst,
 {
     const BaseISA &isa = *tc->getIsaPtr();
     inFlightStore = inst->isStore();
+    const OpClass op = inst->opClass();
+    if (e906DivSqrt && (op == FloatDivOp || op == FloatSqrtOp) &&
+        inst->numSrcRegs() >= 1) {
+        // Its operands before it runs: its cycles follow them
+        const bool sqrt = op == FloatSqrtOp;
+        const uint32_t a = tc->getReg(inst->srcRegIdx(0));
+        const uint32_t b = !sqrt && inst->numSrcRegs() > 1 ?
+            uint32_t(tc->getReg(inst->srcRegIdx(1))) : 0;
+        operandCycles = Cycles(e906DivSqrtCycles(sqrt, a, b));
+    }
     const int ci = classify(inst->opClass(), inst->getEMI());
     for (int i = 0; i < inst->numSrcRegs(); ++i) {
         const RegId reg = inst->srcRegIdx(i).flatten(isa);
@@ -275,7 +288,8 @@ RiscvInstLatency::retire(const StaticInstPtr &whole, const PCStateBase &pc,
 
     // Its own cycles; a split instruction (Zcmp's push and pop, say) a
     // cycle more for each micro-op after the first.
-    Cycles c = cls ? cls->cycles : defaultCycles;
+    Cycles c = operandCycles != Cycles(0) ? operandCycles
+             : cls ? cls->cycles : defaultCycles;
     const Cycles extra_ops(ops > 1 ? ops - 1 : 0);
 
     bool branched_to = false;

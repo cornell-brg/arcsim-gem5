@@ -184,6 +184,17 @@ class DynamicLatencyIntDivFU(MinorFU):
         False, "Use RP2350 Cortex-M33 SDIV/UDIV operand-dependent timing")
 
 
+class Hazard3FpDivSqrtFU(MinorFU):
+    """MinorFU for single-precision divide and square root timed as T-Head's
+    E906 unit (arcsim-soc's Hazard3 FPU): the cycles follow the operands, a
+    result exact in few bits finishing sooner (cpu/e906_divsqrt.hh). opLat
+    is the least an operation takes."""
+
+    type = "Hazard3FpDivSqrtFU"
+    cxx_header = "cpu/minor/func_unit.hh"
+    cxx_class = "gem5::Hazard3FpDivSqrtFU"
+
+
 class MinorFUPool(SimObject):
     type = "MinorFUPool"
     cxx_header = "cpu/minor/func_unit.hh"

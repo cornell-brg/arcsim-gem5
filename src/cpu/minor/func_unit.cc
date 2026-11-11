@@ -44,6 +44,7 @@
 #include <typeinfo>
 
 #include "base/named.hh"
+#include "cpu/e906_divsqrt.hh"
 #include "base/trace.hh"
 #include "debug/MinorExecute.hh"
 #include "debug/MinorTiming.hh"
@@ -78,6 +79,23 @@ MinorFUTiming::MinorFUTiming(
     srcRegsRelativeLats(params.srcRegsRelativeLats),
     opClasses(params.opClasses)
 { }
+
+Cycles
+Hazard3FpDivSqrtFU::dynamicExtraLatency(
+    ThreadContext *tc, const StaticInstPtr &inst) const
+{
+    const OpClass op = inst->opClass();
+    if ((op != FloatDivOp && op != FloatSqrtOp) || inst->numSrcRegs() < 1)
+        return Cycles(0);
+    const bool sqrt = op == FloatSqrtOp;
+    const uint32_t a = tc->getReg(inst->srcRegIdx(0));
+    const uint32_t b = !sqrt && inst->numSrcRegs() > 1 ?
+        uint32_t(tc->getReg(inst->srcRegIdx(1))) : 0;
+    const unsigned cycles = e906DivSqrtCycles(sqrt, a, b);
+    DPRINTF(MinorExecute, "E906 %s a=%#x b=%#x: %u cycles\n",
+            inst->getName(), a, b, cycles);
+    return Cycles(cycles > opLat ? cycles - opLat : 0);
+}
 
 Cycles
 DynamicLatencyIntDivFU::dynamicExtraLatency(
