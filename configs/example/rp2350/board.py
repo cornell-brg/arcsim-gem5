@@ -470,8 +470,11 @@ def _add_second_m33(board, core, scs):
 HAZARD3_DIV_CYCLES = 19
 HAZARD3_LOAD_RESULT_DELAY = 1
 # Zfinx on arcsim-soc's FPU (rtl/fpu/hazard3_fpu.sv): one op at a time, the core held until its result.
-# Measured on the SoC's rtl_sim (soc 51bf51d; smoke/zfinx_timing.S): an add, multiply, compare, convert or
-# sign-inject 3 cycles, dependent or not; a divide 17; a square root 19; an integer use of the result no more.
+# Measured on the SoC's rtl_sim (soc 51bf51d; arcsim-bench's micro/fp_ops, fp_delay, fp_busy and fp_cvt Zfinx
+# bodies measure the same): an add, multiply, compare, convert or sign-inject 3 cycles, dependent or not; a
+# divide 17; a square root 19; an integer use of the result no more. The FPU's divide and square root finish
+# sooner for some operands (1.0 / 1.0 and the root of 1.0 in about 6 cycles at soc 9d3bed4), which this does
+# not model.
 HAZARD3_FP_CYCLES = 3
 HAZARD3_FP_DIV_CYCLES = 17
 HAZARD3_FP_SQRT_CYCLES = 19

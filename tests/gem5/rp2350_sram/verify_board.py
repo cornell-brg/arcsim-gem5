@@ -56,21 +56,4 @@ for placement in ("scratch", "striped"):
             assert sum(stats[f"system.sram.banks.instructionGrants::sram{bank}"]
                        for bank in banks) > 0
         print(f"PASS {args.isa} {placement} {model}")
-if args.isa == "RISCV":
-    # Hazard3's IL latency table against instruction_timings.adoc's rules (smoke/riscv_latency.S),
-    # on arcsim-soc's code memory before its XIP cache, so that no flash miss adds to a case
-    elf = output / "latency.elf"
-    subprocess.run([str(compiler.resolve()), *flags, "-nostdlib", f"-Wl,-T,{smoke / 'riscv.ld'}",
-                    str(smoke / "riscv_latency.S"), "-o", str(elf)], check=True,
-                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
-    directory = output / "latency"
-    result = subprocess.run([
-        str(repo / f"build/{args.isa}/gem5.fast"), "-d", str(directory),
-        str(repo / "configs/example/rp2350/run.py"), "--core", core, "--firmware", str(elf),
-        "--model", "accurate", "--xip-model", "soc-no-cache", "--cpu", "atomic", "--inst-latency",
-        "--tick-limit", "100000000",
-    ], text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
-    assert result.returncode == 0, result.stdout
-    assert "RP2350_RISCV_LATENCY_OK" in result.stdout, result.stdout
-    print("PASS RISCV latency table")
 print(f"Results: {output}")

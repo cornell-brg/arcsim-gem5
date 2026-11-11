@@ -8,7 +8,8 @@ divide HAZARD3_DIV_CYCLES; a taken branch or jump 2, a predicted one 1, and
 a 32-bit target at a halfword address a cycle more. Zfinx's FP operations
 are arcsim-soc's FPU's, as board.py's HAZARD3_FP_* give them for both tiers
 (rtl/fpu/hazard3_fpu.sv takes one op at a time and holds the core until its
-result; the cycles measured on the SoC's rtl_sim by smoke/zfinx_timing.S):
+result; the cycles measured on the SoC's rtl_sim, as arcsim-bench's micro/fp_*
+Zfinx bodies measure them):
 fp_cycles for an add, multiply, compare, convert or sign-inject,
 fp_div_cycles for a divide, fp_sqrt_cycles for a square root."""
 
