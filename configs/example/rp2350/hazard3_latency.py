@@ -11,7 +11,10 @@ are arcsim-soc's FPU's, as board.py's HAZARD3_FP_* give them for both tiers
 result; the cycles measured on the SoC's rtl_sim, as arcsim-bench's micro/fp_*
 Zfinx bodies measure them):
 fp_cycles for an add, multiply, compare, convert or sign-inject,
-fp_div_cycles for a divide, fp_sqrt_cycles for a square root."""
+fp_div_cycles for a divide, fp_sqrt_cycles for a square root when the result
+needs every bit; e906_div_sqrt gives a divide or root its cycles from its
+operands, as T-Head's E906 unit (cpu/e906_divsqrt.hh) and Minor's
+Hazard3FpDivSqrtFU take them."""
 
 from m5.objects import RiscvInstLatency, RiscvLatencyClass
 
@@ -48,4 +51,4 @@ def hazard3_inst_latency(*, fp_cycles=HAZARD3_FP_CYCLES, fp_div_cycles=HAZARD3_F
         RiscvLatencyClass(description="Hazard3FpuSqrt", op_classes=["FloatSqrt"],
                           cycles=fp_sqrt_cycles),
     ]
-    return RiscvInstLatency(classes=classes, **kwargs)
+    return RiscvInstLatency(classes=classes, e906_div_sqrt=True, **kwargs)

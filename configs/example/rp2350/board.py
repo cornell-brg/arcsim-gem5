@@ -470,13 +470,14 @@ def _add_second_m33(board, core, scs):
 HAZARD3_DIV_CYCLES = 19
 HAZARD3_LOAD_RESULT_DELAY = 1
 # Zfinx on arcsim-soc's FPU (rtl/fpu/hazard3_fpu.sv): one op at a time, the core held until its result.
-# Measured on the SoC's rtl_sim (soc 51bf51d; arcsim-bench's micro/fp_ops, fp_delay, fp_busy and fp_cvt Zfinx
-# bodies measure the same): an add, multiply, compare, convert or sign-inject 3 cycles, dependent or not; a
-# divide 17; a square root 19; an integer use of the result no more. The FPU's divide and square root finish
-# sooner for some operands (1.0 / 1.0 and the root of 1.0 in about 6 cycles at soc 9d3bed4), which this does
-# not model.
+# Measured on the SoC's rtl_sim (soc 9d3bed4; arcsim-bench's micro/fp_ops, fp_delay, fp_busy and fp_cvt Zfinx
+# bodies): an add, multiply, compare, convert or sign-inject 3 cycles, dependent or not; an integer use of the
+# result no more. Divide and square root are T-Head's E906 unit, whose cycles follow the operands
+# (cpu/e906_divsqrt.hh: 19 when the result needs every bit, fewer when it is exact in a few bits, 3 for a zero
+# operand), at both tiers (Hazard3FpDivSqrtFU at CL, RiscvInstLatency's e906_div_sqrt at IL); these two are
+# what a result needing every bit takes.
 HAZARD3_FP_CYCLES = 3
-HAZARD3_FP_DIV_CYCLES = 17
+HAZARD3_FP_DIV_CYCLES = 19
 HAZARD3_FP_SQRT_CYCLES = 19
 HAZARD3_FP_OPS = ["FloatAdd", "FloatCmp", "FloatCvt", "FloatMisc", "FloatMult", "FloatMultAcc"]
 
@@ -484,6 +485,7 @@ HAZARD3_FP_OPS = ["FloatAdd", "FloatCmp", "FloatCvt", "FloatMisc", "FloatMult", 
 def _configure_hazard3_minor(core):
     """Give a RISC-V MinorCPU Hazard3's pipeline timing."""
     from m5.objects.BaseMinorCPU import (
+        Hazard3FpDivSqrtFU,
         MinorFU,
         MinorFUPool,
         MinorDefaultFUPool,
@@ -544,11 +546,13 @@ def _configure_hazard3_minor(core):
     # for its whole latency, as the SoC's FPU takes one op at a time, and holds issue until its result, as
     # the SoC holds the core: nothing issues beside an FP op. Then fresh copies of Minor's other
     # default units (a new pool, so that every unit is its child).
+    # Divide and square root on the E906 unit, whose cycles follow the operands: opLat is the least they take
+    # (a zero operand's 3), Hazard3FpDivSqrtFU adds the rest.
     fp_units = [
-        MinorFU(opClasses=minorMakeOpClassSet(classes), opLat=cycles, issueLat=cycles, holdsIssue=True,
-                timings=[MinorFUTiming(description="Hazard3Fpu", srcRegsRelativeLats=[1])])
-        for classes, cycles in ((HAZARD3_FP_OPS, HAZARD3_FP_CYCLES), (["FloatDiv"], HAZARD3_FP_DIV_CYCLES),
-                                (["FloatSqrt"], HAZARD3_FP_SQRT_CYCLES))
+        unit(opClasses=minorMakeOpClassSet(classes), opLat=HAZARD3_FP_CYCLES, issueLat=HAZARD3_FP_CYCLES,
+             holdsIssue=True, timings=[MinorFUTiming(description="Hazard3Fpu", srcRegsRelativeLats=[1])])
+        for unit, classes in ((MinorFU, HAZARD3_FP_OPS), (Hazard3FpDivSqrtFU, ["FloatDiv"]),
+                              (Hazard3FpDivSqrtFU, ["FloatSqrt"]))
     ]
     units = MinorFUPool(funcUnits=fp_units + [
         type(u)() for u in MinorDefaultFUPool().funcUnits if not isinstance(u, MinorDefaultFloatSimdFU)])

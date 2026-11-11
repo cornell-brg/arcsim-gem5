@@ -106,6 +106,9 @@ class RiscvInstLatency : public BaseInstLatency
     const bool predictor;
     const Cycles unalignedTarget;
     const Cycles entryCycles;
+    const bool e906DivSqrt;
+    /** This instruction's cycles from its operands (e906DivSqrt), or 0 */
+    Cycles operandCycles{0};
     std::vector<AddrRange> timedRanges;
     std::vector<AddrRange> waitRanges;
     std::vector<Cycles> waitCycles;

@@ -82,6 +82,12 @@ class RiscvInstLatency(BaseInstLatency):
         "halfword address",
     )
     trap_entry = Param.Cycles(3, "an interrupt's or trap's entry to mtvec")
+    e906_div_sqrt = Param.Bool(
+        False,
+        "a float divide's or square root's cycles from its operands, as "
+        "T-Head's E906 unit takes them (cpu/e906_divsqrt.hh), in place of "
+        "its class's",
+    )
     timed_ranges = VectorParam.AddrRange(
         [], "memory whose accesses cost the latency it returns"
     )
