@@ -56,7 +56,6 @@
 #include "cpu/thread_context.hh"
 #include "cpu/timing_expr.hh"
 #include "params/DynamicLatencyIntDivFU.hh"
-#include "params/Hazard3FpDivSqrtFU.hh"
 #include "params/MinorFU.hh"
 #include "params/MinorFUPool.hh"
 #include "params/MinorOpClass.hh"
@@ -188,9 +187,6 @@ class MinorFU : public SimObject
     /** Results outlive commit: see BaseMinorCPU.py */
     bool resultAfterCommit;
 
-    /** Holds issue until its result: see BaseMinorCPU.py */
-    bool holdsIssue;
-
   public:
     MinorFU(const MinorFUParams &params) :
         SimObject(params),
@@ -199,8 +195,7 @@ class MinorFU : public SimObject
         issueLat(params.issueLat),
         cantForwardFromFUIndices(params.cantForwardFromFUIndices),
         timings(params.timings),
-        resultAfterCommit(params.resultAfterCommit),
-        holdsIssue(params.holdsIssue)
+        resultAfterCommit(params.resultAfterCommit)
     { }
 
     /** Compute data-dependent extra latency at commit time.
@@ -225,19 +220,6 @@ class DynamicLatencyIntDivFU : public MinorFU
   public:
     DynamicLatencyIntDivFU(const DynamicLatencyIntDivFUParams &params)
         : MinorFU(params), rp2350M33Timing(params.rp2350_m33_timing) {}
-
-    Cycles dynamicExtraLatency(
-        ThreadContext *tc, const StaticInstPtr &inst) const override;
-};
-
-/** A single-precision divide and square root unit timed as T-Head's E906
- *  (cpu/e906_divsqrt.hh): its cycles follow its operands, a result exact
- *  in few bits finishing sooner. opLat is the least it takes. */
-class Hazard3FpDivSqrtFU : public MinorFU
-{
-  public:
-    Hazard3FpDivSqrtFU(const Hazard3FpDivSqrtFUParams &params)
-        : MinorFU(params) {}
 
     Cycles dynamicExtraLatency(
         ThreadContext *tc, const StaticInstPtr &inst) const override;

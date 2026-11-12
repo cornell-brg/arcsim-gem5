@@ -84,7 +84,6 @@ Fetch1::Fetch1(const std::string &name_,
     icacheState(IcacheRunning),
     lineSeqNum(InstId::firstLineSeqNum),
     numFetchesInMemorySystem(0),
-    streamOnSpeculation(params.fetchStreamOnSpeculation),
     numFetchesInITLB(0)
 {
     for (auto &info: fetchInfo)
@@ -214,8 +213,6 @@ Fetch1::fetchLine(ThreadID tid)
      * Note that as instructions can span lines, this PC is only a
      * reliable 'new' PC if the next line has a new stream sequence number. */
     thread.fetchAddr = aligned_pc + request_size;
-
-    lineRequested(request);
 }
 
 std::ostream &
@@ -322,7 +319,7 @@ Fetch1::tryToSendToTransfers(FetchRequestPtr request)
         }
 
         /* The memory system may decline a read made on speculation */
-        if (sendOnSpeculation && streamOnSpeculation)
+        if (sendOnSpeculation)
             request->request->setFlags(Request::PREFETCH);
 
         if (!request->packet)
@@ -583,14 +580,9 @@ Fetch1::processResponse(Fetch1::FetchRequestPtr response,
     /* Make sequence numbers valid in return */
     line.id = response->id;
     /* Set the PC in case there was a sequence change */
-    if (response->streamPC)
-        set(line.pc, response->streamPC);
-    else
-        set(line.pc, thread.pc);
+    set(line.pc, thread.pc);
     /* Set fetch address to virtual address */
     line.fetchAddr = response->pc;
-    line.predictedBranch = response->predictedBranch;
-    line.predictedBranchPC = response->predictedBranchPC;
     /* Set the lineBase, which is a sizeof(MachInst) aligned address <=
      *  pc.instAddr() */
     line.lineBaseAddr = response->request->getVaddr();
@@ -840,18 +832,12 @@ Fetch1::FetchRequest::reportData(std::ostream &os) const
 
 bool Fetch1::FetchRequest::isDiscardable() const
 {
+    Fetch1ThreadInfo &thread = fetch.fetchInfo[id.threadId];
+
     /* Can't discard lines in TLB/memory */
     return state != InTranslation && state != RequestIssuing &&
-        fetch.isStale(id);
-}
-
-bool
-Fetch1::isStale(const InstId &id) const
-{
-    const Fetch1ThreadInfo &thread = fetchInfo[id.threadId];
-
-    return id.streamSeqNum != thread.streamSeqNum ||
-        id.predictionSeqNum != thread.predictionSeqNum;
+        (id.streamSeqNum != thread.streamSeqNum ||
+        id.predictionSeqNum != thread.predictionSeqNum);
 }
 
 void
@@ -1233,7 +1219,6 @@ SingleStageFetch1::SingleStageFetch1(const std::string &name_,
     targetRequest(NULL),
     olderTargetRequest(NULL),
     readAheadLimit(params.fetchReadAheadLimit),
-    fifoWordsLimit(params.fetchFifoWords),
     keepTargetInFlight(params.fetchKeepTargetInFlight)
 {
 }
@@ -1258,125 +1243,6 @@ SingleStageFetch1::readAheadFull()
         !fetch2->inputBuffer[tid].empty();
 
     return waiting && thread.fetchAddr >= decode_to + readAheadLimit;
-}
-
-bool
-SingleStageFetch1::fifoFull()
-{
-    /* Only single-threaded M-profile */
-    ThreadID tid = 0;
-    Fetch1ThreadInfo &thread = fetchInfo[tid];
-
-    if (fifoWordsLimit == 0 || thread.state != FetchRunning)
-        return false;
-
-    /* The instruction in the decode register, whose words the FIFO is
-     *  counted from: while issue is held (an FP op holding the core), the
-     *  one holding it; otherwise the next to issue, the head of Execute's
-     *  input */
-    std::unique_ptr<PCStateBase> front;
-    unsigned int front_size = 4;
-    if (execute.issueHeldNextCycle()) {
-        InstSeqNum stream;
-        const PCStateBase *held = execute.lastIssued(stream, front_size);
-        if (!held || stream != thread.streamSeqNum)
-            return false;
-        front.reset(held->clone());
-    } else {
-        MinorDynInstPtr head = execute.nextToIssue(tid);
-        if (!head || head->isFault() ||
-            head->id.streamSeqNum != thread.streamSeqNum)
-            return false;
-        front.reset(head->pc->clone());
-        if (head->isInst() && !head->staticInst->isMicroop())
-            front_size = head->staticInst->size();
-    }
-
-    /* The words before its word have gone */
-    Addr head_word = front->instAddr() & ~Addr(3);
-    while (!fifoWords.empty() && fifoWords.front() != head_word)
-        fifoWords.pop_front();
-
-    /* The decode register holds its halfwords and the rest of the word
-     *  it ends in (Hazard3's three-halfword instruction buffer), so the
-     *  FIFO's words, or those on their way, start at the word after */
-    Addr first = (front->instAddr() + front_size + 3) & ~Addr(3);
-    unsigned int words = 0;
-    for (auto i = fifoWords.begin(); i != fifoWords.end(); i++) {
-        if (*i == first) {
-            words = fifoWords.end() - i;
-            break;
-        }
-    }
-
-    return words >= fifoWordsLimit;
-}
-
-void
-SingleStageFetch1::lineRequested(FetchRequestPtr request)
-{
-    if (fifoWordsLimit != 0) {
-        fifoWords.push_back(request->request->getVaddr() & ~Addr(3));
-        if (fifoWords.size() > 16)
-            fifoWords.pop_front();
-    }
-
-    if (!fetch2->predictLastBackwardBranch)
-        return;
-
-    ThreadID tid = request->id.threadId;
-    Fetch1ThreadInfo &thread = fetchInfo[tid];
-    Addr word = request->request->getVaddr() & ~Addr(3);
-
-    /* A prediction moves the thread's PC on before this line arrives */
-    set(request->streamPC, thread.pc);
-
-    /* The first word after a branch from Execute is sent without the
-     *  compare */
-    bool compare = !executeRedirected;
-    executeRedirected = false;
-
-    /* A 32-bit branch spanning two words goes to its target after the
-     *  second */
-    bool match = predictAfterThis;
-    predictAfterThis = false;
-
-    if (compare && fetch2->backwardBranchValid &&
-        word == (fetch2->backwardBranchPC & ~Addr(3)))
-    {
-        if (fetch2->backwardBranchOverhangs)
-            predictAfterThis = true;
-        else
-            match = true;
-    }
-
-    if (match) {
-        request->predictedBranch = true;
-        request->predictedBranchPC = fetch2->backwardBranchPC;
-        thread.predictionSeqNum++;
-        set(thread.pc, fetch2->backwardBranchTarget);
-        thread.fetchAddr = thread.pc->instAddr();
-
-        DPRINTF(Fetch, "SF1: predict backward branch pc=%#x after line"
-            " %#x: target=%#x predictionSeqNum=%d\n",
-            request->predictedBranchPC, word, thread.fetchAddr,
-            thread.predictionSeqNum);
-    }
-}
-
-bool
-SingleStageFetch1::isStale(const InstId &id) const
-{
-    if (!fetch2->predictLastBackwardBranch)
-        return Fetch1::isStale(id);
-
-    /* Lines from before a prediction are kept until decode has got past
-     *  the predicted branch */
-    const Fetch1ThreadInfo &thread = fetchInfo[id.threadId];
-
-    return id.streamSeqNum != thread.streamSeqNum ||
-        id.predictionSeqNum > thread.predictionSeqNum ||
-        fetch2->predictionPassed(id);
 }
 
 void
@@ -1420,13 +1286,9 @@ SingleStageFetch1::evaluate()
             takeTargetLine(targetRequest, exec_branch, target_line);
         /* A target line still on its way is kept rather than fetched
          *  again (fetchKeepTargetInFlight) */
-        bool kept = !have_target_line &&
-            (keepTargetLine(olderTargetRequest, exec_branch) ||
-             keepTargetLine(targetRequest, exec_branch));
-        /* The FIFO is flushed; a target line taken is its first word */
-        fifoWords.clear();
-        if (have_target_line)
-            fifoWords.push_back(target_line.lineBaseAddr & ~Addr(3));
+        if (!have_target_line &&
+            !keepTargetLine(olderTargetRequest, exec_branch))
+            keepTargetLine(targetRequest, exec_branch);
         abandonTargetRequest(olderTargetRequest);
         abandonTargetRequest(targetRequest);
         fetch2->decodedBranchTarget.reset();
@@ -1435,10 +1297,6 @@ SingleStageFetch1::evaluate()
         fetch2->sureBranch = nullptr;
         fetch2->lastBranch = nullptr;
         sendOnSpeculation = false;
-        /* A target line taken or kept here was fetched without the
-         *  compare, and fetching carries on after it */
-        executeRedirected = !have_target_line && !kept;
-        predictAfterThis = false;
     } else if (fetch2->decodedBranchTarget) {
         /* The direct branch decoded last cycle is in Decode now.  The
          *  targets of two older branches not yet through Execute are
@@ -1595,8 +1453,7 @@ SingleStageFetch1::evaluate()
          *  fetch beside the kept one delays the next branch's target from
          *  SRAM (micro/fetch br_back_0: 714 cycles with one, 616 without,
          *  the board 608) */
-        if (!fetch2->sureBranch && !readAheadFull() && !fifoFull() &&
-            !keptTargetRequest)
+        if (!fetch2->sureBranch && !readAheadFull() && !keptTargetRequest)
             tryToFetch();
     }
 

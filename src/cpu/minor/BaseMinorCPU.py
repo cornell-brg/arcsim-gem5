@@ -162,12 +162,6 @@ class MinorFU(SimObject):
         " result are not held up (out-of-order completion, such as an"
         " iterative divider working beside the pipeline)",
     )
-    holdsIssue = Param.Bool(
-        False,
-        "An instruction on this FU stops all issue until its result is due"
-        " (opLat plus any data-dependent extra latency): nothing else issues"
-        " beside it, as on a core held while a coprocessor works",
-    )
 
 
 class DynamicLatencyIntDivFU(MinorFU):
@@ -182,17 +176,6 @@ class DynamicLatencyIntDivFU(MinorFU):
     cxx_class = "gem5::DynamicLatencyIntDivFU"
     rp2350_m33_timing = Param.Bool(
         False, "Use RP2350 Cortex-M33 SDIV/UDIV operand-dependent timing")
-
-
-class Hazard3FpDivSqrtFU(MinorFU):
-    """MinorFU for single-precision divide and square root timed as T-Head's
-    E906 unit (arcsim-soc's Hazard3 FPU): the cycles follow the operands, a
-    result exact in few bits finishing sooner (cpu/e906_divsqrt.hh). opLat
-    is the least an operation takes."""
-
-    type = "Hazard3FpDivSqrtFU"
-    cxx_header = "cpu/minor/func_unit.hh"
-    cxx_class = "gem5::Hazard3FpDivSqrtFU"
 
 
 class MinorFUPool(SimObject):
@@ -395,14 +378,6 @@ class BaseMinorCPU(BaseCPU):
         " memory system may decline with an error, and a declined line is"
         " fetched again once it is sure to be wanted",
     )
-    fetchStreamOnSpeculation = Param.Bool(
-        True,
-        "With fetchBranchSpeculation: what is fetched of the sequential"
-        " stream behind a branch Execute has yet to complete is flagged a"
-        " prefetch, which the memory system may decline.  Off, only target"
-        " lines are, and the stream is read as any other fetch, as on a core"
-        " whose bus reads cannot be taken back once issued",
-    )
     fetchKeepTargetInFlight = Param.Bool(
         False,
         "With fetchBranchTargetAtDecode: when Execute takes a branch whose"
@@ -418,13 +393,6 @@ class BaseMinorCPU(BaseCPU):
         " source register also has its target line fetched in its Decode"
         " cycle, when every older instruction has been issued and none"
         " still has that register to write",
-    )
-    fetchPredictLastBackwardBranch = Param.Bool(
-        False,
-        "With fetchBranchTargetAtDecode: the last conditional branch taken"
-        " backward is predicted taken as it is fetched, as Hazard3's"
-        " one-entry branch predictor (BRANCH_PREDICTOR); every other branch"
-        " as without",
     )
     fetchFoldMasks = VectorParam.UInt64(
         [],
@@ -452,16 +420,6 @@ class BaseMinorCPU(BaseCPU):
         " a few bytes.  Decode never waits for a line it would not have"
         " waited for without the limit if this is at least the bytes it"
         " can take in the cycles a fetch needs",
-    )
-    fetchFifoWords = Param.Unsigned(
-        0,
-        "With singleFetchStage: no sequential fetch starts while this many"
-        " words, or more, fetched or on their way, lie past the instruction"
-        " Execute takes next, as Hazard3's frontend FIFO behind its decode"
-        " register (0: no limit).  That instruction is the one after the"
-        " next to issue, or the next to issue itself while issue is held"
-        " into the next cycle, so the FIFO frees a word a cycle ahead, as"
-        " Minor's fetch is a stage further from Execute",
     )
     fetch1FetchLimit = Param.Unsigned(
         1, "Number of line fetches allowable in flight at once"
