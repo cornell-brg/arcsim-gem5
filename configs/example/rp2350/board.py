@@ -441,7 +441,7 @@ def _add_second_m33(board, core, scs):
     board.workload.secondary_launch = CORE1_LAUNCH_SYMBOL
 
 
-def _hazard3_cpu(board, n, kind, zfinx, accessible, switched_out=False):
+def _hazard3_cpu(board, n, kind, accessible, switched_out=False):
     """Core n's CPU, a Hazard3 core of the kind given (atomic or minor), on
     core n's interrupt controller (board.xh3irq, xh3irq1, ...) and the
     board's Xh3power. A switched-out core 0 for m5.switchCpus is made the
@@ -469,8 +469,6 @@ def _hazard3_cpu(board, n, kind, zfinx, accessible, switched_out=False):
         # Hazard3's bit extract multiple, which the Pico SDK's float
         # routines use.
         enable_Xh3bextm=True,
-        # Single-precision FP in the x registers instead of F and D
-        enable_Zfinx=zfinx,
         xh3irq=board.xh3irq if n == 0 else getattr(board, f"xh3irq{n}"),
         # h3.block and h3.unblock (EXTENSION_XH3POWER = 1)
         xh3power=board.xh3power,
@@ -484,7 +482,7 @@ def _hazard3_cpu(board, n, kind, zfinx, accessible, switched_out=False):
     return core
 
 
-def _add_hazard3_core(board, n, *, cpu, zfinx, accessible):
+def _add_hazard3_core(board, n, *, cpu, accessible):
     """Add core n of the Hazard3 proxy (cpu, xh3irq, its testbench soft and
     timer IRQ lines and, for n > 0, its routers; _core_child names them) and
     return its CPU. Core n has mhartid n only if the cores are added in
@@ -505,7 +503,7 @@ def _add_hazard3_core(board, n, *, cpu, zfinx, accessible):
     _core_child(board, "xh3irq", n, Xh3irq(hart_id=n, num_irqs=52,
                                            priority_bits=4))
     core = _core_child(board, "cpu", n,
-                       _hazard3_cpu(board, n, cpu, zfinx, accessible))
+                       _hazard3_cpu(board, n, cpu, accessible))
     # The testbench IO block's soft IRQ n and timer n to core n's mip.msip
     # and mip.mtip, as rtl-sim wires them. Pin n of each is connected n-th.
     soft = _core_child(board, "tb_soft_irq_line", n,
@@ -521,7 +519,7 @@ def _add_hazard3_core(board, n, *, cpu, zfinx, accessible):
 
 def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
                 scratch_bank_bandwidth, sram_model, dma, xip_model, cpu,
-                hwpe, zfinx, switch_cpu=None, clock=CLOCK, cores=1,
+                hwpe, switch_cpu=None, clock=CLOCK, cores=1,
                 sram4_7=True):
     from m5.objects import RiscvSystem
     from m5.objects.RiscvFsWorkload import RiscvBareMetal
@@ -572,15 +570,15 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     # The cores: core n has mhartid n, its thread in the system in the order
     # the cores are made.
     board._cores = [
-        _add_hazard3_core(board, n, cpu=cpu, zfinx=zfinx,
+        _add_hazard3_core(board, n, cpu=cpu,
                           accessible=accessible)
         for n in range(cores)
     ]
     board.mem_mode = board.cpu.memory_mode()
     if switch_cpu:
         # Switched out until m5.switchCpus hands it core 0's place
-        board.switch_cpu = _hazard3_cpu(board, 0, switch_cpu, zfinx,
-                                        accessible, switched_out=True)
+        board.switch_cpu = _hazard3_cpu(board, 0, switch_cpu, accessible,
+                                        switched_out=True)
     # The testbench IO block's SET_IRQ bits are IRQs 0 to 31, as rtl-sim wires
     # them. Every external IRQ reaches every core's controller, as in soc.v.
     from m5.objects.Xh3irq import Xh3irqLine
@@ -653,8 +651,8 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     no HWPE and no TCDM, as arcsim-soc's configs without an accelerator
     (XCEL_PRESENT=0). Any other is refused as not modelled. sram4_7
     False (hazard3-proxy only) leaves SRAM4-7 out (0x20040000-0x2007ffff
-    fault), as arcsim-soc's SRAM4_7_PRESENT=0. zfinx gives the Hazard3 proxy
-    Zfinx (floats in the x registers) instead of F and D.
+    fault), as arcsim-soc's SRAM4_7_PRESENT=0. zfinx (arcsim-soc's FPU
+    zfinx) is refused as not modelled: gem5's Hazard3 has F and D.
     switch_cpu ("minor" or "atomic", either proxy) adds board.switch_cpu,
     a core of that kind switched out, for m5.switchCpus. clock is the core
     clock (CLOCK, a Pico 2's default), for firmware built for another.
@@ -692,8 +690,9 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     if hwpe not in HWPES:
         raise ValueError(f"HWPE {hwpe} is not modelled in gem5 (modelled: "
                          f"{', '.join(HWPES)})")
-    if zfinx and core != "hazard3-proxy":
-        raise ValueError("Zfinx is only for the hazard3-proxy")
+    if zfinx:
+        raise ValueError("Zfinx is not modelled in gem5 (gem5's Hazard3 "
+                         "has F and D)")
     if not sram4_7 and core != "hazard3-proxy":
         raise ValueError("sram4_7 False is only for the hazard3-proxy")
     if switch_cpu and (core not in ("arm-m4-proxy", "hazard3-proxy") or
@@ -723,7 +722,7 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                            scratch_bank_bandwidth=scratch_bank_bandwidth,
                            sram_model=sram_model, dma=dma,
                            xip_model=xip_model, cpu=cpu, hwpe=hwpe,
-                           zfinx=zfinx, switch_cpu=switch_cpu,
+                           switch_cpu=switch_cpu,
                            clock=clock, cores=cores,
                            sram4_7=sram4_7)
     raise ValueError(f"Unknown RP2350 core selector: {core}")  

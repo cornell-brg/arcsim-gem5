@@ -55,8 +55,8 @@ tests run a test program on every simulator whose manifest has what it needs
 (`add_soc_test` in `soc/tests/CMakeLists.txt`), so on gem5 a test runs on the same
 configs as on rtl-sim, with two differences:
 
-- gem5's Hazard3 has F and D unless Zfinx, so the configs without an FPU are
-  `FPU=f` here and also run `test_fp_f`.
+- gem5's Hazard3 has F and D, so the configs without an FPU are `FPU=f` here
+  and also run `test_fp_f`.
 - `*_randinit` (Verilator's random initial state) does not run on gem5.
 
 Every test runs with `--model accurate --sram-model banked` (`SOC_GEM5_ARGS`).
@@ -74,3 +74,5 @@ These fail on gem5 because its board models the SoC differently from the RTL:
   (`--xip-model soc-no-cache`, the RTL's code memory, passes).
 - Every test on a config with an accelerator (`*-xcel`): gem5 models no HWPE
   and no TCDM, so run.py stops with "HWPE <name> is not modelled in gem5".
+- Every test on a config with Hazard3's FPU (`*-zfinx-fpu*`): gem5 does not
+  model Zfinx, so run.py stops with "Zfinx is not modelled in gem5".

@@ -35,7 +35,6 @@
 //
 def bitfield RVTYPE rv_type;
 def bitfield ENABLE_ZCD enable_zcd;
-def bitfield ENABLE_ZFINX enable_zfinx;
 
 // Hazard3's h3.block (slt x0, x0, x0) and h3.unblock (slt x0, x0, x1): 1 and
 // 2 on a core with Xh3power; 0 otherwise, as for any other slt.

@@ -82,8 +82,9 @@ parser.add_argument("--no-sram4-7", dest="sram4_7", action="store_false",
                     "(0x20040000-0x2007ffff fault), as arcsim-soc's "
                     "SRAM4_7_PRESENT=0")
 parser.add_argument("--zfinx", action="store_true", default=None,
-                    help="Zfinx on the hazard3-proxy: floats in the x "
-                    "registers instead of F and D")
+                    help="Zfinx on the hazard3-proxy, as arcsim-soc's FPU "
+                    "zfinx: not modelled in gem5, so refused; gem5's Hazard3 "
+                    "has F and D")
 parser.add_argument("--cores", type=int, choices=(1, 2),
                     help="2: on the arm-m4-proxy, the second M33, which starts "
                     "from the firmware's arcsim_core1_launch; on the "
@@ -198,7 +199,7 @@ else:
     print(f"SRAM model=legacy; scratch bank effective bandwidth={args.scratch_bank_bandwidth}")
 if args.core == "hazard3-proxy":
     print("HWPE=empty: no HWPE, no TCDM")
-    print(f"FPU={'zfinx' if args.zfinx else 'f+d'}")
+    print("FPU=f+d")
 roi_start = None
 roi_number = 0
 exit_code = 0

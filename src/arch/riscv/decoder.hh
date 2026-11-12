@@ -63,7 +63,6 @@ class Decoder : public InstDecoder
     uint32_t vlen;
     uint32_t elen;
     bool _enableZcd;
-    bool _enableZfinx;
     bool _enableXh3power;
     Addr jvtEntry;
 
