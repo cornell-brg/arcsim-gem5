@@ -1,7 +1,7 @@
 """Pico 2 / RP2350 timing baseline: one core, or two (the Arm board's two
 M33s, the Hazard3 proxy's two cores as arcsim-soc's dual-core soc.v).
 
-Select the Arm M4 timing proxy or the calibrated RV32 MinorCPU proxy at
+Select the Arm M4 timing proxy or the RV32 MinorCPU proxy (Hazard3) at
 configuration time. Both use the same physically addressed XIP and SRAM
 paths. This is a benchmark board, not an RP2350 boot ROM/peripheral model.
 """
@@ -681,8 +681,7 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
         raise ValueError(f"xip_model {xip_model} is arcsim-soc's, for the "
                          "hazard3-proxy")
     # arcsim-soc's XIP cache is RP2350XIP's shape, with flash timing fitted
-    # to it: the board is qmi's (bench's 8 RTL kernels: 2.1 % mean, gem5
-    # faster, since rtl-sim chains flash transfers only back to back)
+    # to it: the board is qmi's
     if xip_model == "soc":
         xip_model = "qmi"
     if cpu not in ("minor", "atomic"):

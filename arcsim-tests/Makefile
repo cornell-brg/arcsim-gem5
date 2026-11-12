@@ -15,7 +15,7 @@
 #   make clean
 #
 # SOC_CONFIGS (default: all) runs on these SoC configs only, e.g.
-#   make check SOC_CONFIGS="single-core dual-core-vvadd-xcel"
+#   make check SOC_CONFIGS="single-core dual-core"
 # GEM5 (default ../build/RISCV/gem5.opt) is the gem5 binary, e.g.
 #   make check GEM5=../build/RISCV/gem5.debug
 # TICK_LIMIT is every run's --tick-limit. JOBS (default 1) is how many tests

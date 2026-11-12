@@ -17,13 +17,13 @@ source setup-arcsim.sh                     # in an arcsim clone: sets ARCSIM_TES
 module load arcsim-soc                     # sets ARCSIM_SOC_HOME
 scons build/RISCV/gem5.opt -j32            # in .., gem5
 make check                                 # every test on every SoC config, one line per test
-make check SOC_CONFIGS="single-core dual-core-vvadd-xcel"  # on these configs only
+make check SOC_CONFIGS="single-core dual-core"  # on these configs only
 ```
 
 ```
 soc-tests
   gem5-single-core/test_memory             passed (20/20 test cases passed)
-  gem5-dual-core-vvadd-xcel/test_multicore passed (13/13 test cases passed)
+  gem5-dual-core/test_multicore            passed (13/13 test cases passed)
   ...
 ```
 
