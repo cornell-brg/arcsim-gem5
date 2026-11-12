@@ -18,14 +18,20 @@ Hazard3FpDivSqrtFU take them."""
 
 from m5.objects import RiscvInstLatency, RiscvLatencyClass
 
-from board import (
-    HAZARD3_DIV_CYCLES,
-    HAZARD3_FP_CYCLES,
-    HAZARD3_FP_DIV_CYCLES,
-    HAZARD3_FP_OPS,
-    HAZARD3_FP_SQRT_CYCLES,
-    HAZARD3_LOAD_RESULT_DELAY,
-)
+# Hazard3's timing (instruction_timings.adoc): a divide's cycles, and the
+# cycle a loaded register comes after the load.
+HAZARD3_DIV_CYCLES = 19
+HAZARD3_LOAD_RESULT_DELAY = 1
+# Zfinx on arcsim-soc's FPU (rtl/fpu/hazard3_fpu.sv): one op at a time, the core held until its result.
+# Measured on the SoC's rtl_sim (soc 9d3bed4; arcsim-bench's micro/fp_ops, fp_delay, fp_busy and fp_cvt Zfinx
+# bodies): an add, multiply, compare, convert or sign-inject 3 cycles, dependent or not; an integer use of the
+# result no more. Divide and square root are T-Head's E906 unit, whose cycles follow the operands
+# (cpu/e906_divsqrt.hh: 19 when the result needs every bit, fewer when it is exact in a few bits, 3 for a zero
+# operand); these two are what a result needing every bit takes.
+HAZARD3_FP_CYCLES = 3
+HAZARD3_FP_DIV_CYCLES = 19
+HAZARD3_FP_SQRT_CYCLES = 19
+HAZARD3_FP_OPS = ["FloatAdd", "FloatCmp", "FloatCvt", "FloatMisc", "FloatMult", "FloatMultAcc"]
 
 
 def hazard3_inst_latency(*, fp_cycles=HAZARD3_FP_CYCLES, fp_div_cycles=HAZARD3_FP_DIV_CYCLES,

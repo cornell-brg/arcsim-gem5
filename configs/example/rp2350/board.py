@@ -441,134 +441,6 @@ def _add_second_m33(board, core, scs):
     board.workload.secondary_launch = CORE1_LAUNCH_SYMBOL
 
 
-# Hazard3's timing (instruction_timings.adoc), which _configure_hazard3_minor
-# gives MinorCPU and hazard3_latency.py the atomic CPU's latency table: a
-# divide's cycles, and the cycle a loaded register comes after the load.
-HAZARD3_DIV_CYCLES = 19
-HAZARD3_LOAD_RESULT_DELAY = 1
-# Zfinx on arcsim-soc's FPU (rtl/fpu/hazard3_fpu.sv): one op at a time, the core held until its result.
-# Measured on the SoC's rtl_sim (soc 9d3bed4; arcsim-bench's micro/fp_ops, fp_delay, fp_busy and fp_cvt Zfinx
-# bodies): an add, multiply, compare, convert or sign-inject 3 cycles, dependent or not; an integer use of the
-# result no more. Divide and square root are T-Head's E906 unit, whose cycles follow the operands
-# (cpu/e906_divsqrt.hh: 19 when the result needs every bit, fewer when it is exact in a few bits, 3 for a zero
-# operand), at both tiers (Hazard3FpDivSqrtFU at CL, RiscvInstLatency's e906_div_sqrt at IL); these two are
-# what a result needing every bit takes.
-HAZARD3_FP_CYCLES = 3
-HAZARD3_FP_DIV_CYCLES = 19
-HAZARD3_FP_SQRT_CYCLES = 19
-HAZARD3_FP_OPS = ["FloatAdd", "FloatCmp", "FloatCvt", "FloatMisc", "FloatMult", "FloatMultAcc"]
-
-
-def _configure_hazard3_minor(core):
-    """Give a RISC-V MinorCPU Hazard3's pipeline timing."""
-    from m5.objects.BaseMinorCPU import (
-        Hazard3FpDivSqrtFU,
-        MinorFU,
-        MinorFUPool,
-        MinorDefaultFUPool,
-        MinorDefaultFloatSimdFU,
-        MinorDefaultIntDivFU,
-        MinorDefaultIntFU,
-        MinorDefaultIntMulFU,
-        MinorDefaultMemFU,
-        MinorDefaultMiscFU,
-        MinorFUTiming,
-        minorMakeOpClassSet,
-    )
-
-    core.decodeInputWidth = 1
-    core.executeInputWidth = 1
-    core.executeIssueLimit = 1
-    core.executeCommitLimit = 1
-    # Fetch and decode as one stage, as Hazard3's frontend: one aligned
-    # 32-bit fetch a cycle into its 2-word FIFO (FIFO_DEPTH = 2), two
-    # fetches on their way at once.
-    core.singleFetchStage = True
-    core.fetch1LineWidth = 4
-    core.fetch1LineSnapWidth = 4
-    core.fetch1FetchLimit = 2
-    core.fetch1ToFetch2ForwardDelay = 0  # bypassed with singleFetchStage
-    core.fetch1ToFetch2BackwardDelay = 0
-    core.fetchReadAheadLimit = 8
-    # Hazard3's FIFO behind its decode register: no fetch starts while two
-    # words are in it or on their way (fetch_stall), so a predicted branch's
-    # target waits while an FP op holds the core with the FIFO full.
-    core.fetchFifoWords = 2
-    core.executeBranchDelay = 1
-    # A taken branch or jump costs 2 cycles, as Hazard3's X to F loop
-    # (instruction_timings.adoc): a branch redirects fetch in its
-    # issue cycle, and a direct target, or jalr's from its register, is
-    # fetched while the branch is in Decode. This makes up for Minor's
-    # Decode stage, which Hazard3 does not have.
-    core.executeBranchAtIssue = True
-    core.fetchBranchTargetAtDecode = True
-    core.fetchRegisterTargetAtDecode = True
-    # Those target fetches are made on speculation: RP2350XIP reads no
-    # line from flash for one, so a branch that is not taken starts no
-    # flash read Hazard3 would not make. What is fetched behind a branch
-    # not yet resolved is an ordinary read, as Hazard3's is: an AHB
-    # address phase, once accepted, cannot be taken back, and the XIP
-    # cache fills the line.
-    core.fetchBranchSpeculation = True
-    core.fetchStreamOnSpeculation = False
-    # Hazard3's branch predictor (BRANCH_PREDICTOR = 1): the last
-    # conditional branch taken backward is predicted taken as it is
-    # fetched, unless it starts in the word a branch from X went to.
-    core.fetchPredictLastBackwardBranch = True
-    # A load's address phase is its X cycle, and the instruction after
-    # it is in X during the load's data phase.
-    core.executeLoadAccessAtIssue = True
-    # The FP ops on blocking units in place of Minor's float/SIMD unit, which would pipeline them (and takes
-    # an FP op whenever a blocking unit is busy, so it is left out; Hazard3 has no SIMD): an op takes its unit
-    # for its whole latency, as the SoC's FPU takes one op at a time, and holds issue until its result, as
-    # the SoC holds the core: nothing issues beside an FP op. Then fresh copies of Minor's other
-    # default units (a new pool, so that every unit is its child).
-    # Divide and square root on the E906 unit, whose cycles follow the operands: opLat is the least they take
-    # (a zero operand's 3), Hazard3FpDivSqrtFU adds the rest.
-    fp_units = [
-        unit(opClasses=minorMakeOpClassSet(classes), opLat=HAZARD3_FP_CYCLES, issueLat=HAZARD3_FP_CYCLES,
-             holdsIssue=True, timings=[MinorFUTiming(description="Hazard3Fpu", srcRegsRelativeLats=[1])])
-        for unit, classes in ((MinorFU, HAZARD3_FP_OPS), (Hazard3FpDivSqrtFU, ["FloatDiv"]),
-                              (Hazard3FpDivSqrtFU, ["FloatSqrt"]))
-    ]
-    units = MinorFUPool(funcUnits=fp_units + [
-        type(u)() for u in MinorDefaultFUPool().funcUnits if not isinstance(u, MinorDefaultFloatSimdFU)])
-    for unit in units.funcUnits:
-        if isinstance(unit, (MinorDefaultIntFU, MinorDefaultIntMulFU,
-                             MinorDefaultIntDivFU, MinorDefaultMiscFU)):
-            # Results are forwarded to the next instruction in X, and
-            # one with a result delay (a load's) holds it back by that
-            # delay exactly
-            unit.timings = [
-                MinorFUTiming(description="Hazard3Int",
-                              srcRegsRelativeLats=[1])
-            ]
-        if isinstance(unit, (MinorDefaultIntFU, MinorDefaultIntMulFU)):
-            unit.opLat = 1
-        elif isinstance(unit, MinorDefaultMemFU):
-            # A loaded register is ready a cycle after the load's data
-            # phase: an instruction in X that reads it waits a cycle,
-            # but a store's data is read in M, so a store of it does
-            # not (instruction_timings.adoc, data_dependency).
-            unit.timings = [
-                MinorFUTiming(
-                    description="Hazard3Store",
-                    srcRegsRelativeLats=[1, 2],
-                    opClasses=minorMakeOpClassSet(
-                        ["MemWrite", "FloatMemWrite"]),
-                ),
-                MinorFUTiming(
-                    description="Hazard3Load",
-                    srcRegsRelativeLats=[1],
-                    resultUsePenalty=HAZARD3_LOAD_RESULT_DELAY,
-                ),
-            ]
-        elif isinstance(unit, MinorDefaultIntDivFU):
-            unit.opLat = HAZARD3_DIV_CYCLES
-            unit.issueLat = HAZARD3_DIV_CYCLES
-    core.executeFuncUnits = units
-
-
 def _hazard3_cpu(board, n, kind, zfinx, accessible, switched_out=False):
     """Core n's CPU, a Hazard3 core of the kind given (atomic or minor), on
     core n's interrupt controller (board.xh3irq, xh3irq1, ...) and the
@@ -607,9 +479,7 @@ def _hazard3_cpu(board, n, kind, zfinx, accessible, switched_out=False):
     # faults, as rtl-sim's bus errors are; the core raises them before the
     # access leaves it, so they are precise.
     core.mmu.pma_checker.accessible = accessible
-    if kind == "minor":
-        _configure_hazard3_minor(core)
-    elif getattr(board, "_inst_latency", False):
+    if kind == "atomic" and getattr(board, "_inst_latency", False):
         # Each instruction's cycles from Hazard3's latency table, from the
         # CL model's classes, and its flash misses' from RP2350XIP. An APB
         # register read takes 2 cycles over the instruction's own and a
