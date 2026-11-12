@@ -70,33 +70,10 @@ SRAM_REGIONS = (
 # which is about 572 MiB/s.
 SCRATCH_BANK_BANDWIDTH = "572MiB/s"
 
-# optical-flow's engines: name, class, parameters, window offset.
-# optical-flow-rotated's LK engine is lkTopRotated.
-OPTICAL_FLOW = (
-    ("fast", "HWPEFastCellBestK", {"n": 9, "cycles": 1, "threshold": 20}, 0x0000),
-    ("stripe", "HWPEEqpyr", {}, 0x1000),
-    ("lk", "HWPELk", {}, 0x2000),
-)
-OPTICAL_FLOW_ROTATED_LK = {"rotated": True, "num_io_regs": 19}
-
-# The HWPEs for the Hazard3 board, keyed by arcsim-soc's CONFIG_HWPE names:
-# the class and its parameters. vvadd is vvadd-wide with one element per beat.
-# empty is no HWPE and no TCDM, as arcsim-soc's configs without an accelerator
-# (XCEL_PRESENT=0).
-HWPES = {
-    "empty": None,
-    "vvadd": ("HWPEVvaddWide", {"elems": 1}),
-    "vvadd-wide-1": ("HWPEVvaddWide", {"elems": 1}),
-    "vvadd-wide-2": ("HWPEVvaddWide", {"elems": 2}),
-    "vvadd-wide-4": ("HWPEVvaddWide", {"elems": 4}),
-    "vvadd-wide-8": ("HWPEVvaddWide", {"elems": 8}),
-    # Its wrapper's parameters are HWPEFastCellBestK's defaults
-    "fast-with-scoring-wide-multicycle-cell-best-k": ("HWPEFastCellBestK", {}),
-    # arcsim-xcel's hwpe-optical-flow.v: three engines and SELECT in 4 KiB
-    # windows, the engines on HCIMux channels 0 to 2 (OPTICAL_FLOW)
-    "optical-flow": None,
-    "optical-flow-rotated": None,
-}
+# The HWPEs the Hazard3 board models, by arcsim-soc's CONFIG_HWPE names. Only
+# empty: no HWPE and no TCDM, as arcsim-soc's configs without an accelerator
+# (XCEL_PRESENT=0). Any other HWPE (soc_configs.py) is not modelled in gem5.
+HWPES = ("empty",)
 
 
 # 64 bit 0 extra latency crossbar
@@ -688,7 +665,7 @@ def _add_hazard3_core(board, n, *, cpu, zfinx, accessible):
 def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
                 scratch_bank_bandwidth, sram_model, dma, xip_model, cpu,
                 hwpe, zfinx, switch_cpu=None, clock=CLOCK, cores=1,
-                inst_latency=False, hwpe_timed_in_atomic=False, sram4_7=True):
+                inst_latency=False, sram4_7=True):
     from m5.objects import RiscvSystem
     from m5.objects.RiscvFsWorkload import RiscvBareMetal
     from m5.objects.RiscvSemihosting import RiscvSemihosting
@@ -718,59 +695,14 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     if xip_model == "qmi":
         board.xip_ctrl.xip = board.flash
     board.xip_ctrl.pio = board.sram_bus.mem_side_ports
-    # The HWPE's 256 KiB TCDM at 0x60000000 (soc.v): 16 banks shared by the
-    # core side, through the SRAM bus, and the HWPE. Without an HWPE (empty)
-    # neither is there, and their addresses fault, as in soc.v without an
-    # accelerator (XCEL_PRESENT=0).
-    if hwpe != "empty":
-        from m5.objects import HCITcdm
-        board.tcdm = HCITcdm(clk_domain=board.clk_domain)
-        board.mem_ranges.append(board.tcdm.range)
-        board.tcdm.core_port = board.sram_bus.mem_side_ports
-    # The HWPE (soc.v): its registers at 0x50800000 on the SRAM bus, its
-    # data port on the TCDM. Its done event (irq) stays unconnected, as in
-    # soc.v.
-    import m5.objects
-    if hwpe == "empty":
-        pass
-    elif hwpe in ("optical-flow", "optical-flow-rotated"):
-        from m5.objects import HCIMux, HWPESelect
-        board.hwpe_mux = HCIMux(clk_domain=board.clk_domain, num_channels=4)
-        board.hwpe_mux.mem_side_port = board.tcdm.hwpe_port
-        engines = []
-        for name, cls, params, offset in OPTICAL_FLOW:
-            if name == "lk" and hwpe == "optical-flow-rotated":
-                params = OPTICAL_FLOW_ROTATED_LK
-            engine = getattr(m5.objects, cls)(
-                pio_latency="1ns", pio_addr=0x50800000 + offset, pio_size=0x1000,
-                timed_in_atomic=hwpe_timed_in_atomic, **params)
-            setattr(board, f"hwpe_{name}", engine)
-            engines.append(engine)
-        board.hwpe_select = HWPESelect(pio_latency="1ns")
-        engines.append(board.hwpe_select)
-        for engine in engines:
-            engine.pio = board.sram_bus.mem_side_ports
-            board.mem_ranges.append(AddrRange(int(engine.pio_addr),
-                                              size=int(engine.pio_size)))
-        board.hwpe_mux.cpu_side_ports = [e.tcdm_port for e in engines[:-1]]
-    else:
-        hwpe_class, hwpe_params = HWPES[hwpe]
-        board.hwpe = getattr(m5.objects, hwpe_class)(
-            pio_latency="1ns", timed_in_atomic=hwpe_timed_in_atomic,
-            **hwpe_params)
-        board.hwpe.pio = board.sram_bus.mem_side_ports
-        # Its registers are in mem_ranges, as the placeholder memory there
-        # was, so runners that place stand-ins outside mem_ranges leave them
-        # alone.
-        board.mem_ranges.append(AddrRange(int(board.hwpe.pio_addr),
-                                          size=int(board.hwpe.pio_size)))
-        board.hwpe.tcdm_port = board.tcdm.hwpe_port
+    # No HWPE and no TCDM (hwpe empty, the only one modelled): their
+    # addresses fault, as in soc.v without an accelerator (XCEL_PRESENT=0).
     if board._banked_sram:
         board.icode_router.mem_side_ports = board.sram.port
     # Loads, stores and fetches outside what this board has are access
     # faults, as rtl-sim's bus errors are; the core raises them before the
     # access leaves it, so they are precise.
-    # flash, SRAM (without SRAM4-7 if absent), TCDM and HWPE registers (if any)
+    # flash and SRAM (without SRAM4-7 if absent)
     accessible = list(board.mem_ranges)
     if xip_model == "qmi":
         accessible.append(AddrRange(int(board.flash.maintenance_base),
@@ -845,8 +777,7 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                sram_model=None, arm_timing="tuned", dma=None,
                xip_model=None, model="legacy", cpu="minor", hwpe="empty",
                zfinx=False, switch_cpu=None, clock=CLOCK,
-               inst_latency=False, cores=1, hwpe_timed_in_atomic=False,
-               sram4_7=True):
+               inst_latency=False, cores=1, sram4_7=True):
     """Return a board of cores cores with the RP2350 memory baseline.
     board.cpu is core 0, board.cpu1 core 1, and board._cores lists them.
 
@@ -867,9 +798,10 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     timing fitted to RP2350XIP's, so the board is qmi's; "soc-no-cache"
     (hazard3-proxy only) is the RTL before it, its code memory at 0x10000000
     with zero wait states and one transfer a cycle, as rtl-sim's testbench
-    answered soc.v there. hwpe names the Hazard3 board's HWPE (HWPES), as
-    arcsim-soc's CONFIG_HWPE; empty, the default, is no HWPE and no TCDM, as
-    arcsim-soc's configs without an accelerator (XCEL_PRESENT=0). sram4_7
+    answered soc.v there. hwpe names the Hazard3 board's HWPE, as
+    arcsim-soc's CONFIG_HWPE; only empty, the default, is modelled (HWPES):
+    no HWPE and no TCDM, as arcsim-soc's configs without an accelerator
+    (XCEL_PRESENT=0). Any other is refused as not modelled. sram4_7
     False (hazard3-proxy only) leaves SRAM4-7 out (0x20040000-0x2007ffff
     fault), as arcsim-soc's SRAM4_7_PRESENT=0. zfinx gives the Hazard3 proxy
     Zfinx (floats in the x registers) instead of F and D.
@@ -908,7 +840,8 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     if cpu not in ("minor", "atomic"):
         raise ValueError(f"Unknown CPU: {cpu}")
     if hwpe not in HWPES:
-        raise ValueError(f"Unknown HWPE: {hwpe}")
+        raise ValueError(f"HWPE {hwpe} is not modelled in gem5 (modelled: "
+                         f"{', '.join(HWPES)})")
     if zfinx and core != "hazard3-proxy":
         raise ValueError("Zfinx is only for the hazard3-proxy")
     if not sram4_7 and core != "hazard3-proxy":
@@ -946,6 +879,5 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                            zfinx=zfinx, switch_cpu=switch_cpu,
                            clock=clock, cores=cores,
                            inst_latency=inst_latency,
-                           hwpe_timed_in_atomic=hwpe_timed_in_atomic,
                            sram4_7=sram4_7)
     raise ValueError(f"Unknown RP2350 core selector: {core}")  
