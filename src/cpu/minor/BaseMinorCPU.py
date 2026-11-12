@@ -168,6 +168,14 @@ class MinorFU(SimObject):
         " (opLat plus any data-dependent extra latency): nothing else issues"
         " beside it, as on a core held while a coprocessor works",
     )
+    busyHoldMask = Param.UInt64(
+        0,
+        "While this FU cannot take another inst. (its issueLat plus the"
+        " timing's extraIssueLat), an inst. whose ExtMachInst masked by this"
+        " equals busyHoldMatch does not issue, whatever FU it goes to; others"
+        " issue beside it (0: none held)",
+    )
+    busyHoldMatch = Param.UInt64(0, "see busyHoldMask")
 
 
 class DynamicLatencyIntDivFU(MinorFU):

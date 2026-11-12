@@ -635,6 +635,9 @@ Execute::issue(ThreadID thread_id)
             if (halfwordWideMemHolds(inst)) {
                 DPRINTF(MinorExecute, "Can't issue inst: %s yet: it follows"
                     " a 32-bit access two bytes into a word\n", *inst);
+            } else if (heldByBusyFU(inst)) {
+                DPRINTF(MinorExecute, "Can't issue inst: %s while an FU"
+                    " that holds it is busy\n", *inst);
             } else if (waitsForCompletion(thread, inst)) {
                 DPRINTF(MinorExecute, "Can't issue inst: %s until older"
                     " insts complete\n", *inst);
@@ -1270,6 +1273,23 @@ bool
 Execute::isWideInst(const MinorDynInstPtr &inst) const
 {
     return (inst->staticInst->getEMI() & wideInstMask) == wideInstMatch;
+}
+
+bool
+Execute::heldByBusyFU(const MinorDynInstPtr &inst) const
+{
+    if (!inst->isInst() || inst->isFault())
+        return false;
+    const uint64_t emi = inst->staticInst->getEMI();
+    for (unsigned int i = 0; i < numFuncUnits; i++) {
+        const MinorFU &d = funcUnits[i]->description;
+        if (d.busyHoldMask != 0 && (emi & d.busyHoldMask) == d.busyHoldMatch &&
+            !funcUnits[i]->canInsert())
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool

@@ -8,6 +8,13 @@ is an F405 option: CortexM4CPU and the G474 board are unchanged.
   a cycle for VADD, VSUB, VMUL and VCVT, for VMOV to a core register, and for VMLA and
   VFMA (whose accumulator is exempt: the next one accumulating onto it is not held), and
   VMRS of the flags a cycle more.
+- VMLA and VFMA keep the floating-point unit 3 cycles, and in those cycles no other
+  floating-point instruction issues (FP_INST: any, VLDR and VSTR included, through MinorFU's
+  busyHoldMask), while an integer instruction issues and completes beside them
+  (resultAfterCommit, their result due as before): micro/fp_delay's vfma_int (40 cycles on
+  the Crazyflie, 10 VFMAs each followed by an integer add, the same as 10 VFMAs alone), set
+  beside vfma_skip (a float add after each waits: 50) and fp_busy's vfma_vldr and vfma_vstr
+  (a float load or store after each waits).
 - HALFWORD_WIDE_MEM: a 32-bit instruction after a 32-bit load or store two bytes into a
   word waits a cycle (MinorCPU's executeHalfwordWideMemCycles; every other time when it is
   itself a load or store, the first three after a branch free), as the Crazyflie's
@@ -35,9 +42,16 @@ from gem5.prebuilt.cortexm.cpu.cortex_m4 import (
     M4MemFU,
     M4MiscFU,
 )
-from gem5.prebuilt.cortexm.cpu.cortex_m33 import _T32, _VMOV_TO_CORE, _VMRS_FLAGS
+from gem5.prebuilt.cortexm.cpu.cortex_m33 import _T32, _VMOV_TO_CORE, _VMRS_FLAGS, _t32
 
 HALFWORD_WIDE_MEM = True
+
+# A floating-point instruction: a 32-bit coprocessor instruction (first halfword 1110 11xx)
+# for coprocessor 10 or 11 (second halfword's bits 11:9 101), its loads and stores included
+FP_INST = _t32(0xEC000E00, 0xEC000A00)
+# ... a floating-point load or store (first halfword 1110 110x): VLDR, VSTR, VLDM, VSTM,
+# VPUSH, VPOP
+FP_MEM = _t32(0xFE000E00, 0xEC000A00)
 
 
 def _ops(names):
@@ -58,14 +72,31 @@ class F405FloatFU(M4FloatFU):
     ]
 
 
+# Where a VMLA or VFMA (and VMLS, VNMLA, VNMLS, VFMS, VFNMA, VFNMS) reads each source, from
+# issue, for MinorFUTiming's srcRegsRelativeLats: the accumulator (the first) two cycles,
+# which its result's due time (issue + 5) meets when the next VFMA issues 3 cycles after it,
+# and the others one, so a multiplied source waits that cycle more
+_FMAC_SRC_LATS = [2, 1]
+
+
 class F405FloatMacFU(MinorFU):
     """CortexM4CPU's M4FloatMacFU, its result delayed a cycle for every source but the
-    accumulator (the first)."""
+    accumulator, busy 3 cycles in which no other floating-point instruction issues, while
+    integer ones issue and complete: it completes after a cycle, its result due 3 cycles
+    after issue as before. A VFMA whose multiplied source is the VFMA before's result waits
+    that cycle (fp_busy's vfma_cross: 87 cycles on the Crazyflie, 20 VFMAs; vadd_vfma)."""
 
     opClasses = _ops(["FloatMultAcc", "SimdMultAcc", "SimdFloatMultAcc"])
-    opLat = 3
+    opLat = 1
     issueLat = 3
-    timings = [MinorFUTiming(description="F405FMac", srcRegsRelativeLats=[3, 2], resultUsePenalty=1)]
+    resultAfterCommit = True
+    busyHoldMask = FP_INST["mask"]
+    busyHoldMatch = FP_INST["match"]
+    timings = [
+        MinorFUTiming(
+            description="F405FMac", srcRegsRelativeLats=_FMAC_SRC_LATS, resultUsePenalty=1, extraAssumedLat=2
+        )
+    ]
 
 
 class F405FloatDivFU(MinorFU):

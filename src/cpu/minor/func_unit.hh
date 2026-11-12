@@ -191,6 +191,10 @@ class MinorFU : public SimObject
     /** Holds issue until its result: see BaseMinorCPU.py */
     bool holdsIssue;
 
+    /** Insts held while this FU is busy: see BaseMinorCPU.py */
+    uint64_t busyHoldMask;
+    uint64_t busyHoldMatch;
+
   public:
     MinorFU(const MinorFUParams &params) :
         SimObject(params),
@@ -200,7 +204,9 @@ class MinorFU : public SimObject
         cantForwardFromFUIndices(params.cantForwardFromFUIndices),
         timings(params.timings),
         resultAfterCommit(params.resultAfterCommit),
-        holdsIssue(params.holdsIssue)
+        holdsIssue(params.holdsIssue),
+        busyHoldMask(params.busyHoldMask),
+        busyHoldMatch(params.busyHoldMatch)
     { }
 
     /** Compute data-dependent extra latency at commit time.

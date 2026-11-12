@@ -24,10 +24,13 @@ from m5.objects import (
 
 from gem5.prebuilt.cortexm.cpu.cortex_m33 import _T16, _T32, _fold
 
-from cpu import F405FloatDivFU, F405FloatFU, F405FloatMacFU, F405FUPool  # noqa: E402
+from cpu import FP_MEM, F405FloatDivFU, F405FloatFU, F405FloatMacFU, F405FUPool  # noqa: E402
 
-# The units MProfileInstLatency tracks: the floating-point units, as the CL model's
-_UNITS = {F405FloatFU: 0, F405FloatMacFU: 1, F405FloatDivFU: 2}
+# The units MProfileInstLatency tracks: the floating-point units, as the CL model's. VMLA and
+# VFMA share unit 0 with the other floating-point instructions (F405FpMem's loads and stores
+# too), so these wait while one is busy and integer instructions do not, as the CL model's
+# busyHoldMask
+_UNITS = {F405FloatFU: 0, F405FloatMacFU: 0, F405FloatDivFU: 2}
 
 # What the CL model times by its pipeline rather than its classes, from the Cortex-M4's
 # timing [DDI0439D table 3-1, 3.3.2] and the Crazyflie's micro families:
@@ -39,15 +42,17 @@ _UNITS = {F405FloatFU: 0, F405FloatMacFU: 1, F405FloatDivFU: 2}
 #   strd: 1 + N), which a single load after a load or store overlaps and a single store
 #   never pays (load, store: 1 each), and its result a cycle after its transfer
 #   (load_dep: 2 each);
-# - VMLA and VFMA (F405FMac): 3 cycles that hold the next instruction, as the CL model's
-#   in-order completion and the TRM's 3 cycles [table 7-1] (fp_busy's vfma_vldr and
-#   vfma_vstr; kalman -24 % to -10 %, the held-out set unchanged).
+# - VMLA and VFMA (F405FMac): the TRM's 3 cycles [table 7-1] as its unit's busy time, which
+#   holds the next floating-point instruction but not an integer one (fp_delay's vfma_int;
+#   fp_busy's vfma_vldr and vfma_vstr, which F405FpMem's unit makes wait);
+# - a floating-point load or store (F405FpMem): M4Mem's, on the floating-point unit.
 _PIPELINE_CLASSES = (
     ("F405Isb", _T32 | 0xFFFFFFF0, _T32 | 0xF3BF8F60, {"cycles": 3}),
+    ("F405FpMem", FP_MEM["mask"], FP_MEM["match"], {"address_phase": 1, "result_delay": 1, "src_lats": [1], "unit": 0}),
     ("F405BxLr", _T32 | 0xFFFF, _T16 | 0x4770, {}),
     ("F405BxReg", _T32 | 0xFF07, _T16 | 0x4700, {"branch_extra": 1}),
 )
-_DEFAULTS = {"M4Mem": {"address_phase": 1, "result_delay": 1}, "F405FMac": {"cycles": 3}}
+_DEFAULTS = {"M4Mem": {"address_phase": 1, "result_delay": 1}}
 # An IT takes no cycle before a 16-bit instruction (fold's it_same and it_cross); nothing
 # else folds.
 _IT_FOLDS = _fold([(0xFF08, 0xBF08, 2), (0xFF04, 0xBF04, 2), (0xFF02, 0xBF02, 2), (0xFF01, 0xBF01, 2)])
