@@ -92,8 +92,8 @@ parser.add_argument("--cores", type=int, choices=(1, 2),
                     "(default 1)")
 parser.add_argument("--inst-latency", action="store_true",
                     help="with --cpu atomic: each instruction's cycles from "
-                    "the core's latency table (the M33's or Hazard3's), with "
-                    "RP2350XIP's flash misses")
+                    "the M33's latency table, with RP2350XIP's flash misses "
+                    "(arm-m4-proxy only)")
 parser.add_argument("--tick-limit", type=int, default=100_000_000_000)
 args = parser.parse_args()
 if args.list_configs:
