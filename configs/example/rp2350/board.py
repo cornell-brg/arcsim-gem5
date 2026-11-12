@@ -315,7 +315,7 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
         elif arm_timing == "tuned":
             from gem5.prebuilt.cortexm.cpu.cortex_m33 import CortexM33CPU
             core = CortexM33CPU(cpu_id=cpu_id, switched_out=switched_out)
-        elif arm_timing == "pre-tuning":
+        elif arm_timing in ("pre-tuning", "prior-m4"):
             from gem5.prebuilt.cortexm.cpu.cortex_m4 import (
                 CortexM4CPU,
                 use_pre_tuning_timing,
@@ -329,7 +329,8 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
             # For playing around with different branch predictors and dividers
             for unit in core.executeFuncUnits.funcUnits:
                 if isinstance(unit, DynamicLatencyIntDivFU):
-                    unit.rp2350_m33_timing = arm_divider == "rp2350-m33"
+                    unit.rp2350_m33_timing = (arm_divider == "rp2350-m33"
+                                              and arm_timing != "prior-m4")
             if arm_predictor in ("local", "local-small"):
                 core.branchPred.conditionalBranchPred = LocalBP(
                     localPredictorSize=2048, localCtrBits=2
@@ -343,8 +344,10 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
             # wait holds the instructions behind it, and so does a load.
             # Only the banked SRAM has banks to lose; the legacy memories
             # keep the store buffer's timing.
-            core.executeWaitedStoreHoldsInsts = board._banked_sram
-            core.executeWaitedLoadHoldsInsts = board._banked_sram
+            # The prior Cortex-M4 model keeps its store buffer.
+            holds = board._banked_sram and arm_timing != "prior-m4"
+            core.executeWaitedStoreHoldsInsts = holds
+            core.executeWaitedLoadHoldsInsts = holds
 
         if kind == "atomic" and inst_latency:
             # Each instruction's cycles from the Cortex-M33's table (the
@@ -631,7 +634,9 @@ def _hazard3_cpu(board, n, kind, zfinx, accessible, switched_out=False):
     # access leaves it, so they are precise.
     core.mmu.pma_checker.accessible = accessible
     if kind == "minor":
-        _configure_hazard3_minor(core)
+        # Hazard3's timing, or none of it: gem5's MinorCPU as it comes.
+        if getattr(board, "_hazard3_timing", "tuned") == "tuned":
+            _configure_hazard3_minor(core)
     elif getattr(board, "_inst_latency", False):
         # Each instruction's cycles from Hazard3's latency table, from the
         # CL model's classes, and its flash misses' from RP2350XIP. An APB
@@ -688,7 +693,8 @@ def _add_hazard3_core(board, n, *, cpu, zfinx, accessible):
 def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
                 scratch_bank_bandwidth, sram_model, dma, xip_model, cpu,
                 hwpe, zfinx, switch_cpu=None, clock=CLOCK, cores=1,
-                inst_latency=False, hwpe_timed_in_atomic=False, sram4_7=True):
+                inst_latency=False, hwpe_timed_in_atomic=False, sram4_7=True,
+                hazard3_timing="tuned"):
     from m5.objects import RiscvSystem
     from m5.objects.RiscvFsWorkload import RiscvBareMetal
     from m5.objects.RiscvSemihosting import RiscvSemihosting
@@ -703,6 +709,7 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     # misses, which then tracks its tags; arcsim-soc's code memory before its
     # XIP cache (xip_model soc-no-cache) answers in its cycle, as SRAM does
     board._inst_latency = inst_latency
+    board._hazard3_timing = hazard3_timing
     if inst_latency and xip_model == "qmi":
         board.flash.track_tags = True
         board.flash.atomic_latency = True
@@ -846,13 +853,25 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                xip_model=None, model="legacy", cpu="minor", hwpe="empty",
                zfinx=False, switch_cpu=None, clock=CLOCK,
                inst_latency=False, cores=1, hwpe_timed_in_atomic=False,
-               sram4_7=True):
+               sram4_7=True, hazard3_timing="tuned"):
     """Return a board of cores cores with the RP2350 memory baseline.
     board.cpu is core 0, board.cpu1 core 1, and board._cores lists them.
 
     cpu is "minor", the timed core (CortexM33CPU, or the Hazard3 proxy, a
     RISC-V MinorCPU), or "atomic", gem5's atomic CPU as an instruction-level
     simulator: the same ISA and devices, no core timing.
+
+    The timed core's timing can be a baseline's in place of the tuned one,
+    for comparing the two on the same board and memories. arm_timing
+    "prior-m4" is the Cortex-M4 model as published before ARCsim's tuning
+    (CortexM4CPU with use_pre_tuning_timing, its own divider timing, and a
+    store buffer in front of the SRAM), applied to the Cortex-M33 unchanged;
+    "pre-tuning" is the same but for what the board options give it (the
+    RP2350's divider timing unless arm_divider says otherwise, and waited
+    accesses that hold the pipeline on the banked SRAM). hazard3_timing
+    "minor-defaults" leaves the Hazard3 proxy's MinorCPU on gem5's default
+    parameters: the ISA, registers and devices are Hazard3's, the pipeline,
+    functional units and branch predictor are not.
 
     model names the memory system: "legacy" is the lumped SRAM windows and
     the generic cache in front of flash; "accurate" is the banked SRAM, the
@@ -907,6 +926,10 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
         xip_model = "qmi"
     if cpu not in ("minor", "atomic"):
         raise ValueError(f"Unknown CPU: {cpu}")
+    if hazard3_timing not in ("tuned", "minor-defaults"):
+        raise ValueError(f"Unknown Hazard3 timing: {hazard3_timing}")
+    if hazard3_timing != "tuned" and core != "hazard3-proxy":
+        raise ValueError("hazard3_timing is for the hazard3-proxy")
     if hwpe not in HWPES:
         raise ValueError(f"Unknown HWPE: {hwpe}")
     if zfinx and core != "hazard3-proxy":
@@ -947,5 +970,5 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                            clock=clock, cores=cores,
                            inst_latency=inst_latency,
                            hwpe_timed_in_atomic=hwpe_timed_in_atomic,
-                           sram4_7=sram4_7)
+                           sram4_7=sram4_7, hazard3_timing=hazard3_timing)
     raise ValueError(f"Unknown RP2350 core selector: {core}")  
