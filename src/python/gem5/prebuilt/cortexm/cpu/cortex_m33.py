@@ -435,8 +435,8 @@ class CortexM33CPU(ArmMMinorCPU):
     # resolves.
     fetchBranchTargetAtDecode = True
     # The targets of two branches are kept, and what is fetched behind a
-    # branch not yet resolved is fetched on speculation: RP2350XIP reads
-    # no line from flash for it.
+    # branch not yet resolved is fetched on speculation: the memory system
+    # may decline it.
     fetchBranchSpeculation = True
     # So is the target of BX and BLX, read from its register: any taken
     # branch that is not a load costs 2 cycles [RP2350 datasheet

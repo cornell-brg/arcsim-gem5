@@ -159,22 +159,6 @@ of the third. The third prints each subtest's cycles through semihosting
 (OpenOCD's `arm semihosting enable`); without it, the core halts at the first
 print with the cycles already at 0x20000110.
 
-`test_rp2350_xip.elf` times loads from flash, so it needs the flash
-interface as the Pico SDK sets it up, which `reset halt` stops the board
-before. Flash any Pico SDK firmware first; then, instead of `reset halt`:
-`reset run`, wait two seconds, `halt` both cores (`rp2350.cm1`, then
-`rp2350.cm0`), set `msplim_s` and `psplim_s` to 0 (the SDK's stack limit is
-above the test's stack), and carry on from `load_image` as above. It reads
-flash at 0x10100000 to 0x10210000, whatever is there, and writes none. A
-Pico 2 passes all 12 subtests.
-
-`test_rp2350_fetch_ahead.elf` runs the same way, and calls stubs of its own
-in flash, which have to be written there first: its `.flash` section, 4 KiB
-at 0x103f0000 (`arm-none-eabi-objcopy -O binary -j .flash`, then OpenOCD's
-`flash write_image erase` at that address after a `reset halt`; check that
-the sector is not in use). `load_image` then gets the ELF without that
-section (`objcopy -R .flash`). A Pico 2 passes all 3 subtests.
-
 ## Pico SDK firmware
 
 `programs/rp2350_sdk/` holds firmware built with the Pico SDK (its
