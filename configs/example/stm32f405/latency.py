@@ -26,11 +26,11 @@ from gem5.prebuilt.cortexm.cpu.cortex_m33 import _T16, _T32, _fold
 
 from cpu import FP_MEM, F405FloatDivFU, F405FloatFU, F405FloatMacFU, F405FUPool  # noqa: E402
 
-# The units MProfileInstLatency tracks: the floating-point units, as the CL model's. VMLA and
-# VFMA share unit 0 with the other floating-point instructions (F405FpMem's loads and stores
-# too), so these wait while one is busy and integer instructions do not, as the CL model's
-# busyHoldMask
-_UNITS = {F405FloatFU: 0, F405FloatMacFU: 0, F405FloatDivFU: 2}
+# The units MProfileInstLatency tracks: the floating-point units, as the CL model's. VMLA,
+# VFMA, VDIV and VSQRT share unit 0 with the other floating-point instructions (F405FpMem's
+# loads and stores too), so these wait while one is busy and integer instructions do not, as
+# the CL model's busyHoldMask
+_UNITS = {F405FloatFU: 0, F405FloatMacFU: 0, F405FloatDivFU: 0}
 
 # What the CL model times by its pipeline rather than its classes, from the Cortex-M4's
 # timing [DDI0439D table 3-1, 3.3.2] and the Crazyflie's micro families:

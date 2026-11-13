@@ -103,13 +103,19 @@ class F405FloatMacFU(MinorFU):
 
 
 class F405FloatDivFU(MinorFU):
-    """CortexM4CPU's M4FloatDivFU with a cycle of result delay."""
+    """CortexM4CPU's M4FloatDivFU with a cycle of result delay, busy 14 cycles in which no
+    other floating-point instruction issues, while integer ones do (fp_delay's vsqrt_skip:
+    83 cycles on the Crazyflie against vsqrt_use's 88; fp_busy's vsqrt_int, vdiv_dep). As
+    F405FloatMacFU, its result is due a cycle before the unit frees and its sources are read
+    a cycle after issue, as the other floating-point units read theirs (vsqrt_use, vdiv_dep)."""
 
     opClasses = _ops(["FloatDiv", "FloatSqrt", "SimdFloatDiv", "SimdFloatSqrt"])
     opLat = 1
     issueLat = 14
     resultAfterCommit = True
-    timings = [MinorFUTiming(description="F405FDiv", srcRegsRelativeLats=[0], extraAssumedLat=14, resultUsePenalty=1)]
+    busyHoldMask = FP_INST["mask"]
+    busyHoldMatch = FP_INST["match"]
+    timings = [MinorFUTiming(description="F405FDiv", srcRegsRelativeLats=[1], extraAssumedLat=13, resultUsePenalty=1)]
 
 
 class F405FUPool(MinorFUPool):
