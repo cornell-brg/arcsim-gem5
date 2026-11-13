@@ -49,5 +49,5 @@ class TaskInstCounter(ProbeListenerObject):
     stats = VectorParam.String(
         [],
         "full names of scalar statistics whose growth each line gets (e.g. "
-        "system.flash.cache.misses)",
+        "system.xip_cache.overallMisses::total)",
     )

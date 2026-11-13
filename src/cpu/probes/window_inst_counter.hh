@@ -54,7 +54,7 @@
 // for instructions in none. They add up to the window's count.
 //
 // With a stats file and the full names of scalar statistics (e.g.
-// system.flash.cache.chained), each window adds a line there with how much each grew
+// system.xip_cache.overallMisses::total), each window adds a line there with how much each grew
 // over the window, as name=value pairs in the order given. Any CPU model; the
 // statistics change when their objects act, which may be a few cycles off the
 // window's committed edges.

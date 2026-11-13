@@ -25,7 +25,7 @@ class WindowInstCounter(ProbeListenerObject):
     )
     stats = VectorParam.String(
         [], "full names of scalar statistics whose growth over each window the "
-        "stats file gets (e.g. system.flash.cache.chained)"
+        "stats file gets (e.g. system.xip_cache.overallMisses::total)"
     )
     stats_file = Param.String(
         "", "the file each window's growth of the stats is written to"

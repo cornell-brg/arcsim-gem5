@@ -69,9 +69,8 @@ These fail on gem5 because its board models the SoC differently from the RTL:
 
 - `test_sio`: gem5's SIO model reads `GPIO_IN` as all ones instead of 0, and it
   answers its whole 64 KiB window, where the RTL faults above `+0x4000`.
-- `test_xip_ctrl`: `--model accurate` puts the Pico 2's flash and XIP cache in
-  front of flash, whose counters count; rtl-sim has no XIP cache, so they stay 0
-  (`--xip-model soc-no-cache`, the RTL's code memory, passes).
+- `test_xip_ctrl`: gem5's XIP_CTRL counters (`CTR_HIT`, `CTR_ACC`) read 0:
+  nothing counts the XIP cache's hits and accesses.
 - Every test on a config with an accelerator (`*-xcel`): gem5 models no HWPE
   and no TCDM, so run.py stops with "HWPE <name> is not modelled in gem5".
 - Every test on a config with Hazard3's FPU (`*-zfinx-fpu*`): gem5 does not
