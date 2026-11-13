@@ -1,7 +1,7 @@
 """Run Pico SDK firmware on the RP2350 board's Arm proxy.
 
     gem5.opt run_rp2350_sdk.py --firmware <elf> [--sram-model legacy|banked]
-                               [--dma] [--xip-model legacy|qmi]
+                               [--dma] [--xip-model legacy]
 
 The board has no APB peripherals and, of the AHB ones, at most the DMA
 (--dma). The SDK's start-up still writes a few of their registers (the boot
@@ -26,7 +26,7 @@ parser.add_argument(
     "--sram-model", choices=("legacy", "banked"), default="legacy"
 )
 parser.add_argument("--dma", action="store_true")
-parser.add_argument("--xip-model", choices=("legacy", "qmi"), default="legacy")
+parser.add_argument("--xip-model", choices=("legacy",), default="legacy")
 parser.add_argument("--tick-limit", type=int, default=10**12)
 args = parser.parse_args()
 

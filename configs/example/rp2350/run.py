@@ -38,16 +38,15 @@ parser.add_argument("--cpu", choices=("minor", "atomic"), default="minor",
 parser.add_argument("--xip-miss-ns", type=int, default=50)
 parser.add_argument("--xip-hit-latency-cycles", type=int, default=1,
                     help="Set both parallel XIP cache tag and data latency, "
-                    "in cycles of the cache's 10 GHz clock")
+                    "in core cycles")
 parser.add_argument("--xip-replacement", choices=("lru", "random"),
                     default="lru")
 parser.add_argument("--sram-latency-ns", type=int, default=1)
 parser.add_argument("--model", choices=("legacy", "accurate"),
                     default="legacy",
-                    help="The memory system: accurate is the banked SRAM, the "
-                    "DMA controller and the qmi XIP model, timed against a "
-                    "Pico 2; --sram-model, --dma and --xip-model each choose "
-                    "one part and override it")
+                    help="The memory system: accurate is the banked SRAM and "
+                    "the DMA controller; --sram-model, --dma and --xip-model "
+                    "each choose one part and override it")
 parser.add_argument("--sram-model", choices=("legacy", "banked"),
                     help="Banked selects clocked 32-bit SRAM service; legacy timing knobs apply only to legacy")
 parser.add_argument("--scratch-bank-bandwidth",
@@ -66,11 +65,8 @@ parser.add_argument("--dma", action=argparse.BooleanOptionalAction,
                     help="Add the DMA controller")
 parser.add_argument("--xip-model",
                     choices=XIP_MODELS,
-                    help="qmi selects the cache banks and flash interface "
-                    "timing of a Pico 2; soc (hazard3-proxy) arcsim-soc's RTL "
-                    "with its XIP cache, the same as qmi; soc-no-cache "
-                    "(hazard3-proxy) arcsim-soc's RTL before it, zero wait "
-                    "states; the XIP knobs apply only to legacy")
+                    help="legacy, the generic cache and fixed miss delay in "
+                    "front of flash, set by the --xip-* options")
 parser.add_argument("--hwpe", choices=tuple(HWPES),
                     help="The HWPE on the Hazard3 board, as arcsim-soc's "
                     "CONFIG_HWPE; only empty is modelled: no HWPE and no "
@@ -91,10 +87,6 @@ parser.add_argument("--cores", type=int, choices=(1, 2),
                     "hazard3-proxy, arcsim-soc's dual-core soc.v, core 1 "
                     "waiting in init.S until core 0 starts it "
                     "(default 1)")
-parser.add_argument("--inst-latency", action="store_true",
-                    help="with --cpu atomic: each instruction's cycles from "
-                    "the M33's latency table, with RP2350XIP's flash misses "
-                    "(arm-m4-proxy only)")
 parser.add_argument("--tick-limit", type=int, default=100_000_000_000)
 args = parser.parse_args()
 if args.list_configs:
@@ -147,14 +139,12 @@ board = make_board(
     sram4_7=args.sram4_7,
     cpu=args.cpu,
     cores=args.cores,
-    inst_latency=args.inst_latency,
 )
-if args.xip_model == "legacy":
-    board.xip_cache.tag_latency = args.xip_hit_latency_cycles
-    board.xip_cache.data_latency = args.xip_hit_latency_cycles
-    if args.xip_replacement == "random":
-        from m5.objects import RandomRP
-        board.xip_cache.replacement_policy = RandomRP()
+board.xip_cache.tag_latency = args.xip_hit_latency_cycles
+board.xip_cache.data_latency = args.xip_hit_latency_cycles
+if args.xip_replacement == "random":
+    from m5.objects import RandomRP
+    board.xip_cache.replacement_policy = RandomRP()
 board.exit_on_work_items = True
 # What was simulated, beside stats.txt and config.ini: the SoC config (null
 # without --soc-config), the system it set, its manifest values and how it
@@ -182,12 +172,9 @@ if args.soc_config:
 print(f"RP2350 core={args.core} cpu={args.cpu} cores={args.cores} "
       "clock=150MHz")
 print("XIP=0x10000000+16MiB cache=16KiB/2-way/8B")
-if args.xip_model == "qmi":
-    print("XIP model=qmi: two cache banks, flash interface timing of a Pico 2")
-else:
-    print(f"XIP cache tag/data latency={args.xip_hit_latency_cycles} cycles; "
-          f"replacement={args.xip_replacement}; "
-          f"QMI delay={args.xip_miss_ns} ns")
+print(f"XIP cache tag/data latency={args.xip_hit_latency_cycles} cycles; "
+      f"replacement={args.xip_replacement}; "
+      f"QMI delay={args.xip_miss_ns} ns")
 if args.sram4_7:
     print("SRAM=0x20000000+512KiB group windows, 0x20080000/0x20081000+4KiB")
 else:

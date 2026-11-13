@@ -18,43 +18,14 @@ from m5.objects import (
 )
 
 
-# The core clock (board.clk_domain): the CPU, its cycle counter, RP2350XIP and
-# the banked SRAM. make_board(clock=) sets another.
+# The core clock (board.clk_domain): the CPU, its cycle counter, the XIP
+# cache and the banked SRAM. make_board(clock=) sets another.
 CLOCK = "150MHz"
 # make_board's xip_model values (run.py's --xip-model, and bench's runner asks for them)
-XIP_MODELS = ("legacy", "qmi", "soc", "soc-no-cache")
+XIP_MODELS = ("legacy",)
 XIP_BASE = 0x10000000
 XIP_SIZE = "16MiB"  # flash
 
-
-def xip_costs(clock):
-    """RP2350XIP's (miss_cycles, chained_cycles, reselect_cycles) at a core
-    clock ("150MHz" or a period such as "3333ps"), for the flash timing that
-    arcsim-bench's operating_point.c sets there and the boot ROM's at 150 MHz
-    and below. As measured on a Pico 2 at 150, 200, 250 and 300 MHz: a fresh
-    or chained transfer takes a cycle more once RXDELAY (round(f * 12 ns))
-    reaches 3, and the reselect is MIN_DESELECT (ceil(7 f / 150 MHz)) plus 3.
-    Above 300 MHz the flash divider is past 3, which was not measured."""
-    from m5.util.convert import toFrequency, toLatency
-
-    text = str(clock)
-    if text.endswith("s") and not text.endswith("Hz"):
-        hz = 1 / toLatency(text)
-    else:
-        hz = toFrequency(text)
-    # The period string is rounded to a picosecond (3333 ps): the image's
-    # clock is a whole number of MHz
-    mhz = round(hz / 1e6)
-    if mhz <= 150:
-        return 110, 50, 10
-    if mhz > 300:
-        raise ValueError(
-            f"RP2350XIP's flash costs are measured up to 300 MHz, not {mhz} MHz"
-        )
-    rxdelay = (mhz * 12 + 500) // 1000
-    deselect = (7 * mhz + 149) // 150
-    extra = (rxdelay - 2 + 1) // 2
-    return 110 + extra, 50 + extra, deselect + 3
 
 # Physical windows; the legacy model lumps each striped group together.
 SRAM_REGIONS = (
@@ -172,44 +143,19 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
     # XIP path: the front router merges instruction and data requests before
     # the shared cache. The QMI bridge connects only to flash memory.
     # The physical XIP cache is shared by instruction fetch and data reads.
+    # Cache geometry matches RP2350; gem5 hit and QMI miss timing are proxies.
+    board.flash = SimpleMemory(range=xip_range, latency="1ns")
+    board.xip_cache = NoncoherentCache(
+        size="16KiB", assoc=2, tag_latency=1, data_latency=1,
+        response_latency=1, mshrs=4, tgts_per_mshr=4,
+        addr_ranges=[xip_range],
+    )
+    board.qmi_delay = Bridge(delay=f"{xip_miss_ns}ns")
+    board.xip_cache.mem_side = board.qmi_delay.cpu_side_port
+    board.qmi_delay.mem_side_port = board.flash.port
+
     board.xip_front = _router(board.fast_clock)
-    if xip_model == "soc-no-cache":
-        # arcsim-soc's RTL code memory before its XIP cache (soc 2c62f3a and
-        # earlier) in place of the XIP path: its testbench's "magic mem" at
-        # 0x10000000 (soc.v), an AHB minion with zero wait states and one
-        # transfer a cycle behind the crossbar, as an SRAM bank is (rtl-sim's
-        # sim_top::step answers every data phase in its cycle).
-        from m5.objects import RP2350SRAM
-        board.flash = RP2350SRAM(range=xip_range, one_bank=True,
-                                 clk_domain=board.clk_domain)
-        board.xip_front.mem_side_ports = board.flash.port
-    elif xip_model == "qmi":
-        # The cache's two banks and the flash interface's serial transfers,
-        # with a Pico 2's timing at the core clock (RP2350XIP, xip_costs);
-        # xip_miss_ns is not used.
-        from m5.objects import RP2350XIP
-        miss, chained, reselect = xip_costs(clock)
-        board.flash = RP2350XIP(range=xip_range, clk_domain=board.clk_domain,
-                                miss_cycles=miss, chained_cycles=chained,
-                                reselect_cycles=reselect)
-        board.xip_front.mem_side_ports = board.flash.port
-    else:
-        # Cache geometry matches RP2350; gem5 hit and QMI miss timing are
-        # proxies.
-        board.flash = SimpleMemory(range=xip_range, latency="1ns")
-        # A hit answers in the core cycle it is asked, as an SRAM read does
-        # (RP2350 datasheet 4.4.1, "1 cycle hit"): a request waits for the
-        # cache's next clock edge, so the cache runs on the routers' clock,
-        # with zero tag, data and response latency.
-        board.xip_cache = NoncoherentCache(
-            size="16KiB", assoc=2, tag_latency=0, data_latency=0,
-            response_latency=0, mshrs=4, tgts_per_mshr=4,
-            addr_ranges=[xip_range], clk_domain=board.fast_clock,
-        )
-        board.qmi_delay = Bridge(delay=f"{xip_miss_ns}ns")
-        board.xip_cache.mem_side = board.qmi_delay.cpu_side_port
-        board.qmi_delay.mem_side_port = board.flash.port
-        board.xip_front.mem_side_ports = board.xip_cache.cpu_side
+    board.xip_front.mem_side_ports = board.xip_cache.cpu_side
 
     # Core 0's routers; _make_riscv adds the other cores'.
     _core_routers(board, 0)
@@ -238,7 +184,7 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
 def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
               scratch_bank_bandwidth, arm_predictor, arm_divider, sram_model,
               arm_timing, dma, xip_model, cpu, switch_cpu=None,
-              clock=CLOCK, inst_latency=False, cores=1):
+              clock=CLOCK, cores=1):
     from m5.objects import ArmMSystem, ArmSemihosting
     from m5.objects.ArmMSystem import ArmMReleaseCortexM33
     from m5.objects.ArmMFsWorkload import ArmMFsWorkload
@@ -323,29 +269,11 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
             core.executeWaitedStoreHoldsInsts = board._banked_sram
             core.executeWaitedLoadHoldsInsts = board._banked_sram
 
-        if kind == "atomic" and inst_latency:
-            # Each instruction's cycles from the Cortex-M33's table (the
-            # classes CortexM33CPU times by) and its flash misses' from
-            # RP2350XIP, in place of a cycle a micro-op. An APB register
-            # read takes at least 3 cycles and a write 4 [RP2350 datasheet
-            # 2.1.4]: 2 and 3 over the instruction's own.
-            from gem5.prebuilt.cortexm.cpu.cortex_m33_latency import (
-                cortex_m33_inst_latency,
-            )
-            core.inst_latency = cortex_m33_inst_latency(
-                timed_ranges=[board.flash.range],
-                wait_ranges=[AddrRange(0x40000000, 0x50000000)],
-                wait_cycles=[2],
-                wait_write_cycles=[3],
-            )
         core.clk_domain = board.clk_domain
         core.createThreads()
         core.createInterruptController()
         return core
 
-    if inst_latency:
-        board.flash.track_tags = True
-        board.flash.atomic_latency = True
     board.cpu = arm_cpu(cpu)
     board._cores = [board.cpu]
     board.mem_mode = board.cpu.memory_mode()
@@ -537,11 +465,9 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     board.tb_io = Hazard3TbIO(pio_latency="1ns")
     board.tb_io.pio = board.sram_bus.mem_side_ports
     # XIP_CTRL's cache counters at 0x400c8000 (arcsim-soc rtl/xip/xipCtrl.sv),
-    # counting the QMI model's accesses; 0 with the legacy XIP cache
+    # which read 0: nothing counts the XIP cache's hits and accesses
     from m5.objects import RP2350XipCtrl
     board.xip_ctrl = RP2350XipCtrl(pio_latency="1ns")
-    if xip_model == "qmi":
-        board.xip_ctrl.xip = board.flash
     board.xip_ctrl.pio = board.sram_bus.mem_side_ports
     # No HWPE and no TCDM (hwpe empty, the only one modelled): their
     # addresses fault, as in soc.v without an accelerator (XCEL_PRESENT=0).
@@ -552,9 +478,6 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     # access leaves it, so they are precise.
     # flash and SRAM (without SRAM4-7 if absent)
     accessible = list(board.mem_ranges)
-    if xip_model == "qmi":
-        accessible.append(AddrRange(int(board.flash.maintenance_base),
-                                    size=XIP_SIZE))
     if dma:
         # Its four register blocks (normal, XOR, SET, CLR), rp2350_dma.cc
         accessible.append(AddrRange(int(board.dma.pio_addr), size=0x4000))
@@ -615,7 +538,7 @@ def memory_models(model, sram_model=None, dma=None, xip_model=None):
     if dma is None:
         dma = accurate
     if xip_model is None:
-        xip_model = "qmi" if accurate else "legacy"
+        xip_model = "legacy"
     return sram_model, dma, xip_model
 
 
@@ -634,19 +557,14 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     simulator: the same ISA and devices, no core timing.
 
     model names the memory system: "legacy" is the lumped SRAM windows and
-    the generic cache in front of flash; "accurate" is the banked SRAM, the
-    DMA controller and RP2350XIP, the models timed against a Pico 2.
+    the generic cache in front of flash; "accurate" is the banked SRAM and
+    the DMA controller, with the same generic cache in front of flash.
     sram_model, dma and xip_model each choose one part and override model.
 
     dma adds the DMA controller (RP2350DMA) at 0x50000000-0x50003fff; on the
     Hazard3 proxy its interrupt outputs are left unconnected. xip_model
-    "qmi" replaces the generic cache and fixed miss delay in front of flash
-    with RP2350XIP. "soc" (hazard3-proxy only) is arcsim-soc's RTL from its
-    XIP cache on (soc e5fd0f3): the same cache in front of flash, its flash
-    timing fitted to RP2350XIP's, so the board is qmi's; "soc-no-cache"
-    (hazard3-proxy only) is the RTL before it, its code memory at 0x10000000
-    with zero wait states and one transfer a cycle, as rtl-sim's testbench
-    answered soc.v there. hwpe names the Hazard3 board's HWPE, as
+    is "legacy" (XIP_MODELS), the generic cache and fixed miss delay in
+    front of flash. hwpe names the Hazard3 board's HWPE, as
     arcsim-soc's CONFIG_HWPE; only empty, the default, is modelled (HWPES):
     no HWPE and no TCDM, as arcsim-soc's configs without an accelerator
     (XCEL_PRESENT=0). Any other is refused as not modelled. sram4_7
@@ -656,13 +574,10 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     switch_cpu ("minor" or "atomic", either proxy) adds board.switch_cpu,
     a core of that kind switched out, for m5.switchCpus. clock is the core
     clock (CLOCK, a Pico 2's default), for firmware built for another.
-    RP2350XIP and the banked SRAM count in its cycles; the legacy flash
-    delay (xip_miss_ns) and SRAM latency (sram_latency_ns) are in ns.
-    inst_latency gives the M33's atomic CPU (cpu or switch_cpu "atomic")
-    time: each instruction's cycles from the Cortex-M33's latency table
-    (cortex_m33_latency.py) and its flash misses' from RP2350XIP, which
-    then tracks its tags, in place of a cycle a micro-op; it needs
-    xip_model "qmi".
+    The XIP cache and the banked SRAM count in its cycles; the flash delay
+    (xip_miss_ns) and the legacy SRAM latency (sram_latency_ns) are in ns.
+    inst_latency (an atomic CPU timed by a latency table) is refused: this
+    board has no table.
 
     cores is 1 or 2, not yet with switch_cpu. On the arm-m4-proxy, 2 adds
     the RP2350's second M33 (board.cpu1, of the same kind as cpu), which
@@ -677,13 +592,6 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
         raise ValueError(f"Unknown SRAM model: {sram_model}")
     if xip_model not in XIP_MODELS:
         raise ValueError(f"Unknown XIP model: {xip_model}")
-    if xip_model in ("soc", "soc-no-cache") and core != "hazard3-proxy":
-        raise ValueError(f"xip_model {xip_model} is arcsim-soc's, for the "
-                         "hazard3-proxy")
-    # arcsim-soc's XIP cache is RP2350XIP's shape, with flash timing fitted
-    # to it: the board is qmi's
-    if xip_model == "soc":
-        xip_model = "qmi"
     if cpu not in ("minor", "atomic"):
         raise ValueError(f"Unknown CPU: {cpu}")
     if hwpe not in HWPES:
@@ -702,9 +610,8 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
         raise ValueError("cores is 1 or 2")
     if cores == 2 and switch_cpu:
         raise ValueError("cores 2 is without switch_cpu")
-    if inst_latency and (core != "arm-m4-proxy" or xip_model != "qmi"):
-        raise ValueError("inst_latency is for the arm-m4-proxy, with "
-                         "xip_model qmi")
+    if inst_latency:
+        raise ValueError("inst_latency is not available on this board")
     if core == "arm-m4-proxy":
         return _make_arm(firmware, xip_miss_ns=xip_miss_ns,
                          sram_latency_ns=sram_latency_ns,
@@ -714,7 +621,7 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                          arm_timing=arm_timing, dma=dma,
                          xip_model=xip_model, cpu=cpu,
                          switch_cpu=switch_cpu, clock=clock,
-                         inst_latency=inst_latency, cores=cores)
+                         cores=cores)
     if core == "hazard3-proxy":
         return _make_riscv(firmware, xip_miss_ns=xip_miss_ns,
                            sram_latency_ns=sram_latency_ns,
