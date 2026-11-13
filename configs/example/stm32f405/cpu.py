@@ -5,9 +5,12 @@ is an F405 option: CortexM4CPU and the G474 board are unchanged.
 - Each access is made as aligned 32-bit transfers, a cycle each (MinorCPU's
   executeAlignedTransfers): LDRD and STRD take two, an unaligned word two or three.
 - The floating-point units are CortexM4CPU's, with the result delays the Crazyflie shows:
-  a cycle for VADD, VSUB, VMUL and VCVT, for VMOV to a core register, and for VMLA and
-  VFMA (whose accumulator is exempt: the next one accumulating onto it is not held), and
-  VMRS of the flags a cycle more.
+  a cycle for VADD, VSUB, VMUL and VCVT, and for VMLA and VFMA (whose accumulator is
+  exempt: the next one accumulating onto it is not held). VMOV to a core register has
+  none (micro/fp_delay's vmov_use, its result used at once, takes vmov_skip's 59 cycles
+  from flash and the same as vmov_skip in every setting). VMRS of the flags takes a cycle
+  more, as a branch or IT on the flags right after it waits on the Crazyflie (vcmp_branch
+  with prefetch off: 108 cycles).
 - VMLA and VFMA keep the floating-point unit 3 cycles, and in those cycles no other
   floating-point instruction issues (FP_INST: any, VLDR and VSTR included, through MinorFU's
   busyHoldMask), while an integer instruction issues and completes beside them
@@ -60,7 +63,7 @@ def _ops(names):
 
 class F405FloatFU(M4FloatFU):
     timings = [
-        MinorFUTiming(description="F405FToCore", srcRegsRelativeLats=[1], resultUsePenalty=1, **_VMOV_TO_CORE),
+        MinorFUTiming(description="F405FToCore", srcRegsRelativeLats=[1], **_VMOV_TO_CORE),
         MinorFUTiming(description="F405FFlags", srcRegsRelativeLats=[1], extraCommitLat=1, **_VMRS_FLAGS),
         MinorFUTiming(
             description="F405FArith",
