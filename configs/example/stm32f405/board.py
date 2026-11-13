@@ -3,7 +3,7 @@ CortexM4CPU, Cortex-M4 r0p1 on both, with the Crazyflie's own timing), the F405'
 settings, SRAM on the system bus and CCM on the data bus only.
 
     make_board(firmware, caches="full", clock_mhz=168, flash_ws=5, cpu="minor",
-               inst_latency=False) -> ArmMSystem
+               inst_latency=False, timing="tuned") -> ArmMSystem
 
 caches names FLASH_ACR's bits as arcsim-bench does: full (ICEN DCEN PRFTEN),
 noprefetch (ICEN DCEN), nocache (PRFTEN), none. Peripherals beyond the SCS and
@@ -97,12 +97,20 @@ def flash_latency_ps(caches, clock_mhz, flash_ws):
 
 
 def make_board(
-    firmware=None, *, caches="full", clock_mhz=168, flash_ws=5, cpu="minor", inst_latency=False
+    firmware=None, *, caches="full", clock_mhz=168, flash_ws=5, cpu="minor", inst_latency=False,
+    timing="tuned"
 ):
+    """timing "prior-m4" gives the timed core (cpu "minor") the Cortex-M4 model as published
+    before ARCsim's tuning (CortexM4CPU with use_pre_tuning_timing) in place of the
+    Crazyflie's own, on the same board and flash, for comparing the two."""
     if caches not in CACHES:
         raise ValueError(f"caches is one of {', '.join(CACHES)}, not {caches}")
     if cpu not in ("minor", "atomic"):
         raise ValueError(f"cpu is minor or atomic, not {cpu}")
+    if timing not in ("tuned", "prior-m4"):
+        raise ValueError(f"timing is tuned or prior-m4, not {timing}")
+    if timing != "tuned" and cpu != "minor":
+        raise ValueError("timing prior-m4 is for the minor CPU")
     if inst_latency and cpu != "atomic":
         raise ValueError("inst_latency is for the atomic CPU")
     cache_on, prefetch_on = CACHES[caches]
@@ -143,6 +151,11 @@ def make_board(
             cpu.inst_latency = f405_inst_latency(
                 timed_ranges=[FLASH], bus_ranges=[SRAM], bus_word_fifo=3, unaligned_pieces=True
             )
+    elif timing == "prior-m4":
+        from gem5.prebuilt.cortexm.cpu.cortex_m4 import CortexM4CPU, use_pre_tuning_timing
+
+        cpu = CortexM4CPU()
+        use_pre_tuning_timing(cpu)
     else:
         cpu = CrazyflieF405CPU()  # cpu.py: CortexM4CPU with the Crazyflie's own timing
     board.cpu = cpu
