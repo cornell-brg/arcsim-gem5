@@ -3,7 +3,7 @@ CortexM4CPU, Cortex-M4 r0p1 on both, with the Crazyflie's own timing), the F405'
 settings, SRAM on the system bus and CCM on the data bus only.
 
     make_board(firmware, caches="full", clock_mhz=168, flash_ws=5, cpu="minor",
-               inst_latency=False) -> ArmMSystem
+               inst_latency=False, timing="tuned") -> ArmMSystem
 
 caches names FLASH_ACR's bits as arcsim-bench does: full (ICEN DCEN PRFTEN),
 noprefetch (ICEN DCEN), nocache (PRFTEN), none. Peripherals beyond the SCS and

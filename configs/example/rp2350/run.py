@@ -57,11 +57,17 @@ parser.add_argument("--arm-predictor",
                     default="m4")
 parser.add_argument("--arm-divider", choices=("m4", "rp2350-m33"),
                     default="rp2350-m33")
-parser.add_argument("--arm-timing", choices=("tuned", "pre-tuning"),
+parser.add_argument("--arm-timing",
+                    choices=("tuned", "pre-tuning", "prior-m4"),
                     default="tuned",
                     help="CortexM33CPU timing, tuned against a Pico 2, or the "
                     "CortexM4CPU's as it was before its tuning against the "
-                    "STM32G474")
+                    "STM32G474: with this board's options (pre-tuning) or as "
+                    "published (prior-m4)")
+parser.add_argument("--hazard3-timing", choices=("tuned", "minor-defaults"),
+                    default="tuned",
+                    help="the Hazard3 proxy's timing, or gem5's MinorCPU on "
+                    "its default parameters")
 parser.add_argument("--dma", action=argparse.BooleanOptionalAction,
                     help="Add the DMA controller")
 parser.add_argument("--xip-model",
@@ -142,6 +148,7 @@ board = make_board(
     arm_divider=args.arm_divider,
     sram_model=args.sram_model,
     arm_timing=args.arm_timing,
+    hazard3_timing=args.hazard3_timing,
     dma=args.dma,
     xip_model=args.xip_model,
     hwpe=args.hwpe,

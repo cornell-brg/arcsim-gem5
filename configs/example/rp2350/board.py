@@ -306,9 +306,10 @@ def _make_arm(firmware, *, xip_miss_ns, sram_latency_ns,
 
     def arm_cpu(kind, switched_out=False, cpu_id=0):
         """A Cortex-M33 core of the kind given (atomic or minor)."""
-        # The CortexM33CPU timing, tuned against a Pico 2 (the default), or
-        # the CortexM4CPU's as it was before its tuning against the
-        # STM32G474; or the atomic CPU, with no core timing.
+        # The CortexM33CPU timing, tuned against a Pico 2 (the default); the
+        # CortexM4CPU's as it was before its tuning against the STM32G474,
+        # with this board's options (pre-tuning) or as published (prior-m4);
+        # or the atomic CPU, with no core timing.
         if kind == "atomic":
             from m5.objects.ArmMCPU import ArmMAtomicSimpleCPU
             core = ArmMAtomicSimpleCPU(cpu_id=cpu_id, switched_out=switched_out)
@@ -930,6 +931,11 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
         raise ValueError(f"Unknown Hazard3 timing: {hazard3_timing}")
     if hazard3_timing != "tuned" and core != "hazard3-proxy":
         raise ValueError("hazard3_timing is for the hazard3-proxy")
+    # A baseline is the timed core's: with no minor core there is none to give it to.
+    if "minor" not in (cpu, switch_cpu) and (
+            hazard3_timing != "tuned" or arm_timing == "prior-m4"):
+        raise ValueError("hazard3_timing minor-defaults and arm_timing "
+                         "prior-m4 are for the minor CPU")
     if hwpe not in HWPES:
         raise ValueError(f"Unknown HWPE: {hwpe}")
     if zfinx and core != "hazard3-proxy":
