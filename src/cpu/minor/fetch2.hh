@@ -1,0 +1,361 @@
+/*
+ * Copyright (c) 2013-2014 ARM Limited
+ * All rights reserved
+ *
+ * The license below extends only to copyright in the software and shall
+ * not be construed as granting a license to any other intellectual
+ * property including but not limited to intellectual property relating
+ * to a hardware implementation of the functionality of the software
+ * licensed hereunder.  You may use the software subject to the license
+ * terms below provided that you ensure that this notice is replicated
+ * unmodified and in its entirety in all distributions of the software,
+ * modified or unmodified, in source code or in binary form.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met: redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer;
+ * redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution;
+ * neither the name of the copyright holders nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/**
+ * @file
+ *
+ *  Fetch2 receives lines of data from Fetch1, separates them into
+ *  instructions and passes them to Decode
+ */
+
+#ifndef __CPU_MINOR_FETCH2_HH__
+#define __CPU_MINOR_FETCH2_HH__
+
+#include <vector>
+
+#include "base/named.hh"
+#include "cpu/minor/buffers.hh"
+#include "cpu/minor/cpu.hh"
+#include "cpu/minor/pipe_data.hh"
+#include "cpu/pred/bpred_unit.hh"
+#include "params/BaseMinorCPU.hh"
+
+namespace gem5
+{
+
+namespace minor
+{
+
+/** This stage receives lines of data from Fetch1, separates them into
+ *  instructions and passes them to Decode */
+class Fetch2 : public Named
+{
+  protected:
+    /** Pointer back to the containing CPU */
+    MinorCPU &cpu;
+
+    /** Input port carrying lines from Fetch1 */
+    Latch<ForwardLineData>::Output inp;
+
+    /** Input port carrying branches from Execute.  This is a snoop of the
+     *  data provided to F1. */
+    Latch<BranchData>::Output branchInp;
+
+    /** Output port carrying predictions back to Fetch1 */
+    Latch<BranchData>::Input predictionOut;
+
+    /** Output port carrying instructions into Decode */
+    Latch<ForwardInstData>::Input out;
+
+    /** Interface to reserve space in the next stage */
+    std::vector<InputBuffer<ForwardInstData>> &nextStageReserve;
+
+    /** Width of output of this stage/input of next in instructions */
+    unsigned int outputWidth;
+
+    /** If true, more than one input word can be processed each cycle if
+     *  there is room in the output to contain its processed data */
+    bool processMoreThanOneInput;
+
+    /** See fetchFoldMasks in BaseMinorCPU.py */
+    std::vector<uint64_t> foldMasks;
+    std::vector<uint64_t> foldMatches;
+    std::vector<unsigned int> foldKinds;
+
+    /** How static_inst folds: 0 not at all, 1 into the 16-bit instruction
+     *  before it, 2 into the one after it */
+    unsigned int foldKind(const StaticInstPtr &static_inst) const;
+
+    /** Does next fold into first, the 16-bit instruction before it?  Not
+     *  into one of several micro-ops, whose last has no room beside it,
+     *  nor a branch into a branch */
+    bool foldsInto(const StaticInstPtr &next,
+        const StaticInstPtr &first) const;
+
+    /** The next instruction of the line being decoded, if all of it is in
+     *  that line, and its size, without taking it; null otherwise */
+    StaticInstPtr peekNext(ThreadID tid, Addr &size);
+
+    /** Branch predictor passed from Python configuration */
+    branch_prediction::BPredUnit &branchPredictor;
+
+  public:
+    /* Public so that Pipeline can pass it to Fetch1 */
+    std::vector<InputBuffer<ForwardLineData>> inputBuffer;
+
+  protected:
+    /** Data members after this line are cycle-to-cycle state */
+
+    struct Fetch2ThreadInfo
+    {
+        Fetch2ThreadInfo() {}
+
+        Fetch2ThreadInfo(const Fetch2ThreadInfo& other) :
+            inputIndex(other.inputIndex),
+            havePC(other.havePC),
+            lastStreamSeqNum(other.lastStreamSeqNum),
+            expectedStreamSeqNum(other.expectedStreamSeqNum),
+            predictionSeqNum(other.predictionSeqNum),
+            blocked(other.blocked)
+        {
+            set(pc, other.pc);
+        }
+
+        /** Index into an incompletely processed input line that instructions
+         *  are to be extracted from */
+        unsigned int inputIndex = 0;
+
+
+        /** Remembered program counter value.  Between contiguous lines, this
+         *  is just updated with advancePC.  For lines following changes of
+         *  stream, a new PC must be loaded and havePC be set.
+         *  havePC is needed to accomodate instructions which span across
+         *  lines meaning that Fetch2 and the decoder need to remember a PC
+         *  value and a partially-offered instruction from the previous line */
+        std::unique_ptr<PCStateBase> pc;
+
+        /** PC is currently valid.  Initially false, gets set to true when a
+         *  change-of-stream line is received and false again when lines are
+         *  discarded for any reason */
+        bool havePC = false;
+
+        /** Stream sequence number of the last seen line used to identify
+         *  changes of instruction stream */
+        InstSeqNum lastStreamSeqNum = InstId::firstStreamSeqNum;
+
+        /** Fetch2 is the source of fetch sequence numbers.  These represent the
+         *  sequence that instructions were extracted from fetched lines. */
+        InstSeqNum fetchSeqNum = InstId::firstFetchSeqNum;
+
+        /** Stream sequence number remembered from last time the
+         *  predictionSeqNum changed.  Lines should only be discarded when their
+         *  predictionSeqNums disagree with Fetch2::predictionSeqNum *and* they
+         *  are from the same stream that bore that prediction number */
+        InstSeqNum expectedStreamSeqNum = InstId::firstStreamSeqNum;
+
+        /** Fetch2 is the source of prediction sequence numbers.  These
+         *  represent predicted changes of control flow sources from branch
+         *  prediction in Fetch2. */
+        InstSeqNum predictionSeqNum = InstId::firstPredictionSeqNum;
+
+        /** Blocked indication for report */
+        bool blocked = false;
+    };
+
+    std::vector<Fetch2ThreadInfo> fetchInfo;
+    ThreadID threadPriority;
+
+    struct Fetch2Stats : public statistics::Group
+    {
+        Fetch2Stats(MinorCPU *cpu);
+        /** Stats */
+        statistics::Scalar totalInstructions;
+        statistics::Scalar intInstructions;
+        statistics::Scalar fpInstructions;
+        statistics::Scalar vecInstructions;
+        statistics::Scalar loadInstructions;
+        statistics::Scalar storeInstructions;
+        statistics::Scalar amoInstructions;
+    } stats;
+
+  protected:
+    /** Get a piece of data to work on from the inputBuffer, or 0 if there
+     *  is no data. */
+    const ForwardLineData *getInput(ThreadID tid);
+
+    /** Pop an element off the input buffer, if there are any */
+    void popInput(ThreadID tid);
+
+    /** Dump the whole contents of the input buffer.  Useful after a
+     *  prediction changes control flow */
+    void dumpAllInput(ThreadID tid);
+
+    /** Update local branch prediction structures from feedback from
+     *  Execute. */
+    void updateBranchPrediction(const BranchData &branch);
+
+    /** Predicts branches for the given instruction.  Updates the
+     *  instruction's predicted... fields and also the branch which
+     *  carries the prediction to Fetch1 */
+    virtual void predictBranch(MinorDynInstPtr inst, BranchData &branch);
+
+    /** Use the current threading policy to determine the next thread to
+     *  fetch from. */
+    ThreadID getScheduledThread();
+
+  public:
+    Fetch2(const std::string &name,
+        MinorCPU &cpu_,
+        const BaseMinorCPUParams &params,
+        Latch<ForwardLineData>::Output inp_,
+        Latch<BranchData>::Output branchInp_,
+        Latch<BranchData>::Input predictionOut_,
+        Latch<ForwardInstData>::Input out_,
+        std::vector<InputBuffer<ForwardInstData>> &next_stage_input_buffer);
+
+    virtual ~Fetch2();
+
+  public:
+    /** Pass on input/buffer data to the output if you can */
+    virtual void evaluate();
+
+    void minorTrace() const;
+
+
+    /** Is this stage drained?  For Fetch2, draining is initiated by
+     *  Execute halting Fetch1 causing Fetch2 to naturally drain.
+     *  Branch predictions are ignored by Fetch1 during halt */
+    bool isDrained();
+
+  protected:
+    /** Core evaluation logic, parameterized by prediction output.
+     *  Contains: execute branch reaction, decode loop, instruction
+     *  extraction, branch prediction, activity recording. */
+    void evaluateCore(BranchData &prediction_out);
+
+    /** React to Execute branch: update branch predictor, dump input if
+     *  stream change. Pure logic, no stage-ID-dependent operations. */
+    void reactToExecuteBranch();
+
+    /** Discard input lines with stale prediction sequence numbers.
+     *  Pure logic operating on inputBuffer. */
+    void discardStaleLines();
+
+    /** Main decode loop: extract instructions from inputBuffer, run
+     *  branch prediction, pack output into f2ToD latch. */
+    void decodeInstructions(BranchData &prediction_out);
+
+    /** Post-decode: activity recording and stage activation.
+     *  stageId controls which stage gets activated when there is
+     *  more input to process. */
+    void postDecode(unsigned int active_stage_id);
+};
+
+/** SingleStageFetch2 is a no-op in single-stage fetch mode. All Fetch2
+ *  logic is driven by SingleStageFetch1::evaluate() via runDecodeCore(). */
+class SingleStageFetch2 : public Fetch2
+{
+  protected:
+    /** See fetchBranchTargetAtDecode in BaseMinorCPU.py */
+    bool branchTargetAtDecode;
+
+    /** See fetchBranchSpeculation in BaseMinorCPU.py */
+    bool branchSpeculation;
+
+  public:
+    /** See fetchRegisterTargetAtDecode in BaseMinorCPU.py */
+    bool registerTargetAtDecode;
+
+  public:
+    /** The oldest unconditional branch decoded in this stream, which
+     *  ends the stream's sequential fetches; null if none */
+    MinorDynInstPtr sureBranch;
+
+    /** The youngest branch decoded in this stream; null if none */
+    MinorDynInstPtr lastBranch;
+
+    /** The direct branch decoded this cycle and its target, to be
+     *  fetched next cycle */
+    std::unique_ptr<PCStateBase> decodedBranchTarget;
+    MinorDynInstPtr decodedBranch;
+    ThreadID decodedBranchTid;
+
+    /** The branch to a register's value decoded last, whose target is
+     *  still to be fetched, and the cycles left to try in; null if none */
+    MinorDynInstPtr decodedRegisterBranch;
+    unsigned int decodedRegisterTries = 0;
+
+    bool targetAtDecode() const { return branchTargetAtDecode; }
+    bool registerAtDecode() const { return registerTargetAtDecode; }
+
+  public:
+    SingleStageFetch2(const std::string &name,
+        MinorCPU &cpu_,
+        const BaseMinorCPUParams &params,
+        Latch<ForwardLineData>::Output inp_,
+        Latch<BranchData>::Output branchInp_,
+        Latch<BranchData>::Input predictionOut_,
+        Latch<ForwardInstData>::Input out_,
+        std::vector<InputBuffer<ForwardInstData>> &next_stage_input_buffer);
+
+    ~SingleStageFetch2() override = default;
+
+    void evaluate() override;
+
+    /** Run decode core logic. Called by SingleStageFetch1 in combined
+     *  single-stage mode. Uses Fetch1StageId for activation.
+     *  @param executeBranch same-cycle Execute branch (eToF1 input wire) */
+    void runDecodeCore(BranchData &prediction_out,
+                       const BranchData &executeBranch,
+                       ForwardLineData *first_line = nullptr);
+
+    /** Override: for direct branches, predict taken and supply target
+     *  from branchTarget() — modeling Cortex-M4 early address speculation
+     *  [DDI0439D §3.3.1]. Calls base class first to preserve BPredUnit
+     *  history and stats, then overrides the result for direct branches. */
+    void predictBranch(MinorDynInstPtr inst, BranchData &branch) override;
+
+    /** Override: on misprediction, check if the correct target is already
+     *  in the input buffer before dumping. For 16-bit branches, the
+     *  fall-through is in the same 4-byte fetch line — no re-fetch needed.
+     *  Uses same-cycle execute branch (not the 1-cycle delayed latch). */
+    void reactToExecuteBranch(const BranchData &executeBranch);
+
+    /** Peek at the next instruction in the current input line without
+     *  advancing decode state. Returns true if it is a control-flow
+     *  instruction (branch/call/return). Used by SingleStageFetch1 to
+     *  suppress sequential prefetching when a branch is imminent —
+     *  modeling the Cortex-M4's ability to detect branches in the
+     *  32-bit fetch word during decode [DDI0439D §3.3]. */
+    bool scanNextForBranch();
+
+    /** If the instructions being decoded are of the stream and prediction
+     *  given, set addr to the address of the next to decode and return
+     *  true */
+    bool decodeAddr(ThreadID tid, InstSeqNum stream_seq_num,
+        InstSeqNum prediction_seq_num, Addr &addr) const;
+
+    /** Check if the next stage (Decode) is blocked. */
+    bool isNextStageBlocked(ThreadID tid) const {
+        return !nextStageReserve[tid].canReserve();
+    }
+};
+
+} // namespace minor
+} // namespace gem5
+
+#endif /* __CPU_MINOR_FETCH2_HH__ */

@@ -1,0 +1,3 @@
+Import('*')
+SimObject('RP2350SRAMTest.py', sim_objects=['RP2350SRAMTest'])
+Source('rp2350_sram_test.cc')
