@@ -73,14 +73,17 @@ parser.add_argument("--xip-model",
                     "states; the XIP knobs apply only to legacy")
 parser.add_argument("--hwpe", choices=tuple(HWPES),
                     help="The HWPE on the Hazard3 board, as arcsim-soc's "
-                    "CONFIG_HWPE; only empty is modelled: no HWPE and no "
-                    "TCDM, as arcsim-soc's configs without an accelerator "
+                    "CONFIG_HWPE; empty is no HWPE and no TCDM, as "
+                    "arcsim-soc's configs without an accelerator "
                     "(default)")
 parser.add_argument("--no-sram4-7", dest="sram4_7", action="store_false",
                     default=None,
                     help="Without SRAM4-7 on the hazard3-proxy "
                     "(0x20040000-0x2007ffff fault), as arcsim-soc's "
                     "SRAM4_7_PRESENT=0")
+parser.add_argument("--hwpe-timed-in-atomic", action="store_true",
+                    help="With --cpu atomic, the HWPE's jobs still take the cycles "
+                    "they take with a timing CPU")
 parser.add_argument("--zfinx", action="store_true", default=None,
                     help="Zfinx on the hazard3-proxy, as arcsim-soc's FPU "
                     "zfinx: not modelled in gem5, so refused; gem5's Hazard3 "
@@ -143,6 +146,7 @@ board = make_board(
     dma=args.dma,
     xip_model=args.xip_model,
     hwpe=args.hwpe,
+    hwpe_timed_in_atomic=args.hwpe_timed_in_atomic,
     zfinx=args.zfinx,
     sram4_7=args.sram4_7,
     cpu=args.cpu,
@@ -198,7 +202,10 @@ if args.sram_model == "banked":
 else:
     print(f"SRAM model=legacy; scratch bank effective bandwidth={args.scratch_bank_bandwidth}")
 if args.core == "hazard3-proxy":
-    print("HWPE=empty: no HWPE, no TCDM")
+    if args.hwpe == "empty":
+        print("HWPE=empty: no HWPE, no TCDM")
+    else:
+        print(f"HWPE={args.hwpe} at 0x50800000, TCDM=0x60000000+256KiB")
     print("FPU=f+d")
 roi_start = None
 roi_number = 0
