@@ -22,7 +22,7 @@ from m5.objects import (
 # cache and the banked SRAM. make_board(clock=) sets another.
 CLOCK = "150MHz"
 # make_board's xip_model values (run.py's --xip-model, and bench's runner asks for them)
-XIP_MODELS = ("legacy",)
+XIP_MODELS = ("legacy", "rp2350")
 XIP_BASE = 0x10000000
 XIP_SIZE = "16MiB"  # flash
 
@@ -140,22 +140,25 @@ def _attach_memory(board, *, xip_miss_ns, sram_latency_ns,
             board.mem_ranges.append(memory.range)
             memory.port = board.sram_bus.mem_side_ports
 
-    # XIP path: the front router merges instruction and data requests before
-    # the shared cache. The QMI bridge connects only to flash memory.
-    # The physical XIP cache is shared by instruction fetch and data reads.
-    # Cache geometry matches RP2350; gem5 hit and QMI miss timing are proxies.
-    board.flash = SimpleMemory(range=xip_range, latency="1ns")
-    board.xip_cache = NoncoherentCache(
-        size="16KiB", assoc=2, tag_latency=1, data_latency=1,
-        response_latency=1, mshrs=4, tgts_per_mshr=4,
-        addr_ranges=[xip_range],
-    )
-    board.qmi_delay = Bridge(delay=f"{xip_miss_ns}ns")
-    board.xip_cache.mem_side = board.qmi_delay.cpu_side_port
-    board.qmi_delay.mem_side_port = board.flash.port
-
+    # Shared instruction/data XIP path. The RP2350 endpoint models two
+    # cache banks, aliases and QMI serial state; legacy keeps the generic
+    # cache and fixed-delay bridge for baseline comparisons.
     board.xip_front = _router(board.fast_clock)
-    board.xip_front.mem_side_ports = board.xip_cache.cpu_side
+    if xip_model == "rp2350":
+        from m5.objects import RP2350XIP
+        board.flash = RP2350XIP(range=xip_range, clk_domain=board.clk_domain)
+        board.xip_front.mem_side_ports = board.flash.port
+    else:
+        board.flash = SimpleMemory(range=xip_range, latency="1ns")
+        board.xip_cache = NoncoherentCache(
+            size="16KiB", assoc=2, tag_latency=1, data_latency=1,
+            response_latency=1, mshrs=4, tgts_per_mshr=4,
+            addr_ranges=[xip_range],
+        )
+        board.qmi_delay = Bridge(delay=f"{xip_miss_ns}ns")
+        board.xip_cache.mem_side = board.qmi_delay.cpu_side_port
+        board.qmi_delay.mem_side_port = board.flash.port
+        board.xip_front.mem_side_ports = board.xip_cache.cpu_side
 
     # Core 0's routers; _make_riscv adds the other cores'.
     _core_routers(board, 0)
@@ -464,10 +467,11 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     from m5.objects import Hazard3TbIO
     board.tb_io = Hazard3TbIO(pio_latency="1ns")
     board.tb_io.pio = board.sram_bus.mem_side_ports
-    # XIP_CTRL's cache counters at 0x400c8000 (arcsim-soc rtl/xip/xipCtrl.sv),
-    # which read 0: nothing counts the XIP cache's hits and accesses
+    # Shared XIP controls/counters; legacy retains its zero-valued stub.
     from m5.objects import RP2350XipCtrl
     board.xip_ctrl = RP2350XipCtrl(pio_latency="1ns")
+    if xip_model == "rp2350":
+        board.xip_ctrl.xip = board.flash
     board.xip_ctrl.pio = board.sram_bus.mem_side_ports
     # No HWPE and no TCDM (hwpe empty, the only one modelled): their
     # addresses fault, as in soc.v without an accelerator (XCEL_PRESENT=0).
@@ -478,6 +482,9 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     # access leaves it, so they are precise.
     # flash and SRAM (without SRAM4-7 if absent)
     accessible = list(board.mem_ranges)
+    if xip_model == "rp2350":
+        accessible += [AddrRange(base, size=XIP_SIZE) for base in
+                       (0x14000000, 0x18000000, 0x1c000000)]
     if dma:
         # Its four register blocks (normal, XOR, SET, CLR), rp2350_dma.cc
         accessible.append(AddrRange(int(board.dma.pio_addr), size=0x4000))
@@ -548,7 +555,7 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                sram_model=None, arm_timing="tuned", dma=None,
                xip_model=None, model="legacy", cpu="minor", hwpe="empty",
                zfinx=False, switch_cpu=None, clock=CLOCK,
-               inst_latency=False, cores=1, sram4_7=True):
+               inst_latency=False, cores=1, sram4_7=True, **xip_options):
     """Return a board of cores cores with the RP2350 memory baseline.
     board.cpu is core 0, board.cpu1 core 1, and board._cores lists them.
 
@@ -563,8 +570,9 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
 
     dma adds the DMA controller (RP2350DMA) at 0x50000000-0x50003fff; on the
     Hazard3 proxy its interrupt outputs are left unconnected. xip_model
-    is "legacy" (XIP_MODELS), the generic cache and fixed miss delay in
-    front of flash. hwpe names the Hazard3 board's HWPE, as
+    selects "legacy", the generic cache and fixed miss delay, or "rp2350",
+    the two-bank cache and burst-aware QMI endpoint. xip_options configure
+    only that endpoint's cache/flash parameters. hwpe names the board's HWPE, as
     arcsim-soc's CONFIG_HWPE; only empty, the default, is modelled (HWPES):
     no HWPE and no TCDM, as arcsim-soc's configs without an accelerator
     (XCEL_PRESENT=0). Any other is refused as not modelled. sram4_7
@@ -613,7 +621,7 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     if inst_latency:
         raise ValueError("inst_latency is not available on this board")
     if core == "arm-m4-proxy":
-        return _make_arm(firmware, xip_miss_ns=xip_miss_ns,
+        board = _make_arm(firmware, xip_miss_ns=xip_miss_ns,
                          sram_latency_ns=sram_latency_ns,
                          scratch_bank_bandwidth=scratch_bank_bandwidth,
                          arm_predictor=arm_predictor,
@@ -622,8 +630,8 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                          xip_model=xip_model, cpu=cpu,
                          switch_cpu=switch_cpu, clock=clock,
                          cores=cores)
-    if core == "hazard3-proxy":
-        return _make_riscv(firmware, xip_miss_ns=xip_miss_ns,
+    elif core == "hazard3-proxy":
+        board = _make_riscv(firmware, xip_miss_ns=xip_miss_ns,
                            sram_latency_ns=sram_latency_ns,
                            scratch_bank_bandwidth=scratch_bank_bandwidth,
                            sram_model=sram_model, dma=dma,
@@ -631,4 +639,17 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                            switch_cpu=switch_cpu,
                            clock=clock, cores=cores,
                            sram4_7=sram4_7)
-    raise ValueError(f"Unknown RP2350 core selector: {core}")  
+    else:
+        raise ValueError(f"Unknown RP2350 core selector: {core}")
+    allowed = {"xip_hit_cycles": "hit_cycles",
+               "xip_replacement_seed": "replacement_seed"}
+    allowed.update({name: name for name in (
+        "qmi_clkdiv", "qmi_prefix_cycles", "qmi_address_cycles",
+        "qmi_suffix_cycles", "qmi_dummy_cycles", "qmi_data_width",
+        "qmi_min_deselect", "qmi_sample_cycles", "qmi_cooldown_cycles",
+        "qmi_pagebreak_bytes")})
+    for name, value in xip_options.items():
+        if xip_model != "rp2350" or name not in allowed:
+            raise ValueError(f"Unsupported XIP option: {name}")
+        setattr(board.flash, allowed[name], value)
+    return board
