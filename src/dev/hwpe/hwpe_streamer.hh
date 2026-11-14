@@ -150,9 +150,8 @@ class Sink : public StreamUnit
     using StreamUnit::StreamUnit;
 
     // Starts a job: config.totLen beats of at most beat_bytes each.
-    // TODO: an HWPE whose output length depends on the data (FAST's
-    // corners, if one job wrote a beat per corner) needs a finish() that
-    // ends the job before totLen.
+    // TODO: an HWPE whose output length depends on the data needs a
+    // finish() that ends the job before totLen.
     void start(const AddressGenConfig &config, unsigned beat_bytes);
     // The engine's interface: room() says push() may be called. push()
     // hands over a beat of 'bytes' bytes, written from the beat's start

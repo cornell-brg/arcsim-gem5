@@ -70,19 +70,10 @@ SRAM_REGIONS = (
 # which is about 572 MiB/s.
 SCRATCH_BANK_BANDWIDTH = "572MiB/s"
 
-# optical-flow's engines: name, class, parameters, window offset.
-# optical-flow-rotated's LK engine is lkTopRotated.
-OPTICAL_FLOW = (
-    ("fast", "HWPEFastCellBestK", {"n": 9, "cycles": 1, "threshold": 20}, 0x0000),
-    ("stripe", "HWPEEqpyr", {}, 0x1000),
-    ("lk", "HWPELk", {}, 0x2000),
-)
-OPTICAL_FLOW_ROTATED_LK = {"rotated": True, "num_io_regs": 19}
-
 # The HWPEs for the Hazard3 board, keyed by arcsim-soc's CONFIG_HWPE names:
 # the class and its parameters. vvadd is vvadd-wide with one element per beat.
 # empty is no HWPE and no TCDM, as arcsim-soc's configs without an accelerator
-# (XCEL_PRESENT=0).
+# (XCEL_PRESENT=0). Any other CONFIG_HWPE (soc_configs.py) is not modelled in gem5.
 HWPES = {
     "empty": None,
     "vvadd": ("HWPEVvaddWide", {"elems": 1}),
@@ -90,12 +81,6 @@ HWPES = {
     "vvadd-wide-2": ("HWPEVvaddWide", {"elems": 2}),
     "vvadd-wide-4": ("HWPEVvaddWide", {"elems": 4}),
     "vvadd-wide-8": ("HWPEVvaddWide", {"elems": 8}),
-    # Its wrapper's parameters are HWPEFastCellBestK's defaults
-    "fast-with-scoring-wide-multicycle-cell-best-k": ("HWPEFastCellBestK", {}),
-    # arcsim-xcel's hwpe-optical-flow.v: three engines and SELECT in 4 KiB
-    # windows, the engines on HCIMux channels 0 to 2 (OPTICAL_FLOW)
-    "optical-flow": None,
-    "optical-flow-rotated": None,
 }
 
 
@@ -733,26 +718,6 @@ def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
     import m5.objects
     if hwpe == "empty":
         pass
-    elif hwpe in ("optical-flow", "optical-flow-rotated"):
-        from m5.objects import HCIMux, HWPESelect
-        board.hwpe_mux = HCIMux(clk_domain=board.clk_domain, num_channels=4)
-        board.hwpe_mux.mem_side_port = board.tcdm.hwpe_port
-        engines = []
-        for name, cls, params, offset in OPTICAL_FLOW:
-            if name == "lk" and hwpe == "optical-flow-rotated":
-                params = OPTICAL_FLOW_ROTATED_LK
-            engine = getattr(m5.objects, cls)(
-                pio_latency="1ns", pio_addr=0x50800000 + offset, pio_size=0x1000,
-                timed_in_atomic=hwpe_timed_in_atomic, **params)
-            setattr(board, f"hwpe_{name}", engine)
-            engines.append(engine)
-        board.hwpe_select = HWPESelect(pio_latency="1ns")
-        engines.append(board.hwpe_select)
-        for engine in engines:
-            engine.pio = board.sram_bus.mem_side_ports
-            board.mem_ranges.append(AddrRange(int(engine.pio_addr),
-                                              size=int(engine.pio_size)))
-        board.hwpe_mux.cpu_side_ports = [e.tcdm_port for e in engines[:-1]]
     else:
         hwpe_class, hwpe_params = HWPES[hwpe]
         board.hwpe = getattr(m5.objects, hwpe_class)(
@@ -869,7 +834,8 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     with zero wait states and one transfer a cycle, as rtl-sim's testbench
     answered soc.v there. hwpe names the Hazard3 board's HWPE (HWPES), as
     arcsim-soc's CONFIG_HWPE; empty, the default, is no HWPE and no TCDM, as
-    arcsim-soc's configs without an accelerator (XCEL_PRESENT=0). sram4_7
+    arcsim-soc's configs without an accelerator (XCEL_PRESENT=0); any other
+    is refused as not modelled. sram4_7
     False (hazard3-proxy only) leaves SRAM4-7 out (0x20040000-0x2007ffff
     fault), as arcsim-soc's SRAM4_7_PRESENT=0. zfinx gives the Hazard3 proxy
     Zfinx (floats in the x registers) instead of F and D.
@@ -908,7 +874,8 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     if cpu not in ("minor", "atomic"):
         raise ValueError(f"Unknown CPU: {cpu}")
     if hwpe not in HWPES:
-        raise ValueError(f"Unknown HWPE: {hwpe}")
+        raise ValueError(f"HWPE {hwpe} is not modelled in gem5 (modelled: "
+                         f"{', '.join(HWPES)})")
     if zfinx and core != "hazard3-proxy":
         raise ValueError("Zfinx is only for the hazard3-proxy")
     if not sram4_7 and core != "hazard3-proxy":
