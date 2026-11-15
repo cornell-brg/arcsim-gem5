@@ -284,3 +284,76 @@ Open issues:
   2 cycles an iteration, gem5 3). The RTL's BTB redirects fetch when it fetches the branch's word;
   Minor predicts when it decodes the branch, a cycle later here because decode trails fetch.
 - BTB clear on fence.i and trap entry not modelled.
+
+## Item 4 (it04): integer multiply and divide, 2026-11-14
+
+Ranked list proposed (after it03): 1. integer multiply and divide; 2. FPU timing (zfinx);
+3. remaining measurement overhead (+2 cycles); 4. fetch-time BTB redirect and branch to the next
+instruction. Selected: **1**.
+
+The RTL (`hazard3_core.v`, `arith/hazard3_mul_fast.v`, `arith/hazard3_muldiv_seq.v`; MUL_FAST =
+MUL_FASTER = MULH_FAST = 1, MULDIV_UNROLL = 2):
+
+- MUL, MULH, MULHU, MULHSU: the fast multiplier with MUL_FASTER gives its result combinationally
+  in X (`op_passthrough`), bypassed like an ALU result, no use stall (`m_fast_mul_result_vld`
+  stays 0): one cycle (result_delay mul_chain RTL 58 = 50 dependent muls + overhead).
+- DIV, DIVU, REM, REMU: the sequential divider, X stalled until it is done (`x_stall_muldiv`):
+  the issue cycle, the sign pre-adjust (always for an unsigned op; for a signed one unless the
+  dividend is non-negative and the divisor negative, `op_b_neg ^ is_div`, `accum_neg_l`, when the
+  first iteration is done in it instead), 32/2 iterations, and the post-adjust, a cycle more when
+  it negates the result (`op_signs_differ`, divisor non-zero). 19 cycles; a signed op of a
+  negative dividend by a positive divisor 20 (udiv_*_100 1908, sdiv_fast 1 / -2 also 1908).
+
+What changed:
+
+- Minor (`func_unit.{hh,cc}`, `BaseMinorCPU.py`): `DynamicLatencyIntDivFU.hazard3_timing`
+  (default False): one cycle beyond opLat for a signed DIV/REM of a negative dividend by a
+  positive divisor.
+- Board (`_hazard3_pipeline`): IntMul FU opLat 1, srcRegsRelativeLats [1] (was 3);
+  `DynamicLatencyIntDivFU(opLat=19, issueLat=19, hazard3_timing=True)` for IntDiv (was opLat 9);
+  `executeInOrderCompletion` and `executeDynamicLatencyHoldsInst`, so nothing issues behind an
+  instruction still in an FU (X stalls), as x_stall_muldiv.
+
+Tests (gem5): pass/fail identical to it03 in both configs, check by check; only
+test_xip_timing case_2_miss 113 -> 114 cycles (still FAILED, expected 112).
+
+Microbenchmarks:
+
+| config | it00 | it01 | it02 | it03 | it04 |
+|---|---|---|---|---|---|
+| single-core | 25.11 % | 25.11 % | 24.34 % | 9.62 % | **3.62 %** (491, 402 within 5 %) |
+| single-core-zfinx-fpu | refused | 28.64 % | 28.03 % | 14.62 % | **9.95 %** (558, 410 within 5 %) |
+
+single-core per family, it03 -> it04 (mean |err| %): empty 33.33 -> 33.33, nop16 11.42 -> 11.42,
+nop32 11.42 -> 11.42, **alu 12.88 -> 2.08**, branch 2.29 -> 2.29, fetch 7.04 -> 4.83, operand
+2.62 -> 1.75, mem 2.08 -> 1.96, mix 1.87 -> 0.87, **result_delay 28.99 -> 10.29**, **irwin_alu
+24.11 -> 5.33**, irwin_control 4.70 -> 6.17, cache 0.07 -> 0.07, xip_miss 3.19 -> 3.19, kern 2.58
+-> 3.14, dma 6.71 -> 19.93, **rand_asm 12.81 -> 2.58**, **rand_fact 10.26 -> 1.19**.
+single-core-zfinx-fpu (it03 -> it04): fp_ops 71.87 -> 44.02, fp_delay 38.89 -> 81.48, fp_busy
+20.94 -> 41.31, fp_cvt 29.73 -> 96.69; the other families as single-core within ~0.5 points,
+except irwin_control 4.05 and dma 24.18.
+
+- Better: divides (div_flip*, div_rand, sdiv/udiv_*: -45..-53 % -> within +0.3..+0.7 % at 100;
+  the 8/9/16 bodies +2..+5 %), multiplies (mul_chain +204 % -> within a few %, mul_use, rand_fact
+  rf_*_v4 +28 % -> ~1 %, fetch_interleave_mul/div).
+- Worse:
+  - FP (zfinx): X now waits for each FP op, as the RTL's FPU stalls X (one op in flight), but
+    the FP ops still have Minor's default FloatSimd latencies, which the overlap had hidden:
+    fp_delay, fp_busy, fp_cvt worse, fp_ops better. For the FPU item.
+  - irwin_control cf_conditional_not_taken_8 +6.5 -> +58.7 %, cf_cmpbeq_taken_9 +19 -> +49 %,
+    dma setup +7 -> +62 %, words_1: not the core. Their first measured samples miss in the XIP
+    cache (cf_conditional_not_taken_8: samples 141, 141, 141, then 33 throughout; the 8-byte line
+    at body+64 misses in samples 1-3; at it03 every sample 33): the changed execute timing changes
+    the harness's fetch and access pattern, and with it which lines the 2-way XIP cache keeps
+    between samples.
+- instret: alu/dmb and the dma bodies as before, but which dma bodies differ changed (words_1
+  now equal, workspace_256 now DIFFERS): their polling loops make instret timing-dependent.
+
+Open issues:
+
+- XIP cache residency between samples depends on execute timing (above); memory system, for the
+  designer.
+- result_delay bytes_load_word +65 %: a word load after four byte stores to that word costs 3
+  cycles in gem5 (the store buffer cannot forward partial stores, the load waits for them), 1 in
+  the RTL. A load/store hazard item.
+- result_delay jump_next -41 %: a taken branch to the next instruction (as fetch br_fwd_0, it03).

@@ -216,10 +216,12 @@ class DynamicLatencyIntDivFU : public MinorFU
 {
   private:
     bool rp2350M33Timing;
+    bool hazard3Timing;
 
   public:
     DynamicLatencyIntDivFU(const DynamicLatencyIntDivFUParams &params)
-        : MinorFU(params), rp2350M33Timing(params.rp2350_m33_timing) {}
+        : MinorFU(params), rp2350M33Timing(params.rp2350_m33_timing),
+          hazard3Timing(params.hazard3_timing) {}
 
     Cycles dynamicExtraLatency(
         ThreadContext *tc, const StaticInstPtr &inst) const override;

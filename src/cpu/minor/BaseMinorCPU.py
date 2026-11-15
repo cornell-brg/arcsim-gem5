@@ -176,6 +176,11 @@ class DynamicLatencyIntDivFU(MinorFU):
     cxx_class = "gem5::DynamicLatencyIntDivFU"
     rp2350_m33_timing = Param.Bool(
         False, "Use RP2350 Cortex-M33 SDIV/UDIV operand-dependent timing")
+    hazard3_timing = Param.Bool(
+        False,
+        "Hazard3's sequential divider (hazard3_muldiv_seq.v): opLat, plus a"
+        " cycle for a signed DIV/REM of a negative dividend by a positive"
+        " divisor (its sign pre-adjust and result negation both take one)")
 
 
 class MinorFUPool(SimObject):

@@ -86,6 +86,25 @@ DynamicLatencyIntDivFU::dynamicExtraLatency(
     if (inst->opClass() != IntDivOp)
         return Cycles(0);
 
+    if (hazard3Timing) {
+        // hazard3_muldiv_seq.v: the sign pre-adjust takes a cycle unless
+        // a signed op's dividend is not negative and its divisor is
+        // (op_b_neg ^ is_div, accum_neg_l), when the first iteration is
+        // done in it instead; the post-adjust takes a cycle more when it
+        // negates the result (op_signs_differ, divisor not zero). Of
+        // the signed cases only a negative dividend over a positive
+        // divisor is a cycle longer than the unsigned ops' opLat.
+        const std::string &op = inst->getName();
+        if ((op != "div" && op != "rem") || inst->numSrcRegs() < 2)
+            return Cycles(0);
+        const int32_t a = tc->getReg(inst->srcRegIdx(0));
+        const int32_t b = tc->getReg(inst->srcRegIdx(1));
+        const bool longer = a < 0 && b > 0;
+        DPRINTF(MinorExecute, "Hazard3 %s a=%#x b=%#x extra=%d\n",
+                op, (uint32_t)a, (uint32_t)b, longer);
+        return Cycles(longer ? 1 : 0);
+    }
+
     if (rp2350M33Timing) {
         // ARM's generated Thumb divide decode registers Op2 (divisor)
         // before Op1 (dividend), followed by condition-code sources.

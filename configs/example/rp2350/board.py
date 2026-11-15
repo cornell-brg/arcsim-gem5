@@ -506,10 +506,27 @@ def _hazard3_pipeline(core):
     # branch is resolved in X (hazard3_core.v x_jump_req).
     int_fu = MinorDefaultIntFU(opLat=1, timings=[
         MinorFUTiming(description="Hazard3Int", srcRegsRelativeLats=[1])])
+    # MUL, MULH, MULHU and MULHSU (MUL_FAST, MULH_FAST, MUL_FASTER): the
+    # fast multiplier gives its result combinationally in X, bypassed as
+    # an ALU result (hazard3_mul_fast.v op_passthrough).
+    mul_fu = MinorDefaultIntMulFU(opLat=1, timings=[
+        MinorFUTiming(description="Hazard3Mul", srcRegsRelativeLats=[1])])
+    # DIV, DIVU, REM and REMU go to the sequential divider
+    # (hazard3_muldiv_seq.v, MULDIV_UNROLL = 2) and stall X until its
+    # result is ready (x_stall_muldiv): the cycle they issue, the sign
+    # pre-adjust, 32 / 2 iterations and the post-adjust, 19 cycles, one
+    # more when a signed result is negated (hazard3_timing).
+    from m5.objects import DynamicLatencyIntDivFU
+    div_fu = DynamicLatencyIntDivFU(
+        opClasses=minorMakeOpClassSet(["IntDiv"]), opLat=19, issueLat=19,
+        hazard3_timing=True)
+    # X holds an instruction until it is done: nothing issues behind a
+    # divide still in the divider.
+    core.executeInOrderCompletion = True
+    core.executeDynamicLatencyHoldsInst = True
     # Otherwise Minor's default FU pool (MinorDefaultFUPool).
     core.executeFuncUnits = MinorFUPool(funcUnits=[
-        int_fu, MinorDefaultIntMulFU(),
-        MinorDefaultIntDivFU(), MinorDefaultFloatSimdFU(),
+        int_fu, mul_fu, div_fu, MinorDefaultFloatSimdFU(),
         MinorDefaultPredFU(), mem_fu, MinorDefaultMiscFU()])
     # Branch prediction (BRANCH_PREDICTOR = 1): one BTB entry, the last
     # taken backward conditional branch, predicted taken when fetched; no
