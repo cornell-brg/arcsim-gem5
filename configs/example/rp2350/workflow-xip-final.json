@@ -1,0 +1,15 @@
+{
+  "xip_model": "rp2350",
+  "xip_hit_cycles": 1,
+  "qmi_clkdiv": 3,
+  "qmi_prefix_cycles": 8,
+  "qmi_address_cycles": 6,
+  "qmi_suffix_cycles": 2,
+  "qmi_dummy_cycles": 4,
+  "qmi_data_width": 4,
+  "qmi_min_deselect": 7,
+  "qmi_sample_cycles": 2,
+  "qmi_cooldown_cycles": 64,
+  "qmi_pagebreak_bytes": 1024,
+  "xip_replacement_seed": 2350
+}
