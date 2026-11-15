@@ -56,6 +56,7 @@
 #include "cpu/thread_context.hh"
 #include "cpu/timing_expr.hh"
 #include "params/DynamicLatencyIntDivFU.hh"
+#include "params/Hazard3FpuFU.hh"
 #include "params/MinorFU.hh"
 #include "params/MinorFUPool.hh"
 #include "params/MinorOpClass.hh"
@@ -222,6 +223,19 @@ class DynamicLatencyIntDivFU : public MinorFU
     DynamicLatencyIntDivFU(const DynamicLatencyIntDivFUParams &params)
         : MinorFU(params), rp2350M33Timing(params.rp2350_m33_timing),
           hazard3Timing(params.hazard3_timing) {}
+
+    Cycles dynamicExtraLatency(
+        ThreadContext *tc, const StaticInstPtr &inst) const override;
+};
+
+/** Hazard3's FPU (arcsim-soc rtl/fpu/hazard3_fpu.sv): FPnew with the
+ *  T-Head E906 divide/square-root unit, one operation at a time.  opLat
+ *  covers every operation but FDIV and FSQRT, whose SRT iterations stop
+ *  once the partial remainder is zero; see dynamicExtraLatency. */
+class Hazard3FpuFU : public MinorFU
+{
+  public:
+    Hazard3FpuFU(const Hazard3FpuFUParams &params) : MinorFU(params) {}
 
     Cycles dynamicExtraLatency(
         ThreadContext *tc, const StaticInstPtr &inst) const override;

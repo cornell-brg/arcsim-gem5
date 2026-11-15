@@ -492,7 +492,7 @@ def _hazard3_pipeline(core):
     # that register, whose data is bypassed in M (hazard3_core.v:
     # x_stall_on_raw).
     from m5.objects import (
-        MinorDefaultFloatSimdFU, MinorDefaultIntDivFU, MinorDefaultIntFU,
+        MinorDefaultIntFU,
         MinorDefaultIntMulFU, MinorDefaultMemFU, MinorDefaultMiscFU,
         MinorDefaultPredFU, MinorFUPool, MinorFUTiming, minorMakeOpClassSet)
     mem_fu = MinorDefaultMemFU(timings=[
@@ -524,9 +524,21 @@ def _hazard3_pipeline(core):
     # divide still in the divider.
     core.executeInOrderCompletion = True
     core.executeDynamicLatencyHoldsInst = True
-    # Otherwise Minor's default FU pool (MinorDefaultFUPool).
+    # The FPU (arcsim-soc rtl/fpu/hazard3_fpu.sv; FPU_PIPE_ADDMUL,
+    # _NONCOMP, _CONV = 1, one pipeline register): one operation at a time,
+    # X stalled until its result is held (x_stall_fpu), 3 cycles; FDIV and
+    # FSQRT as the E906 divide/sqrt unit's SRT rounds (Hazard3FpuFU).
+    from m5.objects import Hazard3FpuFU
+    fpu_fu = Hazard3FpuFU(opClasses=minorMakeOpClassSet([
+        "FloatAdd", "FloatCmp", "FloatCvt", "FloatMult", "FloatMultAcc",
+        "FloatDiv", "FloatMisc", "FloatSqrt"]), opLat=3, issueLat=3,
+        timings=[MinorFUTiming(description="Hazard3Fpu",
+                               srcRegsRelativeLats=[1])])
+    # Otherwise Minor's default FU pool (MinorDefaultFUPool), but for its
+    # float/SIMD unit: an FP op the FPU cannot take yet must wait for it
+    # rather than issue there (Hazard3 has no SIMD).
     core.executeFuncUnits = MinorFUPool(funcUnits=[
-        int_fu, mul_fu, div_fu, MinorDefaultFloatSimdFU(),
+        int_fu, mul_fu, div_fu, fpu_fu,
         MinorDefaultPredFU(), mem_fu, MinorDefaultMiscFU()])
     # Branch prediction (BRANCH_PREDICTOR = 1): one BTB entry, the last
     # taken backward conditional branch, predicted taken when fetched; no

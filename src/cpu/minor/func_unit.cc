@@ -38,6 +38,8 @@
 #include "cpu/minor/func_unit.hh"
 
 #include <algorithm>
+#include <cmath>
+#include <numeric>
 #include <cstdlib>
 #include <iomanip>
 #include <sstream>
@@ -170,6 +172,99 @@ DynamicLatencyIntDivFU::dynamicExtraLatency(
     if (latency > opLat)
         return Cycles(latency - opLat);
     return Cycles(0);
+}
+
+namespace
+{
+
+/** The significant bits of n > 0: from its most to its least
+ *  significant 1 */
+unsigned
+significantBits(uint64_t n)
+{
+    return 64 - __builtin_clzll(n) - __builtin_ctzll(n);
+}
+
+/** The value of FP32 operand i (an integer register under Zfinx, else a
+ *  float register's low 32 bits) */
+uint32_t
+fp32Operand(ThreadContext *tc, const StaticInstPtr &inst, int i)
+{
+    int seen = 0;
+    for (int s = 0; s < inst->numSrcRegs(); s++) {
+        const RegId &reg = inst->srcRegIdx(s);
+        if (reg.classValue() != IntRegClass &&
+            reg.classValue() != FloatRegClass)
+        {
+            continue;
+        }
+        if (seen++ == i)
+            return static_cast<uint32_t>(tc->getReg(reg));
+    }
+    return 0;
+}
+
+} // anonymous namespace
+
+Cycles
+Hazard3FpuFU::dynamicExtraLatency(
+    ThreadContext *tc, const StaticInstPtr &inst) const
+{
+    const OpClass op = inst->opClass();
+    if (op != FloatDivOp && op != FloatSqrtOp)
+        return Cycles(0);
+
+    /* hazard3_fpu.sv holds the result a cycle (busy, result_r), so an
+     *  operation is in X for FPnew's latency plus two cycles: opLat (3)
+     *  for FPnew's one pipeline register.  The E906 divide/sqrt unit
+     *  (pa_fdsu_ctrl.v) takes a zero, infinite or NaN operand, and a
+     *  negative square root, without iterating (ex1_srt_skip): opLat.
+     *  Otherwise it takes one cycle to start, its SRT rounds (radix 4,
+     *  srt_cnt from 14: at most 15; srt_last_round once the remainder is
+     *  zero, srt_remainder_zero) and RND and PACK. */
+    const bool is_sqrt = op == FloatSqrtOp;
+    const uint32_t a = fp32Operand(tc, inst, 0);
+    const uint32_t b = is_sqrt ? 0x3f800000 : fp32Operand(tc, inst, 1);
+    auto exp_of = [](uint32_t x) { return (x >> 23) & 0xff; };
+    auto special = [&](uint32_t x) {
+        return (x & 0x7fffffff) == 0 || exp_of(x) == 0xff;
+    };
+    if (special(a) || special(b) || (is_sqrt && (a >> 31)))
+        return Cycles(0);
+
+    /* The rounds until the remainder is zero follow the exact result's
+     *  significant bits m: m / 2 + 2 of them (the bodies of micro/fp_ops:
+     *  1 bit 2 rounds ... 24 bits 14); an inexact result takes all 15 */
+    auto mant = [&](uint32_t x) -> uint64_t {
+        return exp_of(x) ? ((x & 0x7fffff) | 0x800000) : (x & 0x7fffff);
+    };
+    unsigned rounds = 15;
+    if (!is_sqrt) {
+        uint64_t ma = mant(a), mb = mant(b);
+        const uint64_t g = std::gcd(ma, mb);
+        ma /= g;
+        mb /= g;
+        if ((mb & (mb - 1)) == 0)
+            rounds = std::min(15u, significantBits(ma) / 2 + 2);
+    } else {
+        /* sqrt(m * 2^e): with e even, an exact root of m is the root's
+         *  mantissa */
+        uint64_t m = mant(a);
+        const int e = static_cast<int>(exp_of(a)) - 127 - 23;
+        if (e & 1)
+            m <<= 1;
+        uint64_t r = static_cast<uint64_t>(std::sqrt(static_cast<double>(m)));
+        while (r * r > m)
+            r--;
+        while ((r + 1) * (r + 1) <= m)
+            r++;
+        if (r * r == m)
+            rounds = std::min(15u, significantBits(r) / 2 + 2);
+    }
+    const unsigned cycles = 4 + rounds;
+    DPRINTF(MinorExecute, "Hazard3 FPU %s a=%#x b=%#x rounds=%u cycles=%u\n",
+            inst->getName(), a, b, rounds, cycles);
+    return Cycles(cycles > opLat ? cycles - opLat : 0);
 }
 
 namespace minor

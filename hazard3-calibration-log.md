@@ -357,3 +357,69 @@ Open issues:
   cycles in gem5 (the store buffer cannot forward partial stores, the load waits for them), 1 in
   the RTL. A load/store hazard item.
 - result_delay jump_next -41 %: a taken branch to the next instruction (as fetch br_fwd_0, it03).
+
+## Item 5 (it05): FPU timing, 2026-11-15
+
+Ranked list proposed (after it04): 1. FPU timing (zfinx); 2. remaining measurement overhead
+(+2 cycles); 3. load/store hazards; 4. frontend leftovers. Selected: **1**.
+
+The RTL (arcsim-soc `rtl/fpu/hazard3_fpu.sv`, `hazard3_fpnew_cfg.sv`; FPU_PIPE_ADDMUL,
+_NONCOMP, _CONV = 1, _DIVSQRT = 0; the E906 divide/sqrt unit `pa_fdsu_ctrl.v`):
+
+- One operation at a time; X stalls until the adapter holds the result (`x_stall_fpu`,
+  `busy`, `result_r`): FPnew's one pipeline register plus two cycles, 3 cycles for every add,
+  mul, sign-inject, min/max, compare, classify and convert (vadd 50 ops = 158; no extra cycle
+  for a dependent FP op or integer use).
+- FDIV and FSQRT: a zero, infinite or NaN operand or a negative square root skips the SRT
+  (`ex1_srt_skip`): 3 cycles. Otherwise 4 cycles plus the SRT rounds (radix 4, `srt_cnt` from
+  14, at most 15), which stop once the partial remainder is zero (`srt_remainder_zero`): an
+  exact result of m significant bits takes m/2 + 2 rounds (fp_ops vdiv_bits1..24, vdiv_3_2,
+  vdiv_100_2, vdiv_lt2/lt8, vsqrt_bits2..12, vsqrt_4: 6..18 cycles a divide), an inexact one 15
+  (vdiv_hard, vdiv_1_3, vsqrt_hard: 19).
+
+What changed:
+
+- Minor (`func_unit.{hh,cc}`, `BaseMinorCPU.py`, `SConscript`): new FU `Hazard3FpuFU`,
+  opLat for every operation, plus for FloatDiv/FloatSqrt the rounds above from the operands
+  (an integer register under Zfinx, else a float register): the quotient is exact when the
+  divisor's mantissa over the gcd of both is a power of two, m the significant bits of the
+  dividend's over it; a root is exact when the mantissa (doubled for an odd exponent) is a
+  perfect square, m the significant bits of its root.
+- Board: `Hazard3FpuFU` (opLat 3, issueLat 3, srcRegsRelativeLats [1]) for FloatAdd, Cmp, Cvt,
+  Mult, MultAcc, Div, Misc, Sqrt. Minor's default float/SIMD FU is no longer in the pool: an FP
+  op the FPU could not take yet (a loaded operand) issued there instead, with its 6-cycle
+  latency (fp_delay vldr_use: 3 cycles a load-use pair instead of the RTL's 1). Hazard3 has no
+  SIMD. In-order completion (it04) gives the X stall.
+
+Tests (gem5): identical to it04 in both configs, check by check (test_fp_f, test_fp_zfinx,
+test_fpu pass).
+
+Microbenchmarks:
+
+| config | it00 | it01 | it02 | it03 | it04 | it05 |
+|---|---|---|---|---|---|---|
+| single-core | 25.11 % | 25.11 % | 24.34 % | 9.62 % | 3.62 % | **3.62 %** (every body as it04) |
+| single-core-zfinx-fpu | refused | 28.64 % | 28.03 % | 14.62 % | 9.95 % | **4.36 %** (558, 413 within 5 %) |
+
+single-core-zfinx-fpu, it04 -> it05: fp_ops 44.02 -> 9.91 %, fp_delay 81.48 -> 12.41 %,
+fp_busy 41.31 -> 10.93 %, fp_cvt 96.69 -> 11.06 %; the other families unchanged.
+
+- Every warm sample of the FP bodies is now within +2..3 cycles of the RTL (vadd 161 vs 158,
+  vdiv_bits8 211 vs 208, vdiv_zero 72 vs 69, vldr_use 188 -> 138 vs 135). What is left of the
+  ~10 % is their first measured samples, ~100 cycles slower in gem5 (vadd 258, 264, 269, then
+  161): a miss in the XIP cache on the harness's arcsim_roi_call_close after the body returns,
+  in the first 3-4 measured samples, never in the RTL (as irwin_control and dma at it04).
+- The frames' XIP counters show gem5's frontend makes more XIP accesses than the RTL: vadd
+  103-105 a sample against the RTL's 79 (xip_hit 103 vs 77). The extra fetch traffic (refetches
+  after stream changes, fetches past a jump) changes which lines the 2-way XIP cache keeps. A
+  frontend item.
+
+Open issues:
+
+- The early-sample XIP misses above (frontend fetch traffic vs the memory system).
+- Not modelled: the E906 unit's extra cycle for a denormal operand (WFI2, `fdsu_dn_stall`)
+  and its skip on exponent overflow/underflow (`ex2_of`, `ex2_uf_srt_skip`).
+- Scripts' work directory: a helper of mine overwrote `work/single-core/runs/rtl/irwin_control/
+  frames` (it imported the skill's analyze.py, whose main ran); regenerated with `SIMS=rtl
+  TARGETS=irwin_control FORCE=1`, the it04 analysis reproduced exactly (irwin_control 6.17 %,
+  all 3.62 %).

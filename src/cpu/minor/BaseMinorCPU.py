@@ -183,6 +183,16 @@ class DynamicLatencyIntDivFU(MinorFU):
         " divisor (its sign pre-adjust and result negation both take one)")
 
 
+class Hazard3FpuFU(MinorFU):
+    """Hazard3's FPU (arcsim-soc rtl/fpu/hazard3_fpu.sv): opLat for every
+    operation, and for FDIV and FSQRT the E906 divide/sqrt unit's
+    data-dependent SRT rounds (they stop once the remainder is zero)."""
+
+    type = "Hazard3FpuFU"
+    cxx_header = "cpu/minor/func_unit.hh"
+    cxx_class = "gem5::Hazard3FpuFU"
+
+
 class MinorFUPool(SimObject):
     type = "MinorFUPool"
     cxx_header = "cpu/minor/func_unit.hh"
