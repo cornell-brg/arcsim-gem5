@@ -72,5 +72,5 @@ These fail on gem5 because its board models the SoC differently from the RTL:
 - `test_xip_ctrl`: `--model accurate` puts the Pico 2's flash and XIP cache in
   front of flash, whose counters count; rtl-sim has no XIP cache, so they stay 0
   (`--xip-model soc-no-cache`, the RTL's code memory, passes).
-- Every test on the fast-cell and optical-flow configs: gem5 models only the
-  vvadd accelerators, so run.py stops with "HWPE <name> is not modelled in gem5".
+- Every test on the optical-flow configs: gem5 models only the vvadd and the
+  FAST cell accelerators, so run.py stops with "HWPE <name> is not modelled in gem5".

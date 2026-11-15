@@ -61,3 +61,59 @@ Plan: `HWPEFastCell` (src/dev/hwpe/hwpe_fast_cell.{hh,cc}, HWPE.py, SConscript, 
   is unchanged (tests and cycles checked before and after).
 - IL: `atomic_latency` = the RTL's job time less the atomic polling overhead (~8,115); the job
   time is data-independent but for +5 cycles with corners, so one number (within 0.1%).
+
+### Designer: approved. Phases 2 and 3 start.
+
+## Phase 2: CL model (done)
+
+Built (`src/dev/hwpe/hwpe_fast_cell.{hh,cc}`, `HWPEFastCell` in `HWPE.py`, `SConscript`, board
+`HWPES`):
+- `fastScore()`: fastScore.sv's arithmetic (arc minima as a 2/4/8/9 tree, max, M > threshold,
+  M - 1). `FastCellEngine`: fastCellEngine.sv's registers (band 9 x (7+chunk), 3x3 scores,
+  best 3, nbest, count, y, c, lr) and FSM; `clock()` is its always_ff at one edge.
+  `HWPEFastCell`: the top's FSM (WORKING -> FINISHED on engine done and, if started, sink
+  done), the per-row source sequencing (src_y, src_busy, req_start), the sink start;
+  evaluated once per clock edge by `cycleEvent` (priority before the streamer's tick, so the
+  source's read in a cycle sees the engine's ready of that cycle). COUNT = extFlags(), latched
+  at FINISHED, 0 after a soft clear.
+- Streams: Source `pix` (channel 0, depth 2, gated by the engine's ready), Sink `corner`
+  (channel 1, depth 1, one masked 32-byte write); mux_channels 2.
+- Parameters: chunk 8, threshold 10, pix_depth 2, source_start_latency 2, row_restart_latency 2,
+  sink_start_latency 2, sink_done_latency 3 (all read off the RTL VCD); start_latency 5 (TRIGGER
+  handshake to WORKING); done_latency 1 (hwpe_ctrl_regfile clears STATUS at the edge after
+  true_done, so a read in the next cycle sees 0).
+- Shared code: `Source::setReady()` (hci_core_source's req = address valid & stream.ready);
+  ungated by default. vvadd before/after: test_vvadd 19/19 on both vvadd configs; vvadd job
+  minor 376/323/323 -> 376/323/323, atomic 19/19/19 -> 19/19/19.
+
+Calibration: none needed past the RTL's numbers. Trace of `fast_trace` (cell 0, flat cell) on
+rtl-sim (VCD) and gem5 (`--debug-flags=HWPE,HWPETrace,HCITcdm`): both jobs make the same TCDM
+accesses (4161 and 4160: same addresses, same order) granted in the same cycle relative to the
+TRIGGER (first read T+7, corner write T+8113), and reach FINISHED at the same cycle (T+8117,
+T+8112). The rest of the per-job difference is on the core's side (mcycle read to TRIGGER,
+STATUS polling): 12 cycles on rtl-sim, 14-15 on gem5.
+
+## Phase 3: IL model and results (done)
+
+- IL: `atomic_latency` 8117, the RTL's TRIGGER -> FINISHED with corners. The atomic CPU's polling
+  loop rounds to its next STATUS read: 8115 reads 8123, 8117 and 8119 read 8127, 8121 reads 8131;
+  8129 is not reachable. One number, no formula.
+- Tests: soc tests on gem5 (`gem5-single-core-zfinx-fpu-fast-cell-xcel`): test_fast_cell 8/8,
+  test_dma, test_fpu, test_fp_zfinx, test_interconnect, test_memory pass; test_sio,
+  test_xip_ctrl, test_xip_cache, test_xip_timing fail as on every gem5 config. IL:
+  test_fast_cell 8/8 with `--cpu atomic` (run.py). vvadd configs as at the starting point.
+- Cycles per job (`fast_cycles.elf`, test_fast_cell's 10 jobs; job 1 = cell 0 cold, 2-8 cells
+  with corners, 9 the flat cell, 10 the core reading the TCDM):
+
+  | job | rtl-sim | CL (minor) | CL err | IL (atomic) | IL err |
+  |---|---|---|---|---|---|
+  | 1 | 8180 | 8178 | -0.02% | 8127 | -0.65% |
+  | 2-8, 10 | 8129 | 8131 | +0.02% | 8127 | -0.02% |
+  | 9 (flat) | 8124 | 8127 | +0.04% | 8127 | +0.04% |
+  | min / mean / max | 8124 / 8133 / 8180 | 8127 / 8135 / 8178 | mean abs 0.026% | 8127 / 8127 / 8127 | mean abs 0.09% |
+
+  Requirements: CL within 1% per job (max 0.04%), IL within 5% (max 0.65%, the cold first job:
+  core-side).
+- arcsim-tests/README.md: the fast-cell configs are no longer a known failure.
+- Open: the remaining 2-3 cycles per job are in gem5's core/peripheral-bus timing (TRIGGER write
+  and STATUS polling), not the HWPE; not fixed (out of scope).

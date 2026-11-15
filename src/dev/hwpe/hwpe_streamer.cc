@@ -118,7 +118,17 @@ Source::start(const AddressGenConfig &config, unsigned beat_bytes,
 bool
 Source::wantsAccess() const
 {
-    return !gen.done() && beats.size() < depth;
+    return consumerReady && !gen.done() && beats.size() < depth;
+}
+
+void
+Source::setReady(bool ready)
+{
+    if (ready == consumerReady)
+        return;
+    consumerReady = ready;
+    if (ready)
+        streamer.wake();
 }
 
 PacketPtr
@@ -181,6 +191,7 @@ Source::serialize(CheckpointOut &cp) const
     SERIALIZE_SCALAR(beatBytes);
     SERIALIZE_SCALAR(lastBeatBytes);
     SERIALIZE_SCALAR(popped);
+    SERIALIZE_SCALAR(consumerReady);
     // Checkpoints are taken drained, so every read has returned
     const unsigned num_beats = beats.size();
     SERIALIZE_SCALAR(num_beats);
@@ -199,6 +210,7 @@ Source::unserialize(CheckpointIn &cp)
     UNSERIALIZE_SCALAR(beatBytes);
     UNSERIALIZE_SCALAR(lastBeatBytes);
     UNSERIALIZE_SCALAR(popped);
+    UNSERIALIZE_SCALAR(consumerReady);
     unsigned num_beats;
     UNSERIALIZE_SCALAR(num_beats);
     beats.clear();

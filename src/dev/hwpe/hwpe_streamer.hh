@@ -116,6 +116,11 @@ class Source : public StreamUnit
     void pop();
     // All beats have been read and taken by the engine
     bool exhausted() const { return gen.done() && beats.empty(); }
+    // The engine's stream ready (hci_core_source: req = address valid &
+    // stream.ready): a source the engine gates with setReady() reads only
+    // in cycles in which the engine says it is ready. A source that is
+    // never gated reads whenever its buffer has room.
+    void setReady(bool ready);
 
     void serialize(CheckpointOut &cp) const override;
     void unserialize(CheckpointIn &cp) override;
@@ -139,6 +144,7 @@ class Source : public StreamUnit
     // beat is its position in the stream, so beats[0] has number 'popped'.
     std::deque<Beat> beats;
     uint64_t popped = 0;      // beats the engine has taken so far
+    bool consumerReady = true;  // see setReady()
 };
 
 // Writes a stream from the engine to the TCDM (engine -> TCDM). Writes the
