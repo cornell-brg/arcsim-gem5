@@ -1,0 +1,313 @@
+/*
+ * Copyright (c) 2013-2014 ARM Limited
+ * All rights reserved
+ *
+ * The license below extends only to copyright in the software and shall
+ * not be construed as granting a license to any other intellectual
+ * property including but not limited to intellectual property relating
+ * to a hardware implementation of the functionality of the software
+ * licensed hereunder.  You may use the software subject to the license
+ * terms below provided that you ensure that this notice is replicated
+ * unmodified and in its entirety in all distributions of the software,
+ * modified or unmodified, in source code or in binary form.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met: redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer;
+ * redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution;
+ * neither the name of the copyright holders nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include "cpu/minor/func_unit.hh"
+
+#include <algorithm>
+#include <cstdlib>
+#include <iomanip>
+#include <sstream>
+#include <typeinfo>
+
+#include "base/named.hh"
+#include "cpu/e906_divsqrt.hh"
+#include "base/trace.hh"
+#include "debug/MinorExecute.hh"
+#include "debug/MinorTiming.hh"
+#include "enums/OpClass.hh"
+
+namespace gem5
+{
+
+MinorOpClassSet::MinorOpClassSet(const MinorOpClassSetParams &params) :
+    SimObject(params),
+    opClasses(params.opClasses),
+    /* Initialise to true for an empty list so that 'fully capable' is
+     *  the default */
+    capabilityList(Num_OpClasses, (opClasses.empty() ? true : false))
+{
+    for (unsigned int i = 0; i < opClasses.size(); i++)
+        capabilityList[opClasses[i]->opClass] = true;
+}
+
+MinorFUTiming::MinorFUTiming(
+    const MinorFUTimingParams &params) :
+    SimObject(params),
+    mask(params.mask),
+    match(params.match),
+    description(params.description),
+    suppress(params.suppress),
+    extraCommitLat(params.extraCommitLat),
+    extraCommitLatExpr(params.extraCommitLatExpr),
+    extraAssumedLat(params.extraAssumedLat),
+    extraIssueLat(params.extraIssueLat),
+    resultUsePenalty(params.resultUsePenalty),
+    srcRegsRelativeLats(params.srcRegsRelativeLats),
+    opClasses(params.opClasses)
+{ }
+
+Cycles
+Hazard3FpDivSqrtFU::dynamicExtraLatency(
+    ThreadContext *tc, const StaticInstPtr &inst) const
+{
+    const OpClass op = inst->opClass();
+    if ((op != FloatDivOp && op != FloatSqrtOp) || inst->numSrcRegs() < 1)
+        return Cycles(0);
+    const bool sqrt = op == FloatSqrtOp;
+    const uint32_t a = tc->getReg(inst->srcRegIdx(0));
+    const uint32_t b = !sqrt && inst->numSrcRegs() > 1 ?
+        uint32_t(tc->getReg(inst->srcRegIdx(1))) : 0;
+    const unsigned cycles = e906DivSqrtCycles(sqrt, a, b);
+    DPRINTF(MinorExecute, "E906 %s a=%#x b=%#x: %u cycles\n",
+            inst->getName(), a, b, cycles);
+    return Cycles(cycles > opLat ? cycles - opLat : 0);
+}
+
+Cycles
+DynamicLatencyIntDivFU::dynamicExtraLatency(
+    ThreadContext *tc, const StaticInstPtr &inst) const
+{
+    if (inst->opClass() != IntDivOp)
+        return Cycles(0);
+
+    if (rp2350M33Timing) {
+        // ARM's generated Thumb divide decode registers Op2 (divisor)
+        // before Op1 (dividend), followed by condition-code sources.
+        // The RP2350 M33 divider's iteration count follows the distance
+        // between their most significant set bits, not the size of either
+        // operand in isolation.  The repeated SDIV fast-case benchmark
+        // measures four-cycle spacing, modeled here as a four-cycle floor.
+        if (inst->numSrcRegs() < 2)
+            return Cycles(0);
+        const bool isSigned = inst->getName() == "sdiv";
+        auto magnitude = [isSigned](uint32_t raw) {
+            if (!isSigned)
+                return raw;
+            const int64_t value = static_cast<int32_t>(raw);
+            return static_cast<uint32_t>(value < 0 ? -value : value);
+        };
+        const uint32_t divisor = magnitude(
+            tc->getReg(inst->srcRegIdx(0)));
+        const uint32_t dividend = magnitude(
+            tc->getReg(inst->srcRegIdx(1)));
+        unsigned latency = isSigned ? 4 : 2;
+        if (dividend && divisor) {
+            const int bitDifference =
+                __builtin_clz(divisor) - __builtin_clz(dividend);
+            if (bitDifference >= 0)
+                latency = 4 + bitDifference / 4;
+        }
+        DPRINTF(MinorExecute,
+                "RP2350 M33 %s dividend=%#x divisor=%#x latency=%u\n",
+                inst->getName(), dividend, divisor, latency);
+        return Cycles(latency > opLat ? latency - opLat : 0);
+    }
+
+    // Read source registers to find the dividend.  The dividend
+    // determines the divider's iteration count.  We read all integer
+    // source registers and use the one with the most significant bits.
+    uint32_t maxVal = 0;
+    for (int i = 0; i < inst->numSrcRegs(); i++) {
+        RegId srcReg = inst->srcRegIdx(i);
+        if (srcReg.classValue() == IntRegClass) {
+            uint32_t val = tc->getReg(srcReg);
+            uint32_t absVal = static_cast<uint32_t>(
+                std::abs(static_cast<int32_t>(val)));
+            if (absVal > maxVal)
+                maxVal = absVal;
+        }
+    }
+
+    unsigned sigBits = (maxVal == 0) ? 0
+        : (32 - __builtin_clz(maxVal));
+
+    // Latency formula: 4 + ceil(sigBits / 4), clamped to [2, 12]
+    // [DDI0439D Table 3-1, footnote a]
+    unsigned latency = (maxVal == 0) ? 2
+        : std::clamp(4u + (sigBits + 3) / 4, 2u, 12u);
+
+    DPRINTF(MinorExecute, "IntDiv dynamicExtraLatency: maxVal=%#x "
+            "sigBits=%u latency=%u opLat=%u extra=%u\n",
+            maxVal, sigBits, latency, (unsigned)opLat,
+            latency > opLat ? latency - (unsigned)opLat : 0);
+
+    // Return extra cycles beyond opLat
+    if (latency > opLat)
+        return Cycles(latency - opLat);
+    return Cycles(0);
+}
+
+namespace minor
+{
+
+void
+QueuedInst::reportData(std::ostream &os) const
+{
+    inst->reportData(os);
+}
+
+FUPipeline::FUPipeline(const std::string &name, const MinorFU &description_,
+    ClockedObject &timeSource_) :
+    FUPipelineBase(name, "insts", description_.opLat),
+    description(description_),
+    timeSource(timeSource_),
+    nextInsertCycle(Cycles(0))
+{
+    /* Issue latencies are set to 1 in calls to addCapability here.
+     * Issue latencies are associated with the pipeline as a whole,
+     * rather than instruction classes in Minor */
+
+    /* All pipelines should be able to execute No_OpClass instructions */
+    addCapability(No_OpClass, description.opLat, 1);
+
+    /* Add the capabilities listed in the MinorFU for this functional unit */
+    for (unsigned int i = 0; i < description.opClasses->opClasses.size();
+         i++)
+    {
+        addCapability(description.opClasses->opClasses[i]->opClass,
+            description.opLat, 1);
+    }
+
+    for (unsigned int i = 0; i < description.timings.size(); i++) {
+        MinorFUTiming &timing = *(description.timings[i]);
+
+        if (debug::MinorTiming) {
+            std::ostringstream lats;
+
+            unsigned int num_lats = timing.srcRegsRelativeLats.size();
+            unsigned int j = 0;
+            while (j < num_lats) {
+                lats << timing.srcRegsRelativeLats[j];
+
+                j++;
+                if (j != num_lats)
+                    lats << ',';
+            }
+
+            DPRINTFS(MinorTiming, static_cast<Named *>(this),
+                "Adding extra timing decode pattern %d to FU"
+                " mask: %016x match: %016x srcRegLatencies: %s\n",
+                i, timing.mask, timing.match, lats.str());
+        }
+    }
+
+    const std::vector<unsigned> &cant_forward =
+        description.cantForwardFromFUIndices;
+
+    /* Setup the bit vector cantForward... with the set indices
+     *  specified in the parameters */
+    for (auto i = cant_forward.begin(); i != cant_forward.end(); ++i) {
+        cantForwardFromFUIndices.resize((*i) + 1, false);
+        cantForwardFromFUIndices[*i] = true;
+    }
+}
+
+Cycles
+FUPipeline::cyclesBeforeInsert()
+{
+    if (nextInsertCycle == 0 || timeSource.curCycle() > nextInsertCycle)
+        return Cycles(0);
+    else
+        return nextInsertCycle - timeSource.curCycle();
+}
+
+bool
+FUPipeline::canInsert() const
+{
+    return nextInsertCycle == 0 || timeSource.curCycle() >= nextInsertCycle;
+}
+
+void
+FUPipeline::advance()
+{
+    bool was_stalled = stalled;
+
+    /* If an instruction was pushed into the pipeline, set the delay before
+     *  the next instruction can follow */
+    if (alreadyPushed()) {
+        if (nextInsertCycle <= timeSource.curCycle()) {
+            nextInsertCycle = timeSource.curCycle() + description.issueLat;
+        }
+    } else if (was_stalled && nextInsertCycle != 0) {
+        /* Don't count stalled cycles as part of the issue latency */
+        ++nextInsertCycle;
+    }
+    FUPipelineBase::advance();
+}
+
+MinorFUTiming *
+FUPipeline::findTiming(const StaticInstPtr &inst)
+{
+    /*
+     * This will only work on ISAs with an instruction format with a fixed size
+     * which can be categorized using bit masks. This is really only supported
+     * on ARM and is a bit of a hack.
+     */
+    uint64_t mach_inst = inst->getEMI();
+
+    const std::vector<MinorFUTiming *> &timings =
+        description.timings;
+    unsigned int num_timings = timings.size();
+
+    for (unsigned int i = 0; i < num_timings; i++) {
+        MinorFUTiming &timing = *timings[i];
+
+        if (timing.provides(inst->opClass()) &&
+            (mach_inst & timing.mask) == timing.match)
+        {
+            DPRINTFS(MinorTiming, static_cast<Named *>(this),
+                "Found extra timing match (pattern %d '%s')"
+                " %s %16x (type %s)\n",
+                i, timing.description, inst->disassemble(0), mach_inst,
+                typeid(inst).name());
+
+            return &timing;
+        }
+    }
+
+    if (num_timings != 0) {
+        DPRINTFS(MinorTiming, static_cast<Named *>(this),
+            "No extra timing info. found for inst: %s"
+            " mach_inst: %16x\n",
+            inst->disassemble(0), mach_inst);
+    }
+
+    return NULL;
+}
+
+} // namespace minor
+} // namespace gem5

@@ -1,0 +1,121 @@
+# Makefile for Cortex-M4 gem5 test programs
+#
+# Requires: arm-none-eabi-gcc (ARM embedded toolchain)
+# Install: apt install gcc-arm-none-eabi
+#
+# Usage:
+#   make                    # build all test ELFs
+#   make clean              # remove build artifacts
+#   make test_cps.elf       # build specific test
+#
+# Run a test:
+#   ./build/ALL/gem5.opt tests/gem5/m_profile_tests/configs/run_m4_test.py \
+#       --firmware tests/gem5/m_profile_tests/programs/test_cps.elf
+
+CROSS = arm-none-eabi-
+AS = $(CROSS)as
+LD = $(CROSS)ld
+OBJDUMP = $(CROSS)objdump
+
+ASFLAGS = -mcpu=cortex-m4 -mthumb
+LDFLAGS = -T cortexm4.ld --no-warn-rwx-segments
+
+TESTS = cortexm4_basic test_cps test_mrs_msr test_bx_exc_return \
+        test_load_store test_blocked_insts test_sp_sync \
+        test_pop_pc_exc_return test_nested_exceptions \
+        test_data_processing \
+        test_psp_exception \
+        test_deliberate_fail \
+        test_exc_return_mask test_blx_no_exc_return test_bx_bit0_fault \
+        test_srs_rfe_blocked test_coproc_detection test_ldrex_strex_granule \
+        test_nested_priority \
+        test_systick_active_pending \
+        test_ipr_byte_access \
+        test_scs_checkpoint \
+        test_nvic_oob \
+        test_icsr_read \
+        test_cpuid_readonly \
+        test_nvic_irq_mask \
+        test_xpsr_nzcv_sync \
+        test_control_spsel \
+        test_scb_byte_access \
+        test_exc_return_validate \
+        test_faultmask_priority \
+        test_bridge_io \
+        test_bridge_io_irq \
+        test_dwt_cyccnt \
+        test_fpv5 \
+        test_fpv5_undefined \
+        test_coproc_nocp \
+        test_coproc_rp2350 \
+        test_rp2350_gpioc \
+        test_rp2350_order \
+        test_v8m_exclusive \
+        test_v8m_exclusive_undefined \
+        test_it_fp_load_store \
+        test_rp2350_dma \
+        test_rp2350_dma_dreq \
+        test_rp2350_dma_chain \
+        test_rp2350_xip \
+        test_rp2350_store_wait \
+        test_rp2350_load_wait \
+        test_rp2350_fetch_ahead \
+        test_nvic_pend_enable \
+        test_fp_stacking \
+        test_late_arrival \
+        test_fp_stacking_rp2350 \
+        test_late_arrival_rp2350
+
+all: $(addsuffix .elf, $(TESTS)) freertos-tests
+
+# Recurse into freertos/ to build FreeRTOS-based tests
+.PHONY: freertos-tests
+freertos-tests:
+	$(MAKE) -C freertos
+
+# FPv5 and coprocessor tests use Cortex-M33 instructions
+test_fpv5.o test_fpv5_undefined.o test_coproc_nocp.o test_coproc_rp2350.o: ASFLAGS = -mcpu=cortex-m33 -mfpu=fpv5-sp-d16 -mthumb
+
+test_it_fp_load_store.o: ASFLAGS = -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mthumb
+
+# The FP context tests, for the STM32F405 platform and, from the same
+# source, for the RP2350 board from SRAM
+FP_CONTEXT_TESTS = test_fp_stacking test_late_arrival
+$(addsuffix .o, $(FP_CONTEXT_TESTS)): ASFLAGS = -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mthumb
+$(addsuffix _rp2350.o, $(FP_CONTEXT_TESTS)): %_rp2350.o: %.S
+	$(AS) -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mthumb --defsym RP2350=1 $< -o $@
+$(addsuffix _rp2350.elf, $(FP_CONTEXT_TESTS)): LDFLAGS = -T rp2350_sram.ld --no-warn-rwx-segments
+$(addsuffix _rp2350.elf, $(FP_CONTEXT_TESTS)): rp2350_sram.ld
+
+# The load-acquire and store-release instructions are ARMv8-M's
+test_v8m_exclusive.o test_v8m_exclusive_undefined.o: ASFLAGS = -mcpu=cortex-m33 -mthumb
+
+# The RP2350 GPIO test runs from SRAM on the RP2350 board and checks itself
+test_rp2350_gpioc.o: ASFLAGS = -mcpu=cortex-m33 -mthumb --defsym CHECK=1
+test_rp2350_gpioc.elf: LDFLAGS = -T rp2350_sram.ld --no-warn-rwx-segments
+test_rp2350_gpioc.elf: rp2350_sram.ld
+test_rp2350_order.o: ASFLAGS = -mcpu=cortex-m33 -mthumb
+test_rp2350_order.elf: LDFLAGS = -T rp2350_sram.ld --no-warn-rwx-segments
+test_rp2350_order.elf: rp2350_sram.ld
+RP2350_DMA_TESTS = test_rp2350_dma test_rp2350_dma_dreq test_rp2350_dma_chain \
+        test_rp2350_xip \
+        test_rp2350_store_wait test_rp2350_load_wait
+$(addsuffix .o, $(RP2350_DMA_TESTS)): ASFLAGS = -mcpu=cortex-m33 -mthumb
+$(addsuffix .elf, $(RP2350_DMA_TESTS)): LDFLAGS = -T rp2350_sram.ld --no-warn-rwx-segments
+$(addsuffix .elf, $(RP2350_DMA_TESTS)): rp2350_sram.ld
+# Runs from SRAM and calls stubs in flash
+test_rp2350_fetch_ahead.o: ASFLAGS = -mcpu=cortex-m33 -mthumb
+test_rp2350_fetch_ahead.elf: LDFLAGS = -T rp2350_sram_flash.ld --no-warn-rwx-segments
+test_rp2350_fetch_ahead.elf: rp2350_sram_flash.ld
+
+%.o: %.S
+	$(AS) $(ASFLAGS) $< -o $@
+
+%.elf: %.o cortexm4.ld
+	$(LD) $(LDFLAGS) $< -o $@
+	$(OBJDUMP) -d -t $@ > $(@:.elf=.dump)
+
+clean:
+	rm -f *.o *.elf *.dump
+
+.PHONY: all clean

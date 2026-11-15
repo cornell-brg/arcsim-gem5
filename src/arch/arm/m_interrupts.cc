@@ -1,0 +1,557 @@
+/*
+ * Copyright (c) 2026 University of California, Davis and Cornell University
+ * All rights reserved
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met: redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer;
+ * redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution;
+ * neither the name of the copyright holders nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/**
+ * @file
+ * M-profile interrupt controller (CPU-side) implementation.
+ *
+ * On M-profile, the NVIC (inside the SCS device) owns all per-interrupt
+ * state: enabled, pending, active, priority for up to 240 IRQs plus
+ * system exceptions.  The NVIC performs priority resolution and then
+ * signals the CPU with a single "something is deliverable" doorbell.
+ *
+ * This class bridges the BaseInterrupts interface to the SCS:
+ *
+ *   post()/clear():
+ *     The int_num/index parameters are NOT per-interrupt IDs.  They are
+ *     artifacts of the BaseInterrupts interface.  On M-profile, the SCS
+ *     calls cpu->postInterrupt(0,0,0) as a single doorbell signal after
+ *     updatePending() has already resolved priorities.  So post() just
+ *     sets pendingSignal=true and clear() sets it to false.
+ *
+ *     IMPORTANT: pendingSignal is only an optimization hint to skip the
+ *     SCS query when we know nothing was posted.  The SCS only calls
+ *     clearFromInterruptController() from updatePending() when NO
+ *     interrupt is deliverable, so clear() setting false is safe in
+ *     that context.  However, checkInterrupts() always double-checks
+ *     with scs->hasDeliverableIRQ() because masks (PRIMASK, BASEPRI)
+ *     can change between the post() and the check, potentially making
+ *     a previously-deliverable interrupt undeliverable.
+ *
+ *   checkInterrupts():
+ *     Quick-exit if !pendingSignal, then ask SCS for the real answer.
+ *     This means pendingSignal=true does NOT guarantee delivery -- the
+ *     SCS re-evaluates masks and priorities on every query.
+ *
+ *   getInterrupt():
+ *     Has the SCS promote the exception from pending to active, and
+ *     wraps its number in ArmMFault.
+ *
+ *   updateIntrInfo():
+ *     Tells SCS to transition the interrupt pending->active.
+ */
+
+#include "arch/arm/m_interrupts.hh"
+
+#include "arch/arm/interrupts.hh"
+
+#include "arch/arm/m_faults.hh"
+#include "arch/arm/m_fp_insts.hh"
+#include "arch/arm/m_mmu.hh"
+#include "arch/arm/m_system.hh"
+#include "arch/arm/pcstate.hh"
+#include "arch/arm/regs/int.hh"
+#include "arch/arm/regs/misc.hh"
+#include "arch/arm/regs/misc_types.hh"
+#include "base/trace.hh"
+#include "cpu/base.hh"
+#include "cpu/thread_context.hh"
+#include "debug/Faults.hh"
+#include "debug/MProfileStacking.hh"
+#include "dev/arm/m_profile_scs.hh"
+
+namespace gem5
+{
+
+namespace ArmISA
+{
+
+// M-profile BitUnion types (XPSR, etc.) live inside namespace ArmMISA
+// (declared in misc_types.hh).  The using-directive makes them
+// available without the ArmMISA:: prefix.
+using namespace ArmMISA;
+
+MProfileInterrupts::MProfileInterrupts(const Params &p)
+    : BaseInterrupts(p)
+{}
+
+void
+MProfileInterrupts::setThreadContext(ThreadContext *_tc)
+{
+    BaseInterrupts::setThreadContext(_tc);
+
+    // Discover the SCS/NVIC device through the system object.
+    // MProfileInterrupts has no explicit SCS param -- it finds the
+    // SCS via ArmMSystem, which registers the SCS during init().
+    auto *msys = dynamic_cast<ArmMSystem *>(_tc->getSystemPtr());
+    if (msys)
+        scs = msys->getSCS(_tc->contextId());
+}
+
+// =========================================================================
+// Signal interface (called by BaseCPU on behalf of SCS)
+// =========================================================================
+//
+// These are doorbell signals, not per-interrupt tracking.
+// The SCS has already resolved priorities before calling post().
+// See file-level comment for why int_num/index are unused.
+
+void
+MProfileInterrupts::post(int int_num, int index)
+{
+    // Another core's SEV: an event, not an exception. It sets this core's
+    // event register, which its next WFE consumes, and BaseCPU wakes the
+    // core if it sleeps in one.
+    if (int_num == INT_SEV) {
+        tc->setMiscReg(MISCREG_SEV_MAILBOX, 1);
+        return;
+    }
+    pendingSignal = true;
+}
+
+void
+MProfileInterrupts::clear(int int_num, int index)
+{
+    pendingSignal = scs->hasDeliverableIRQ();
+}
+
+void
+MProfileInterrupts::clearAll()
+{
+    pendingSignal = scs->hasDeliverableIRQ();
+    lastAckedExcNum = -1;
+    stackOperating = false;
+    unstacking = false;
+    stackPriority = 256;
+    returningExcNum = -1;
+}
+
+
+// MMU will call to notify when stack read/write finishes
+
+void
+MProfileInterrupts::setupStackPending(bool reading)
+{
+    stackOperating = true;
+    unstacking = reading;
+    stackPriority = scs->getCurrentExcPriority();
+    returningExcNum = scs->getCurrentExcNum();
+}
+
+void
+MProfileInterrupts::removeStackReadPending()
+{
+    DPRINTF(MProfileStacking,
+            "removeStackReadPending: stackOperating=%d "
+            "returningExcNum=%d\n",
+            stackOperating, returningExcNum);
+
+    assert(returningExcNum > 0);
+    scs->deactivateIRQ(returningExcNum);
+    returningExcNum = -1;
+
+    stackOperating = false;
+    stackPriority = 256;
+}
+
+void
+MProfileInterrupts::removeStackWritePending()
+{
+    DPRINTF(MProfileStacking,
+            "removeStackWritePending: stackOperating=%d "
+            "returningExcNum=%d\n",
+            stackOperating, returningExcNum);
+
+    // A lazy FP save can be made in Thread mode, with no exception
+    // active.
+    returningExcNum = -1;
+
+    stackOperating = false;
+    stackPriority = 256;
+}
+
+
+// =========================================================================
+// CPU pipeline interface
+// =========================================================================
+
+bool
+MProfileInterrupts::checkInterrupts() const
+{
+    // Quick exit: if the SCS hasn't posted anything, no need to query.
+    if (!pendingSignal || !scs)
+        return false;
+
+    // Even though pendingSignal is true, the interrupt may no longer
+    // be deliverable.  Masks (PRIMASK, BASEPRI, FAULTMASK) can change
+    // between when the SCS posted and when the CPU checks.  The SCS
+    // re-evaluates the full priority/mask state on every call.
+    return scs->hasDeliverableIRQ();
+}
+
+Fault
+MProfileInterrupts::getInterrupt()
+{
+    assert(scs);
+
+    // The exception to take stays pending until it is certain to be
+    // taken: checkInterrupts() only looks.
+    const int pendingExc = scs->deliverableIRQ();
+    if (pendingExc < 0)
+        return NoFault;
+
+    if (stackOperating) {
+        // Stacking or unstacking is in progress.  Only allow a
+        // strictly higher priority exception to preempt.
+        // Same or lower priority must wait until the operation
+        // completes (DDI0403E B1.5.14).
+        int16_t pendingPri = scs->getExcPriority(pendingExc);
+
+        DPRINTF(MProfileStacking,
+                "getInterrupt: stackOperating=true, pendingExc=%d "
+                "pendingPri=%d stackPriority=%d\n",
+                pendingExc, pendingPri, stackPriority);
+
+        if (pendingPri >= stackPriority) {
+            return NoFault;
+        }
+
+        // Higher priority: allow preemption.  An exception return's
+        // unstacking is abandoned.  Stacking writes (a frame being
+        // pushed, a lazy FP save) are left to finish, as the frame of
+        // a late-arriving exception on real hardware: the preempting
+        // exception's frame goes below them.
+        DPRINTF(MProfileStacking,
+                "getInterrupt: preempting with higher-priority "
+                "exc#%d (pri=%d > stack pri=%d) unstacking=%d\n",
+                pendingExc, pendingPri, stackPriority, unstacking);
+
+        if (unstacking) {
+            auto *mmu = dynamic_cast<MMMU *>(tc->getMMUPtr());
+            assert(mmu);
+            mmu->abandonUnstacking();
+            // The return already restored the background state (the
+            // unstacking's functional reads); only its timing is cut
+            // short.  The returning exception is deactivated now, as
+            // the reads' completion would have (the return deactivates
+            // it before popping, DDI0403E B1.5.8).
+            removeStackReadPending();
+        }
+    }
+
+    // Promote it to active and take it.
+    scs->updatePending();
+    lastAckedExcNum = scs->acknowledgeIRQ();
+    return std::make_shared<ArmMFault>(lastAckedExcNum);
+}
+
+void
+MProfileInterrupts::updateIntrInfo()
+{
+    // Activation is now handled by ArmMFault::invoke() via
+    // scs->activateIRQ().  Nothing to do here — just clear
+    // the acked exception number.
+    lastAckedExcNum = -1;
+}
+
+bool
+MProfileInterrupts::validateExcReturn(ThreadContext *tc, uint32_t exc_return,
+                  const char *&reason)
+{
+    // Check 1: bits[31:5] must be ones (reserved encoding)
+    if ((exc_return & 0xFFFFFFE0) != 0xFFFFFFE0) {
+        reason = "reserved (bits[31:5] not all ones)";
+        return false;
+    }
+
+    // Check 1b: bit[4] (FType) = 0, a frame with FP state, needs an FPU
+    auto *msys = dynamic_cast<ArmMSystem *>(tc->getSystemPtr());
+    if (!(exc_return & 0x10) &&
+        !(msys && msys->has(ArmExtension::M_PROFILE_FPU_SP))) {
+        reason = "FP frame (bit[4]=0) without an FPU";
+        return false;
+    }
+
+    // Check 2: Handler mode (bit[3]=0) + PSP (bit[2]=1) is impossible
+    // — Handler mode always uses MSP
+    if (!(exc_return & 0x8) && (exc_return & 0x4)) {
+        reason = "Handler mode + PSP is invalid";
+        return false;
+    }
+
+    // Check 3: return to Thread (bit[3]=1) from Thread mode (IPSR==0)
+    // — can only do exception return from Handler mode
+    uint32_t ipsr = bits(
+        tc->readMiscRegNoEffect(MISCREG_M_XPSR), 8, 0);
+    if ((exc_return & 0x8) && ipsr == 0) {
+        reason = "return to Thread from Thread mode (IPSR==0)";
+        return false;
+    }
+
+    return true;
+}
+
+void
+MProfileInterrupts::excReturnUnstack(ThreadContext *tc, uint32_t exc_return)
+{
+    DPRINTFS(MProfileStacking, tc->getCpuPtr(),
+             "excReturnUnstack: exc_return=%#x pc=%#x\n",
+             exc_return, tc->pcState().as<PCState>().pc());
+
+    // MISSING-1: validate EXC_RETURN — halt on invalid values.
+    // Invalid EXC_RETURN indicates firmware bug (LR corruption).
+    // On real hardware this would generate UsageFault (INVPC).
+    const char *reason = nullptr;
+    fatal_if(!validateExcReturn(tc, exc_return, reason),
+             "Invalid EXC_RETURN 0x%08x: %s. "
+             "This indicates a firmware bug (corrupted LR). "
+             "Valid values: 0xFFFFFFF1 (Handler/MSP), "
+             "0xFFFFFFF9 (Thread/MSP), 0xFFFFFFFD (Thread/PSP), "
+             "and with an FP frame 0xFFFFFFE1, 0xFFFFFFE9, 0xFFFFFFED. "
+             "(DDI0403E B1.5.8)",
+             exc_return, reason);
+
+
+    // Decode EXC_RETURN (DDI0403E B1.5.8).
+    //   bit[4] = 0: the frame holds FP state (FType)
+    //   bit[3] = 0: return to Handler mode, 1: return to Thread mode
+    //   bit[2] = 0: restore from MSP,       1: restore from PSP
+    bool fpFrame = !(exc_return & 0x10);
+    bool returnToThread = (exc_return & 0x8);
+    bool restoreFromPSP = (exc_return & 0x4);
+
+    // An FP frame's s0-s15 and FPSCR are popped unless its lazy save is
+    // still pending: then the registers hold that state yet, and the
+    // save is dropped (PopStack, DDI0403E B1.5.8).
+    bool popFP = false;
+    if (fpFrame) {
+        FPCCR_M fpccr = tc->readMiscRegNoEffect(MISCREG_M_FPCCR);
+        if (fpccr.lspact) {
+            fpccr.lspact = 0;
+            tc->setMiscRegNoEffect(MISCREG_M_FPCCR, fpccr);
+        } else {
+            popFP = true;
+        }
+    }
+
+    MiscRegIndex spReg = restoreFromPSP ? MISCREG_M_PSP : MISCREG_M_MSP;
+
+    // Read the frame pointer from the correct stack source.
+    //
+    // For MSP frames (bit[2]=0): read from R13 (int_reg::Sp).
+    //   Handler mode R13 IS MSP.  Reading R13 is correct even after
+    //   nested exceptions, because inner exception entries overwrite
+    //   MISCREG_M_MSP (via setMiscRegNoEffect in invoke()) but the
+    //   handler's PUSH/POP only track R13.  After the handler's
+    //   software POP, R13 points to the hardware exception frame.
+    //   MISCREG_M_MSP may still hold a stale value from an inner
+    //   exception's entry — using it would pop from the wrong address.
+    //
+    // For PSP frames (bit[2]=1): read from MISCREG_M_PSP.
+    //   Handler mode R13 = MSP ≠ PSP.  The frame was pushed to PSP
+    //   before R13 switched to MSP on exception entry, so we must
+    //   use the misc reg to find it.
+    //
+    // DDI0403E B1.5.8: SP_process / SP_main selected by EXC_RETURN bit[2].
+    uint32_t frameptr;
+    if (restoreFromPSP) {
+        frameptr = (uint32_t)tc->readMiscRegNoEffect(MISCREG_M_PSP);
+    } else {
+        frameptr = (uint32_t)tc->getReg(int_reg::Sp);
+    }
+
+    // Read the exception frame via MMMU::readFromStack().
+    // Phase 1 (inside readFromStack): sendFunctional() for immediate
+    // data.  Phase 2: timing reads for realistic latency with the
+    // stacking barrier holding icache responses until done.
+    auto *mmu = dynamic_cast<MMMU *>(tc->getMMUPtr());
+    assert(mmu && "M-profile CPU must use MMMU");
+    DPRINTFS(MProfileStacking, tc->getCpuPtr(),
+             "excReturnUnstack: calling readFromStack "
+             "frameptr=%#x restoreFromPSP=%d fpFrame=%d popFP=%d\n",
+             frameptr, restoreFromPSP, fpFrame, popFP);
+    std::vector<uint32_t> frame =
+        mmu->readFromStack(frameptr, popFP ? 25 : 8, tc);
+
+    // Frame layout (DDI0403E B1.5.6):
+    //   [0]=R0, [1]=R1, [2]=R2, [3]=R3,
+    //   [4]=R12, [5]=LR, [6]=ReturnAddr, [7]=xPSR
+    uint32_t retAddr = frame[6];
+    XPSR xpsr = frame[7];
+
+    // Restore general-purpose registers.
+    tc->setReg(int_reg::R0,  (RegVal)frame[0]);
+    tc->setReg(int_reg::R1,  (RegVal)frame[1]);
+    tc->setReg(int_reg::R2,  (RegVal)frame[2]);
+    tc->setReg(int_reg::R3,  (RegVal)frame[3]);
+    tc->setReg(int_reg::R12, (RegVal)frame[4]);
+    tc->setReg(int_reg::Lr,  (RegVal)frame[5]);
+
+    // [8..23]=S0-S15, [24]=FPSCR
+    if (popFP) {
+        for (RegIndex i = 0; i < 16; ++i)
+            tc->setReg(vfpSRegId(i), (RegVal)frame[8 + i]);
+        tc->setMiscRegNoEffect(MISCREG_FPSCR, (RegVal)frame[24]);
+    }
+
+    // Restore SP — undo alignment padding if frameptralign was set.
+    // Write both R13 (authoritative) and misc reg copy.
+    uint32_t sp = frameptr + (fpFrame ? 0x68 : 0x20);
+    if (xpsr.frameptralign)
+        sp += 4;
+    tc->setReg(int_reg::Sp, (RegVal)sp);
+    tc->setMiscRegNoEffect(spReg, sp);
+
+    // Bug 4 fix: restore CONTROL.SPSEL from EXC_RETURN bit[2].
+    // Returning to Thread/PSP (bit[2]=1) → SPSEL=1.
+    // Returning to Thread/MSP or Handler (bit[2]=0) → SPSEL=0.
+    // DDI0403E B1.4.4: CONTROL.SPSEL is only meaningful in Thread mode
+    // and is restored by exception return.
+    // CONTROL.FPCA is set again when the frame held FP state: the
+    // returned-to context has one.
+    {
+        CONTROL_M ctrl = tc->readMiscRegNoEffect(MISCREG_M_CONTROL);
+        ctrl.spsel = restoreFromPSP ? 1 : 0;
+        ctrl.fpca = fpFrame ? 1 : 0;
+        tc->setMiscRegNoEffect(MISCREG_M_CONTROL, ctrl);
+    }
+
+    // Restore xPSR.  The stacked value already contains the correct
+    // IPSR for the interrupted context (0 for Thread mode, non-zero
+    // for a nested Handler).  Clear frameptralign since it is only
+    // meaningful in the stacked copy.
+    xpsr.frameptralign = 0;
+    tc->setMiscRegNoEffect(MISCREG_M_XPSR, xpsr);
+
+    // BUG-5: use shared helper to sync xPSR → CC flat regs.
+    // The stacked xPSR has the interrupted code's NZCV/GE flags.
+    // After restoring xPSR above, push those flags into CC flat regs
+    // so conditional instructions in the resumed code see correct values.
+    syncXpsrToCCRegs(tc);
+
+    // Set NPC to the stacked return address.
+    //
+    // mProfileExcReturn() is called from execute() (via BxMProfile or
+    // ExcReturnFromPC), so advancePC() will call advance() afterwards:
+    //   advance(): _pc = _npc; _npc = _pc + instSize
+    // We must therefore set _npc = retAddr, NOT use the PCState(addr)
+    // constructor (which calls set() → _npc = addr+2 → off by two).
+    //
+    // Contrast with ArmMFault::invoke() / MProfileReset::invoke(): those
+    // are true fault handlers where the fault path does NOT call advance()
+    // after tc->pcState(pc), so PCState(addr) is correct there.
+    //
+    // Here we take the current pcState and only change _npc and the
+    // Thumb-state flag.  _pc, _aarch64, etc. are already correct since we
+    // are mid-execution on an M-profile (Thumb, AArch32) instruction.
+    auto pc = tc->pcState().as<PCState>();
+    pc.nextThumb(true);                    // M-profile always returns to Thumb
+    pc.illegalExec(false);
+    // NPC = return address; advance() copies to PC.
+    pc.npc(retAddr & ~(Addr)0x1);
+    // The stacked IT state: returning into an IT block resumes it, so the
+    // block's remaining instructions stay conditional. advance() makes
+    // nextItstate the resumed instruction's itstate; zero means none.
+    ITSTATE it = 0;
+    it.top6 = xpsr.iciIt2;
+    it.bottom2 = xpsr.iciIt1;
+    pc.itstate(0);
+    pc.nextItstate(it);
+    tc->pcState(pc);
+
+    DPRINTF(Faults, "M-profile exception return: EXC_RETURN=%#x "
+            "retAddr=%#x SP=%#x %s mode\n",
+            exc_return, retAddr & ~0x1, sp,
+            returnToThread ? "Thread" : "Handler");
+}
+
+// =========================================================================
+// Exception return (called when CPU detects EXC_RETURN address)
+// =========================================================================
+//
+// M-profile exception return is hardware-automatic: the CPU detects
+// the EXC_RETURN value, deactivates the returning exception, and
+// unstacks the exception frame — all in one operation.
+// This is unlike A-profile where software explicitly writes to
+// ICC_EOIR to deactivate.
+//
+// Split into two phases:
+//   1. Deactivate: clear active bit via scs->deactivateIRQ()
+//   2. Unstack:    restore CPU state via excReturnUnstack()
+
+void
+MProfileInterrupts::excReturn(ThreadContext *tc, uint32_t exc_return)
+{
+    // Read current IPSR to identify which exception is returning.
+    // Must happen before unstacking, which restores the stacked xPSR
+    // (overwriting IPSR with the interrupted context's exception number).
+    XPSR currentXpsr = tc->readMiscRegNoEffect(MISCREG_M_XPSR);
+    returningExcNum = currentXpsr.exception;
+
+    DPRINTF(MProfileStacking,
+            "excReturn: exc_return=%#x returningExcNum=%d\n",
+            exc_return, returningExcNum);
+
+    // Exception return opens the local exclusive monitor (DDI0403E
+    // A3.4.4).
+    tc->getIsaPtr()->globalClearExclusive();
+
+    // Do NOT deactivate here — the exception stays active during
+    // unstacking.  Deactivation happens in removeStackReadPending()
+    // when the MMU signals that all unstacking reads have completed.
+    // This matches real HW: deactivation occurs when the return
+    // sequence completes successfully (DDI0403E B1.5.8).
+
+    // Unstack the exception frame and restore CPU state.
+    // readFromStack() inside excReturnUnstack() will call
+    // setupStackReadPending() and register the completion callback.
+    DPRINTF(MProfileStacking,
+            "excReturn: calling excReturnUnstack\n");
+    excReturnUnstack(tc, exc_return);
+}
+
+// =========================================================================
+// Serialization (minimal for MVP)
+// =========================================================================
+
+void
+MProfileInterrupts::serialize(CheckpointOut &cp) const
+{
+    SERIALIZE_SCALAR(pendingSignal);
+    SERIALIZE_SCALAR(lastAckedExcNum);
+}
+
+void
+MProfileInterrupts::unserialize(CheckpointIn &cp)
+{
+    UNSERIALIZE_SCALAR(pendingSignal);
+    UNSERIALIZE_SCALAR(lastAckedExcNum);
+}
+
+} // namespace ArmISA
+} // namespace gem5

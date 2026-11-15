@@ -1,0 +1,691 @@
+# Copyright (c) 2012-2014, 2017-2018, 2025 Arm Limited
+# All rights reserved.
+#
+# The license below extends only to copyright in the software and shall
+# not be construed as granting a license to any other intellectual
+# property including but not limited to intellectual property relating
+# to a hardware implementation of the functionality of the software
+# licensed hereunder.  You may use the software subject to the license
+# terms below provided that you ensure that this notice is replicated
+# unmodified and in its entirety in all distributions of the software,
+# modified or unmodified, in source code or in binary form.
+#
+# Copyright (c) 2007 The Regents of The University of Michigan
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met: redistributions of source code must retain the above copyright
+# notice, this list of conditions and the following disclaimer;
+# redistributions in binary form must reproduce the above copyright
+# notice, this list of conditions and the following disclaimer in the
+# documentation and/or other materials provided with the distribution;
+# neither the name of the copyright holders nor the names of its
+# contributors may be used to endorse or promote products derived from
+# this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+from m5.defines import buildEnv
+from m5.objects.BaseCPU import BaseCPU
+from m5.objects.BranchPredictor import *
+from m5.objects.DummyChecker import DummyChecker
+from m5.objects.FuncUnit import OpClass
+from m5.objects.TimingExpr import TimingExpr
+from m5.params import *
+from m5.proxy import *
+from m5.SimObject import SimObject
+
+
+class MinorOpClass(SimObject):
+    """Boxing of OpClass to get around build problems and provide a hook for
+    future additions to OpClass checks"""
+
+    type = "MinorOpClass"
+    cxx_header = "cpu/minor/func_unit.hh"
+    cxx_class = "gem5::MinorOpClass"
+
+    opClass = Param.OpClass("op class to match")
+
+
+class MinorOpClassSet(SimObject):
+    """A set of matchable op classes"""
+
+    type = "MinorOpClassSet"
+    cxx_header = "cpu/minor/func_unit.hh"
+    cxx_class = "gem5::MinorOpClassSet"
+
+    opClasses = VectorParam.MinorOpClass(
+        [], "op classes to be matched.  An empty list means any class"
+    )
+
+
+class MinorFUTiming(SimObject):
+    type = "MinorFUTiming"
+    cxx_header = "cpu/minor/func_unit.hh"
+    cxx_class = "gem5::MinorFUTiming"
+
+    mask = Param.UInt64(0, "mask for testing ExtMachInst")
+    match = Param.UInt64(
+        0,
+        "match value for testing ExtMachInst:"
+        " (ext_mach_inst & mask) == match",
+    )
+    suppress = Param.Bool(
+        False, "if true, this inst. is not executed by this FU"
+    )
+    extraCommitLat = Param.Cycles(
+        0, "extra cycles to stall commit for this inst."
+    )
+    extraCommitLatExpr = Param.TimingExpr(
+        NULL, "extra cycles as a run-time evaluated expression"
+    )
+    extraAssumedLat = Param.Cycles(
+        0,
+        "extra cycles to add to scoreboard"
+        " retire time for this insts dest registers once it leaves the"
+        " functional unit.  For mem refs, if this is 0, the result's time"
+        " is marked as unpredictable and no forwarding can take place.",
+    )
+    extraIssueLat = Param.Cycles(
+        0,
+        "extra cycles, beyond the functional unit's issueLat, before the"
+        " unit takes another inst. after this one",
+    )
+    resultUsePenalty = Param.Cycles(
+        0,
+        "cycles an inst. that reads this inst.'s results is held back,"
+        " counted from when this inst. completes, however long that took"
+        " (0: none).  A reader whose srcRegsRelativeLats entry for that"
+        " register is larger than its others by as much is not held back",
+    )
+    srcRegsRelativeLats = VectorParam.Cycles(
+        "the maximum number of cycles"
+        " after inst. issue that each src reg can be available for this"
+        " inst. to issue"
+    )
+    opClasses = Param.MinorOpClassSet(
+        MinorOpClassSet(),
+        "op classes to be considered for this decode.  An empty set means any"
+        " class",
+    )
+    description = Param.String(
+        "", "description string of the decoding/inst class"
+    )
+
+
+def minorMakeOpClassSet(op_classes):
+    """Make a MinorOpClassSet from a list of OpClass enum value strings"""
+
+    def boxOpClass(op_class):
+        return MinorOpClass(opClass=op_class)
+
+    return MinorOpClassSet(opClasses=[boxOpClass(o) for o in op_classes])
+
+
+class MinorFU(SimObject):
+    type = "MinorFU"
+    cxx_header = "cpu/minor/func_unit.hh"
+    cxx_class = "gem5::MinorFU"
+
+    opClasses = Param.MinorOpClassSet(
+        MinorOpClassSet(),
+        "type of operations allowed on this functional unit",
+    )
+    opLat = Param.Cycles(1, "latency in cycles")
+    issueLat = Param.Cycles(
+        1, "cycles until another instruction can be issued"
+    )
+    timings = VectorParam.MinorFUTiming([], "extra decoding rules")
+
+    cantForwardFromFUIndices = VectorParam.Unsigned(
+        [],
+        "list of FU indices from which this FU can't receive and early"
+        " (forwarded) result",
+    )
+
+    resultAfterCommit = Param.Bool(
+        False,
+        "Instructions on this FU commit after opLat cycles but their results"
+        " become available only opLat plus the timing's extraAssumedLat"
+        " cycles after issue, so later instructions that do not need the"
+        " result are not held up (out-of-order completion, such as an"
+        " iterative divider working beside the pipeline)",
+    )
+    holdsIssue = Param.Bool(
+        False,
+        "An instruction on this FU stops all issue until its result is due"
+        " (opLat plus any data-dependent extra latency): nothing else issues"
+        " beside it, as on a core held while a coprocessor works",
+    )
+
+
+class DynamicLatencyIntDivFU(MinorFU):
+    """MinorFU with data-dependent SDIV/UDIV latency.
+
+    The default keeps the existing M4 estimate. The optional RP2350
+    setting uses dividend/divisor magnitudes and the measured signed
+    divide fast-case throughput."""
+
+    type = "DynamicLatencyIntDivFU"
+    cxx_header = "cpu/minor/func_unit.hh"
+    cxx_class = "gem5::DynamicLatencyIntDivFU"
+    rp2350_m33_timing = Param.Bool(
+        False, "Use RP2350 Cortex-M33 SDIV/UDIV operand-dependent timing")
+
+
+class Hazard3FpDivSqrtFU(MinorFU):
+    """MinorFU for single-precision divide and square root timed as T-Head's
+    E906 unit (arcsim-soc's Hazard3 FPU): the cycles follow the operands, a
+    result exact in few bits finishing sooner (cpu/e906_divsqrt.hh). opLat
+    is the least an operation takes."""
+
+    type = "Hazard3FpDivSqrtFU"
+    cxx_header = "cpu/minor/func_unit.hh"
+    cxx_class = "gem5::Hazard3FpDivSqrtFU"
+
+
+class MinorFUPool(SimObject):
+    type = "MinorFUPool"
+    cxx_header = "cpu/minor/func_unit.hh"
+    cxx_class = "gem5::MinorFUPool"
+
+    funcUnits = VectorParam.MinorFU("functional units")
+
+
+class MinorDefaultIntFU(MinorFU):
+    opClasses = minorMakeOpClassSet(["IntAlu"])
+    timings = [MinorFUTiming(description="Int", srcRegsRelativeLats=[2])]
+    opLat = 3
+
+
+class MinorDefaultIntMulFU(MinorFU):
+    opClasses = minorMakeOpClassSet(["IntMult"])
+    timings = [MinorFUTiming(description="Mul", srcRegsRelativeLats=[0])]
+    opLat = 3
+
+
+class MinorDefaultIntDivFU(MinorFU):
+    opClasses = minorMakeOpClassSet(["IntDiv"])
+    issueLat = 9
+    opLat = 9
+
+
+class MinorDefaultFloatSimdFU(MinorFU):
+    opClasses = minorMakeOpClassSet(
+        [
+            "FloatAdd",
+            "FloatCmp",
+            "FloatCvt",
+            "FloatMisc",
+            "FloatMult",
+            "FloatMultAcc",
+            "FloatDiv",
+            "FloatSqrt",
+            "Bf16Cvt",
+            "SimdAdd",
+            "SimdAddAcc",
+            "SimdAlu",
+            "SimdCmp",
+            "SimdCvt",
+            "SimdMisc",
+            "SimdMult",
+            "SimdMultAcc",
+            "SimdMatMultAcc",
+            "SimdShift",
+            "SimdShiftAcc",
+            "SimdDiv",
+            "SimdSqrt",
+            "SimdFloatAdd",
+            "SimdFloatAlu",
+            "SimdFloatCmp",
+            "SimdFloatCvt",
+            "SimdFloatDiv",
+            "SimdFloatMisc",
+            "SimdFloatMult",
+            "SimdFloatMultAcc",
+            "SimdFloatMatMultAcc",
+            "SimdFloatSqrt",
+            "SimdReduceAdd",
+            "SimdReduceAlu",
+            "SimdReduceCmp",
+            "SimdFloatReduceAdd",
+            "SimdFloatReduceCmp",
+            "SimdAes",
+            "SimdAesMix",
+            "SimdSha1Hash",
+            "SimdSha1Hash2",
+            "SimdSha256Hash",
+            "SimdSha256Hash2",
+            "SimdShaSigma2",
+            "SimdShaSigma3",
+            "SimdSha3",
+            "SimdSm4e",
+            "SimdCrc",
+            "Matrix",
+            "MatrixMov",
+            "MatrixOP",
+            "SimdExt",
+            "SimdFloatExt",
+            "SimdFloatCvt",
+            "SimdConfig",
+            "SimdDotProd",
+            "SimdBf16Add",
+            "SimdBf16Cmp",
+            "SimdBf16Cvt",
+            "SimdBf16DotProd",
+            "SimdBf16MatMultAcc",
+            "SimdBf16Mult",
+            "SimdBf16MultAcc",
+        ]
+    )
+
+    timings = [MinorFUTiming(description="FloatSimd", srcRegsRelativeLats=[2])]
+    opLat = 6
+
+
+class MinorDefaultPredFU(MinorFU):
+    opClasses = minorMakeOpClassSet(["SimdPredAlu"])
+    timings = [MinorFUTiming(description="Pred", srcRegsRelativeLats=[2])]
+    opLat = 3
+
+
+class MinorDefaultMemFU(MinorFU):
+    opClasses = minorMakeOpClassSet(
+        [
+            "MemRead",
+            "MemWrite",
+            "FloatMemRead",
+            "FloatMemWrite",
+            "SimdUnitStrideLoad",
+            "SimdUnitStrideStore",
+            "SimdUnitStrideMaskLoad",
+            "SimdUnitStrideMaskStore",
+            "SimdStridedLoad",
+            "SimdStridedStore",
+            "SimdIndexedLoad",
+            "SimdIndexedStore",
+            "SimdUnitStrideFaultOnlyFirstLoad",
+            "SimdWholeRegisterLoad",
+            "SimdWholeRegisterStore",
+        ]
+    )
+    timings = [
+        MinorFUTiming(
+            description="Mem", srcRegsRelativeLats=[1], extraAssumedLat=2
+        )
+    ]
+    opLat = 1
+
+
+class MinorDefaultMiscFU(MinorFU):
+    opClasses = minorMakeOpClassSet(["InstPrefetch", "System"])
+    opLat = 1
+
+
+class MinorDefaultFUPool(MinorFUPool):
+    funcUnits = [
+        MinorDefaultIntFU(),
+        MinorDefaultIntFU(),
+        MinorDefaultIntMulFU(),
+        MinorDefaultIntDivFU(),
+        MinorDefaultFloatSimdFU(),
+        MinorDefaultPredFU(),
+        MinorDefaultMemFU(),
+        MinorDefaultMiscFU(),
+    ]
+
+
+class ThreadPolicy(Enum):
+    vals = ["SingleThreaded", "RoundRobin", "Random"]
+
+
+class BaseMinorCPU(BaseCPU):
+    type = "BaseMinorCPU"
+    cxx_header = "cpu/minor/cpu.hh"
+    cxx_class = "gem5::MinorCPU"
+
+    @classmethod
+    def memory_mode(cls):
+        return "timing"
+
+    @classmethod
+    def require_caches(cls):
+        return True
+
+    @classmethod
+    def support_take_over(cls):
+        return True
+
+    threadPolicy = Param.ThreadPolicy("RoundRobin", "Thread scheduling policy")
+    singleFetchStage = Param.Bool(
+        False,
+        "Model Fetch1+Fetch2 as a single logical fetch stage "
+        "(3-stage pipeline mode)",
+    )
+    fetchBranchTargetAtDecode = Param.Bool(
+        False,
+        "With singleFetchStage: no dynamic branch prediction.  A direct"
+        " branch's target line is fetched in the cycle after the fetch stage"
+        " decodes it (the branch's Decode cycle), beside the sequential"
+        " stream, and starts the new stream if Execute takes the branch, as"
+        " on cores that compute direct targets in decode",
+    )
+    fetchBranchSpeculation = Param.Bool(
+        False,
+        "With fetchBranchTargetAtDecode: the target lines of two branches"
+        " Execute has yet to complete are kept, the second only behind a"
+        " conditional branch, where otherwise each decoded branch's target"
+        " fetch replaces the last.  The line after a squash-after"
+        " instruction is fetched in the same way.  Nothing more of the"
+        " sequential stream is fetched once an unconditional branch has"
+        " been decoded.  A target line, and what is fetched of the stream"
+        " behind any other branch Execute has yet to complete, is fetched"
+        " on speculation: its request is flagged a prefetch, which the"
+        " memory system may decline with an error, and a declined line is"
+        " fetched again once it is sure to be wanted",
+    )
+    fetchStreamOnSpeculation = Param.Bool(
+        True,
+        "With fetchBranchSpeculation: what is fetched of the sequential"
+        " stream behind a branch Execute has yet to complete is flagged a"
+        " prefetch, which the memory system may decline.  Off, only target"
+        " lines are, and the stream is read as any other fetch, as on a core"
+        " whose bus reads cannot be taken back once issued",
+    )
+    fetchKeepTargetInFlight = Param.Bool(
+        False,
+        "With fetchBranchTargetAtDecode: when Execute takes a branch whose"
+        " target line is still on its way (fetched while the branch was in"
+        " Decode, not on speculation), that request is kept and starts the"
+        " new stream when it arrives, where otherwise it is given up and the"
+        " same line fetched again; this matters only where a fetch takes"
+        " longer than the branch's Decode cycle (code over a slower bus)",
+    )
+    fetchRegisterTargetAtDecode = Param.Bool(
+        False,
+        "With fetchBranchTargetAtDecode: a branch to the value of its one"
+        " source register also has its target line fetched in its Decode"
+        " cycle, when every older instruction has been issued and none"
+        " still has that register to write",
+    )
+    fetchPredictLastBackwardBranch = Param.Bool(
+        False,
+        "With fetchBranchTargetAtDecode: the last conditional branch taken"
+        " backward is predicted taken as it is fetched, as Hazard3's"
+        " one-entry branch predictor (BRANCH_PREDICTOR); every other branch"
+        " as without",
+    )
+    fetchFoldMasks = VectorParam.UInt64(
+        [],
+        "With fetchFoldMatches and fetchFoldKinds: instructions that take"
+        " no cycle of their own beside a 16-bit neighbour (folding, or"
+        " limited dual issue): one in the same fetched word, or the last of"
+        " the word before if that one was not branched to.  Nothing folds"
+        " into an instruction of several micro-ops, nor a branch into a"
+        " branch.  The patterns are tested in order, and the first with"
+        " (ext_mach_inst & mask) == match gives the instruction's kind",
+    )
+    fetchFoldMatches = VectorParam.UInt64([], "see fetchFoldMasks")
+    fetchFoldKinds = VectorParam.Unsigned(
+        [],
+        "see fetchFoldMasks: 0 for an instruction that does not fold, 1 for"
+        " one that folds into the 16-bit instruction before it, 2 for one"
+        " that folds into the 16-bit instruction after it.  Needs"
+        " decodeInputWidth and executeInputWidth of at least 2",
+    )
+    fetchReadAheadLimit = Param.Unsigned(
+        0,
+        "With singleFetchStage: no sequential fetch starts while this many"
+        " bytes of the stream, or more, are fetched or on their way and not"
+        " yet decoded (0: no limit), as a core whose prefetch buffer holds"
+        " a few bytes.  Decode never waits for a line it would not have"
+        " waited for without the limit if this is at least the bytes it"
+        " can take in the cycles a fetch needs",
+    )
+    fetchFifoWords = Param.Unsigned(
+        0,
+        "With singleFetchStage: no sequential fetch starts while this many"
+        " words, or more, fetched or on their way, lie past the instruction"
+        " Execute takes next, as Hazard3's frontend FIFO behind its decode"
+        " register (0: no limit).  That instruction is the one after the"
+        " next to issue, or the next to issue itself while issue is held"
+        " into the next cycle, so the FIFO frees a word a cycle ahead, as"
+        " Minor's fetch is a stage further from Execute",
+    )
+    fetch1FetchLimit = Param.Unsigned(
+        1, "Number of line fetches allowable in flight at once"
+    )
+    fetch1LineSnapWidth = Param.Unsigned(
+        0,
+        "Fetch1 'line' fetch snap size in bytes"
+        " (0 means use system cache line size)",
+    )
+    fetch1LineWidth = Param.Unsigned(
+        0,
+        "Fetch1 maximum fetch size in bytes (0 means use system cache"
+        " line size)",
+    )
+    fetch1ToFetch2ForwardDelay = Param.Cycles(
+        1, "Forward cycle delay from Fetch1 to Fetch2 (1 means next cycle)"
+    )
+    fetch1ToFetch2BackwardDelay = Param.Cycles(
+        1,
+        "Backward cycle delay from Fetch2 to Fetch1 for branch prediction"
+        " signalling (0 means in the same cycle, 1 mean the next cycle)",
+    )
+
+    fetch2InputBufferSize = Param.Unsigned(
+        2, "Size of input buffer to Fetch2 in cycles-worth of insts."
+    )
+    fetch2ToDecodeForwardDelay = Param.Cycles(
+        1, "Forward cycle delay from Fetch2 to Decode (1 means next cycle)"
+    )
+    fetch2CycleInput = Param.Bool(
+        True,
+        "Allow Fetch2 to cross input lines to generate full output each"
+        " cycle",
+    )
+
+    decodeInputBufferSize = Param.Unsigned(
+        3, "Size of input buffer to Decode in cycles-worth of insts."
+    )
+    decodeToExecuteForwardDelay = Param.Cycles(
+        1, "Forward cycle delay from Decode to Execute (1 means next cycle)"
+    )
+    decodeInputWidth = Param.Unsigned(
+        2,
+        "Width (in instructions) of input to Decode (and implicitly"
+        " Decode's own width)",
+    )
+    decodeCycleInput = Param.Bool(
+        True,
+        "Allow Decode to pack instructions from more than one input cycle"
+        " to fill its output each cycle",
+    )
+
+    executeInputWidth = Param.Unsigned(
+        2, "Width (in instructions) of input to Execute"
+    )
+    executeCycleInput = Param.Bool(
+        True,
+        "Allow Execute to use instructions from more than one input cycle"
+        " each cycle",
+    )
+    executeIssueLimit = Param.Unsigned(
+        2, "Number of issuable instructions in Execute each cycle"
+    )
+    executeMemoryIssueLimit = Param.Unsigned(
+        1, "Number of issuable memory instructions in Execute each cycle"
+    )
+    executeCommitLimit = Param.Unsigned(
+        2, "Number of committable instructions in Execute each cycle"
+    )
+    executeMemoryCommitLimit = Param.Unsigned(
+        1, "Number of committable memory references in Execute each cycle"
+    )
+    executeInputBufferSize = Param.Unsigned(
+        7, "Size of input buffer to Execute in cycles-worth of insts."
+    )
+    executeMemoryWidth = Param.Unsigned(
+        0,
+        "Width (and snap) in bytes of the data memory interface. (0 mean use"
+        " the system cacheLineSize)",
+    )
+    executeMaxAccessesInMemory = Param.Unsigned(
+        2,
+        "Maximum number of concurrent accesses allowed to the memory system"
+        " from the dcache port",
+    )
+    executeLSQMaxStoreBufferStoresPerCycle = Param.Unsigned(
+        2, "Maximum number of stores that the store buffer can issue per cycle"
+    )
+    executeLSQRequestsQueueSize = Param.Unsigned(
+        1, "Size of LSQ requests queue (address translation queue)"
+    )
+    executeLSQTransfersQueueSize = Param.Unsigned(
+        2, "Size of LSQ transfers queue (memory transaction queue)"
+    )
+    executeLSQStoreBufferSize = Param.Unsigned(5, "Size of LSQ store buffer")
+    executeBranchDelay = Param.Cycles(
+        1,
+        "Delay from Execute deciding to branch and Fetch1 reacting"
+        " (1 means next cycle)",
+    )
+
+    executeFuncUnits = Param.MinorFUPool(
+        MinorDefaultFUPool(), "FUlines for this processor"
+    )
+
+    executeSetTraceTimeOnCommit = Param.Bool(
+        True, "Set inst. trace times to be commit times"
+    )
+    executeSetTraceTimeOnIssue = Param.Bool(
+        False, "Set inst. trace times to be issue times"
+    )
+
+    executeAllowEarlyMemoryIssue = Param.Bool(
+        True,
+        "Allow mem refs to be issued to the LSQ before reaching the head of"
+        " the in flight insts queue",
+    )
+
+    executeInOrderCompletion = Param.Bool(
+        False,
+        "An instruction issues only once every older instruction has"
+        " completed, as in a single execute stage that stalls for"
+        " multi-cycle operations, with two exceptions: a memory reference"
+        " may follow older memory references (pipelined address and data"
+        " phases), and FUs with resultAfterCommit complete beside the"
+        " pipeline.  Micro-ops after the first of a macro-op follow it",
+    )
+
+    executeWaitedStoreHoldsInsts = Param.Bool(
+        False,
+        "A store sent to memory that is not answered within its cycle keeps"
+        " Execute from committing or issuing until it is, as on a core with"
+        " no write buffer, whose pipeline stalls while its bus makes a store"
+        " wait.  The store buffer then sends a store in the cycle the store"
+        " commits, the cycle of its address phase",
+    )
+
+    executeWaitedLoadHoldsInsts = Param.Bool(
+        False,
+        "A load sent to memory that is not answered within its cycle keeps"
+        " Execute from committing or issuing until it is, as on a core"
+        " whose pipeline stalls while its bus makes a load wait, so that no"
+        " later access starts its address phase in the meantime",
+    )
+
+    executeDynamicLatencyHoldsInst = Param.Bool(
+        False,
+        "An FU's data-dependent extra latency (dynamicExtraLatency, e.g. an"
+        " operand-dependent divide) keeps the instruction itself from"
+        " completing until it has passed, as on cores whose divider stalls"
+        " the pipeline; otherwise it keeps only the FU busy and delays the"
+        " instruction's results",
+    )
+
+    executeBranchAtIssue = Param.Bool(
+        False,
+        "A single-cycle branch or squash-after instruction that issues with"
+        " nothing older in flight changes the stream in its issue cycle"
+        " rather than one cycle later, as on cores that redirect fetch from"
+        " the execute cycle.  So does a single-cycle instruction with a"
+        " branch folded into it (fetchFoldMasks) that reads nothing the"
+        " instruction writes, and the branch with it",
+    )
+
+    executeFreeUpdateMicroops = Param.Bool(
+        False,
+        "A micro-op after its macro-op's first that only does integer"
+        " arithmetic (the base register update of a load or store multiple)"
+        " takes no cycle of its own: Decode passes it on with the micro-op"
+        " before it and nothing else shares a Decode output, and Execute"
+        " issues it with that micro-op, beyond its issue limits.  Needs"
+        " executeInputWidth of at least 2",
+    )
+
+    executeLoadAccessAtIssue = Param.Bool(
+        False,
+        "A load issued to a single-cycle FU goes to memory in its issue"
+        " cycle rather than one cycle later, when nothing it has to wait"
+        " for is still in flight: answered within that cycle, it completes"
+        " in the next, as on cores whose load takes one cycle",
+    )
+
+    executeAlignedTransfers = Param.Bool(
+        False,
+        "An access takes a cycle for each naturally aligned bus transfer of"
+        " up to 4 bytes it is made as, and nothing issues in the cycles"
+        " after its first: a load one transfer for each 32-bit word it"
+        " touches, a store one for each aligned piece (3 for a word one"
+        " byte past a word boundary), as on cores that split unaligned"
+        " accesses, and those of more than a word, on a 32-bit bus",
+    )
+
+    executeHalfwordWideMemCycles = Param.Cycles(
+        0,
+        "Cycles a 32-bit instruction waits to issue when it follows, in"
+        " sequence, a 32-bit load or store at an address two bytes into a"
+        " word (0: none), as on a core whose prefetch drains under such"
+        " loads: every other time when it is itself a load or store, and"
+        " not for the first executeHalfwordWideMemGrace of them after the"
+        " stream last broke, nor after an access of several transfers"
+        " (executeAlignedTransfers).  32-bit: executeWideInstMask/Match",
+    )
+    executeHalfwordWideMemGrace = Param.Unsigned(
+        3,
+        "see executeHalfwordWideMemCycles: the occurrences after a break in"
+        " the stream that cost nothing",
+    )
+    executeWideInstMask = Param.UInt64(
+        0, "ExtMachInst bits that, compared with executeWideInstMatch, mark"
+        " a 32-bit instruction"
+    )
+    executeWideInstMatch = Param.UInt64(0, "see executeWideInstMask")
+
+    enableIdling = Param.Bool(
+        True, "Enable cycle skipping when the processor is idle\n"
+    )
+
+    branchPred = Param.BranchPredictor(
+        BranchPredictor(
+            conditionalBranchPred=TournamentBP(numThreads=Parent.numThreads)
+        ),
+        "Branch Predictor",
+    )
+
+    def addCheckerCpu(self):
+        print("Checker not yet supported by MinorCPU")
+        exit(1)

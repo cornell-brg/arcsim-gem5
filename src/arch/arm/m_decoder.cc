@@ -1,0 +1,1484 @@
+/*
+ * Copyright (c) 2026 University of California, Davis and Cornell University
+ * All rights reserved
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met: redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer;
+ * redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution;
+ * neither the name of the copyright holders nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include "arch/arm/m_decoder.hh"
+
+#include <cmath>
+#include <cstring>
+
+#include "arch/arm/m_faults.hh"
+#include "arch/arm/m_fp_insts.hh"
+#include "arch/arm/m_insts.hh"
+#include "base/bitfield.hh"
+#include "debug/Decode.hh"
+
+namespace gem5
+{
+
+namespace ArmISA
+{
+
+MDecoder::MDecoder(const Params &params)
+    : InstDecoder(params, &data),
+      decoderFlavor(enums::Generic),  // M-profile uses Generic flavor
+      dvmEnabled(false),              // M-profile has no DVM
+      mSystem(dynamic_cast<ArmMSystem *>(params.system)),
+      data(0), bigThumb(false), offset(0), foundIt(false)
+{
+    // If the release includes FPU support, verify the host FP environment
+    // can correctly simulate ARM FPv4-SP single-precision operations.
+    if (has(ArmExtension::M_PROFILE_FPU_SP)) {
+        verifyHostFpEnvironment();
+    }
+
+    reset();
+}
+
+// =========================================================================
+// Thumb instruction assembly — replicated from Decoder (decoder.cc:81-185)
+// No A-profile ISA dependencies.  M-profile is always Thumb.
+// =========================================================================
+
+void
+MDecoder::reset()
+{
+    InstDecoder::reset();
+    bigThumb = false;
+    offset = 0;
+    emi = 0;
+    foundIt = false;
+}
+
+void
+MDecoder::process()
+{
+    // Instruction ready unless we're mid-way through a 32-bit Thumb.
+    instDone = true;
+
+    // M-profile is always Thumb — no ARM mode path needed.
+    uint16_t word = (data >> (offset * 8));
+    if (bigThumb) {
+        // Second half of a 32-bit Thumb instruction.
+        emi.instBits = emi.instBits | word;
+        bigThumb = false;
+        consumeBytes(2);
+        DPRINTF(Decode, "MDecoder: second half 32-bit Thumb: %#x\n",
+                emi.instBits);
+    } else {
+        uint16_t highBits = word & 0xF800;
+        if (highBits == 0xE800 || highBits == 0xF000 ||
+                highBits == 0xF800) {
+            // Start of a 32-bit Thumb instruction.
+            emi.bigThumb = 1;
+            if (offset == 0) {
+                // Both halfwords available in the fetch data.
+                emi.instBits = (data >> 16) | (data << 16);
+                DPRINTF(Decode, "MDecoder: full 32-bit Thumb: %#x\n",
+                        emi.instBits);
+                consumeBytes(4);
+            } else {
+                // Only have the first halfword.
+                emi.instBits = (uint32_t)word << 16;
+                bigThumb = true;
+                consumeBytes(2);
+                instDone = false;  // Need second halfword.
+            }
+        } else {
+            // 16-bit Thumb instruction.
+            consumeBytes(2);
+            emi.instBits = word;
+            emi.condCode = COND_UC;
+            DPRINTF(Decode, "MDecoder: 16-bit Thumb: %#x\n",
+                    emi.instBits);
+            // IT instruction detection
+            if (bits(word, 15, 8) == 0xbf &&
+                    bits(word, 3, 0) != 0x0) {
+                foundIt = true;
+                itBits = bits(word, 7, 0);
+                DPRINTF(Decode, "MDecoder: IT detected, "
+                        "cond=%#x, mask=%#x\n",
+                        itBits.cond, itBits.mask);
+            }
+        }
+    }
+}
+
+void
+MDecoder::consumeBytes(int numBytes)
+{
+    offset += numBytes;
+    assert(offset <= sizeof(data) || emi.decoderFault);
+    if (offset == sizeof(data))
+        outOfBytes = true;
+}
+
+void
+MDecoder::moreBytes(const PCStateBase &_pc, Addr fetchPC)
+{
+    auto &pc = _pc.as<PCState>();
+
+    // EXC_RETURN detection for POP {PC} / LDM {PC}:
+    // When an LDM/POP micro-op loads an EXC_RETURN value into PC,
+    // the CPU tries to fetch the next instruction from that address
+    // (e.g., 0xFFFFFFF8).  We detect this here and set a flag
+    // so that decode() returns an exception-return instruction
+    // instead of trying to decode from that address.
+    //
+    // EXC_RETURN values have bits[31:5] all set (DDI0403E B1.5.8).
+    // Valid range: 0xFFFFFFE0–0xFFFFFFFF.
+    if (isMProfileExcReturn(pc.instAddr())) {
+        _pendingExcReturn = true;
+        _excReturnVal = (uint32_t)pc.instAddr();
+        // Don't try to fetch — there is no memory at an EXC_RETURN.
+        // Set instDone so decode() can handle it.
+        instDone = true;
+        return;
+    }
+    _pendingExcReturn = false;
+
+    data = letoh(data);
+    offset = (fetchPC >= pc.instAddr()) ? 0 : pc.instAddr() - fetchPC;
+
+    // M-profile is always Thumb. Set these fields for the decode tree.
+    emi.thumb = 1;       // Always Thumb on M-profile
+    emi.aarch64 = 0;     // Never AArch64 on M-profile
+    emi.fpscrLen = 0;    // No FPSCR vector length on M-profile
+    emi.fpscrStride = 0;
+    emi.sveLen = 0;      // No SVE on M-profile
+
+    const Addr alignment = 0x1;  // Thumb: 2-byte aligned
+    emi.decoderFault = static_cast<uint8_t>(
+        pc.instAddr() & alignment ?
+            DecoderFault::UNALIGNED : DecoderFault::OK);
+
+    outOfBytes = false;
+    process();
+}
+
+// =========================================================================
+// decode() — M-profile override of InstDecoder::decode
+// =========================================================================
+//
+// Called by the CPU pipeline at every instruction boundary.
+//
+// Flow:
+//   1. Try M-profile decode: match encoding against instructions
+//      that differ on M-profile (see tryMProfileDecode)
+//   2. If matched: return M-profile instruction object
+//   3. If not matched: fall through to Decoder::decode(pc) which
+//      uses the standard ISA-generated A-profile Thumb decoder
+//
+// The fall-through is safe because MISA aliases CPSR → xPSR:
+//   - Load/store instructions read CPSR.e (bit[9]) for endianness
+//     → alias returns xPSR bit[9] = 0 → correct (always LE)
+//   - DSP saturation instructions write CPSR.Q (bit[27])
+//     → MISA redirects to xPSR bit[27] → correct
+//   - No other CPSR field is accessed by fall-through instructions
+//   See step8_cpsr_alias_proof.md for the complete proof.
+
+StaticInstPtr
+MDecoder::decode(PCStateBase &_pc)
+{
+    // Must replicate the housekeeping that Decoder::decode does
+    // (isa.cc line 188-211): instDone check, PC advancement,
+    // IT state handling, decoder state reset.  If we just called
+    // Decoder::decode for the fall-through case, the M-profile
+    // intercept path would skip all of this.
+
+    if (!instDone)
+        return NULL;
+
+    auto &pc = _pc.as<PCState>();
+
+    // Handle POP {PC} / LDM {PC} EXC_RETURN.
+    // moreBytes() detected that the fetch address is an EXC_RETURN
+    // value and set _pendingExcReturn.  Return a
+    // BxMProfile instruction that will call mProfileExcReturn().
+    if (_pendingExcReturn) {
+        _pendingExcReturn = false;
+        instDone = false;
+        // Create a BxMProfile that will trigger exception return.
+        // We pass the EXC_RETURN value via a synthetic instruction
+        // that reads LR (which still holds the EXC_RETURN value
+        // on M-profile when returning via POP {PC}).
+        // Actually, the EXC_RETURN value is the PC itself.
+        // Create an instruction that calls mProfileExcReturn directly.
+        StaticInstPtr inst = new ExcReturnFromPC(
+            ExtMachInst(0), _excReturnVal);
+        inst->size(0);  // No actual instruction bytes consumed
+        return inst;
+    }
+
+    // Advance PC and handle IT state (same as Decoder::decode)
+    const int inst_size((!emi.thumb || emi.bigThumb) ? 4 : 2);
+    ExtMachInst this_emi(emi);
+
+    pc.npc(pc.pc() + inst_size);
+    if (foundIt)
+        pc.nextItstate(itBits);
+    this_emi.itstate = pc.itstate();
+    this_emi.illegalExecution = pc.illegalExec() ? 1 : 0;
+    this_emi.debugStep = pc.debugStep() ? 1 : 0;
+    pc.size(inst_size);
+
+    // Reset decoder state (consumed this instruction)
+    emi = 0;
+    instDone = false;
+    foundIt = false;
+
+    // Try M-profile decode first
+    StaticInstPtr inst = tryMProfileDecode(this_emi);
+
+    if (inst) {
+        inst->size(inst_size);
+        DPRINTF(Decode, "MDecoder: M-profile decoded %s: %#x\n",
+                inst->getName(), (uint64_t)this_emi);
+        return inst;
+    }
+
+    // Fall through to standard Thumb decoder (ISA-generated decode tree).
+    // Safe because MISA aliases CPSR → xPSR (step8_cpsr_alias_proof.md).
+    StaticInstPtr si = decodeThumbFallthrough(this_emi, pc.instAddr());
+    si->size(inst_size);
+    return si;
+}
+
+// =========================================================================
+// tryMProfileDecode — main dispatch
+// =========================================================================
+
+StaticInstPtr
+MDecoder::tryMProfileDecode(ExtMachInst mach_inst)
+{
+    if (!mach_inst.thumb) {
+        // M-profile is always Thumb.  If somehow we're not in Thumb
+        // mode, something is very wrong.  Let the standard decoder
+        // handle it (it will likely fault on ARM-mode decode).
+        return nullptr;
+    }
+
+    if (mach_inst.bigThumb) {
+        // 32-bit Thumb instruction
+        return tryMProfileDecode32(mach_inst);
+    } else {
+        // 16-bit Thumb instruction
+        return tryMProfileDecode16(mach_inst);
+    }
+}
+
+// =========================================================================
+// tryMProfileDecode16 — 16-bit Thumb intercepts
+// =========================================================================
+//
+// Encoding reference: DDI0403E A5.2 (16-bit Thumb instruction encoding)
+//
+// Instructions intercepted:
+//   BX Rm      — [15:7] = 010001110  → EXC_RETURN detection
+//   BLX Rm     — [15:7] = 010001111  → EXC_RETURN detection
+//   CPS        — [15:5] = 10110110011 → PRIMASK/FAULTMASK
+//   SVC imm8   — [15:8] = 11011111   → M-profile SVCALL exception
+//   BKPT #0xAB — inst = 0xBEAB       → M-profile semihosting
+//   WFE        — hint instruction     → M-profile sleep semantics
+//   WFI        — hint instruction     → M-profile sleep semantics
+//   POP {PC}   — [15:9] = 1011110, bit[8]=1 → EXC_RETURN check
+
+StaticInstPtr
+MDecoder::tryMProfileDecode16(ExtMachInst mach_inst)
+{
+    const uint32_t inst = (uint32_t)mach_inst;
+
+    // ---- BX Rm / BLX Rm ----
+    // Encoding: 010001 11 L Rm[6:3] 000
+    //   bits[15:8] = 01000111
+    //   bit[7] = L (0=BX, 1=BLX)
+    //   bits[6:3] = Rm
+    // gem5 A-profile: formats/data.isa:1076-1084
+    // DDI0403E A7.7.20 (BX), A7.7.19 (BLX register)
+    if (bits(inst, 15, 8) == 0x47) {
+        const RegIndex rm = (RegIndex)bits(inst, 6, 3);
+        if (bits(inst, 7) == 0) {
+            return new BxMProfile(mach_inst, rm);
+        } else {
+            return new BlxRegMProfile(mach_inst, rm);
+        }
+    }
+
+    // ---- SVC #imm8 ----
+    // Encoding: 1101 1111 imm[7:0]
+    //   bits[15:8] = 0xDF
+    // gem5 A-profile: formats/branch.isa:101-102
+    // DDI0403E A7.7.175 (SVC)
+    if (bits(inst, 15, 8) == 0xDF) {
+        const uint8_t imm8 = bits(inst, 7, 0);
+        return new SvcMProfile(mach_inst, imm8);
+    }
+
+    // ---- CPS (Change Processor State) ----
+    // Encoding: 10110110 011 im[4] (0)(0) F[1] I[0]
+    //   bits[15:5] = 0b10110110011
+    // gem5 A-profile: formats/data.isa:1225-1229
+    // DDI0403E A7.7.17 (CPS)
+    if (bits(inst, 15, 5) == 0x5B3) {  // 0b10110110011
+        const bool disable = bits(inst, 4);
+        // DDI0403E A7.7.17, Thumb-16 T1 encoding:
+        //   bit[1] = I (affects PRIMASK)
+        //   bit[0] = F (affects FAULTMASK)
+        // Same layout as A-profile (data.isa:1227 uses bits[2:0] = A,I,F)
+        const bool affectI = bits(inst, 1);
+        const bool affectF = bits(inst, 0);
+        return new CpsMProfile(mach_inst, disable, affectI, affectF);
+    }
+
+    // ---- SETEND ----
+    // Encoding: 10110110 010 E[3] (0000)
+    //   bits[15:5] = 0b10110110010
+    // M-profile has no SETEND (always LE).  DDI0403E: UNDEFINED.
+    // gem5 A-profile: formats/data.isa:1223-1224
+    if (bits(inst, 15, 5) == 0x5B2) {  // 0b10110110010
+        return new MProfileUndefined(mach_inst, "SETEND");
+    }
+
+    // ---- BKPT #0xAB (Semihosting) ----
+    // Encoding: 1011 1110 imm8
+    //   bits[15:8] = 0xBE, imm8 = 0xAB → inst = 0xBEAB
+    // Per the ARM semihosting spec, M-profile uses BKPT #0xAB as the
+    // semihosting trigger (not SVC #0xAB which is used by A/R-profile).
+    // ABI: R0 = operation code, R1 = parameter block pointer.
+    if (bits(inst, 15, 0) == 0xBEAB) {
+        return new BkptSemiMProfile(mach_inst);
+    }
+
+    // ---- WFI ----
+    // Encoding: 10111111 0011 0000
+    //   inst = 0xBF30
+    // gem5 A-profile: formats/data.isa (Thumb16Misc, hint group)
+    // DDI0403E A7.7.184 (WFI)
+    if (bits(inst, 15, 0) == 0xBF30) {
+        return new WfiMProfile(mach_inst);
+    }
+
+    // ---- WFE ----
+    // Encoding: 10111111 0010 0000
+    //   inst = 0xBF20
+    // DDI0403E A7.7.183 (WFE)
+    if (bits(inst, 15, 0) == 0xBF20) {
+        return new WfeMProfile(mach_inst);
+    }
+
+    // ---- PUSH {reglist} / PUSH {reglist, LR} ----
+    // Encoding T1: 1011 010 M LLLLLLLL
+    //   bits[15:9] = 0b1011010 (0x5A)
+    //   bit[8] = M (1 = include LR)
+    //   bits[7:0] = register_list (r0-r7)
+    // DDI0403E A7.7.101 (PUSH)
+    if (bits(inst, 15, 9) == 0x5A) {  // 0b1011010
+        uint32_t reglist = bits(inst, 7, 0);
+        if (bits(inst, 8))
+            reglist |= (1 << int_reg::Lr);
+        return new PushPopMProfile("push", mach_inst, false, reglist);
+    }
+
+    // ---- POP {reglist} / POP {reglist, PC} ----
+    // Encoding T1: 1011 110 P LLLLLLLL
+    //   bits[15:9] = 0b1011110 (0x5E)
+    //   bit[8] = P (1 = include PC)
+    //   bits[7:0] = register_list (r0-r7)
+    // DDI0403E A7.7.99 (POP)
+    if (bits(inst, 15, 9) == 0x5E) {  // 0b1011110
+        uint32_t reglist = bits(inst, 7, 0);
+        if (bits(inst, 8))
+            reglist |= (1 << int_reg::Pc);
+        return new PushPopMProfile("pop", mach_inst, true, reglist);
+    }
+
+    // Not an M-profile intercepted 16-bit instruction.
+    return nullptr;
+}
+
+// =========================================================================
+// tryMProfileDecode32 — 32-bit Thumb intercepts
+// =========================================================================
+//
+// Encoding reference: DDI0403E A5.3 (32-bit Thumb instruction encoding)
+//
+// Instructions intercepted:
+//
+//   Branches and Misc Ctrl group (HTOPCODE_12_11=0x2, LTOPCODE_15=1):
+//     MSR CPSR       — op=0x38/0x39, r=0, bit5=0  → MsrMProfile
+//     MSR SPSR       — op=0x38/0x39, r=1           → UsageFault
+//     MSR Banked     — op=0x38/0x39, bit5=1        → UsageFault
+//     MRS CPSR       — op=0x3e/0x3f, r=0, bit5=0  → MrsMProfile
+//     MRS SPSR       — op=0x3e/0x3f, r=1           → UsageFault
+//     MRS Banked     — op=0x3e/0x3f, bit5=1        → UsageFault
+//     BXJ            — op=0x3c                     → UsageFault
+//     ERET           — op=0x3d, imm=0              → UsageFault
+//     SUBS PC,LR     — op=0x3d, imm!=0             → UsageFault
+//     HVC            — op=0x7e                     → UsageFault
+//     SMC            — op=0x7f                     → UsageFault
+//
+//   SRS/RFE group (HTOPCODE_12_11=0x1, HTOPCODE_10_9=0x0):
+//     SRS            — A-profile only              → UsageFault
+//     RFE            — A-profile only              → UsageFault
+//
+//   Coprocessor group:
+//     MRC/MCR CP14   — LTCOPROC=0xe                → UsageFault
+//     MRC/MCR CP15   — LTCOPROC=0xf                → UsageFault
+//     VMRS/VMSR      — LTCOPROC=0xa/0xb            → M-profile FP access
+//
+//   Misc:
+//     SETEND         — [15:5]=10110110010           → UsageFault
+
+StaticInstPtr
+MDecoder::tryMProfileDecode32(ExtMachInst mach_inst)
+{
+    const uint32_t inst = (uint32_t)mach_inst;
+
+    // Thumb-32: hw1 in [31:16], hw2 in [15:0]
+    // The ISA description uses these field names (defined in types.hh):
+    //   HTOPCODE_N = hw1[N] = combined[N+16]
+    //   LTOPCODE = bits[15:0] (second halfword)
+    //
+    // Key fields (from types.hh Bitfield definitions):
+    //   HTOPCODE_12_11 = Bitfield<28,27> = hw1[12:11]
+    //   HTOPCODE_10_9  = Bitfield<26,25> = hw1[10:9]
+    //   HTOPCODE_8_7   = Bitfield<24,23> = hw1[8:7]
+    //   HTOPCODE_6     = Bitfield<22>    = hw1[6]
+    //   LTOPCODE_15 = bit[15]
+    //   op = bits[26:20]
+    //   op1 = bits[14:12]
+
+    const uint32_t htopcode_12_11 = bits(inst, 28, 27);
+    const uint32_t htopcode_10_9 = bits(inst, 26, 25);
+
+    // ================================================================
+    // SRS / RFE group — A-profile only
+    // ================================================================
+    // Thumb-32: HTOPCODE_12_11=0x1, HTOPCODE_10_9=0x0,
+    //           HTOPCODE_6=0, HTOPCODE_8_7={0x0, 0x3}
+    // gem5 A-profile: thumb.isa:68-71 (Thumb32SrsRfe)
+    // DDI0403D Table A5-9: op1=01, op2=00xx0xx → Load/Store Multiple
+    // DDI0403E: SRS and RFE are UNDEFINED on M-profile.
+    if (htopcode_12_11 == 0x1 && htopcode_10_9 == 0x0) {
+        if (bits(inst, 22) == 0) {  // HTOPCODE_6 = hw1[6]
+            uint32_t htop_8_7 = bits(inst, 24, 23); // hw1[8:7]
+            if (htop_8_7 == 0x0 || htop_8_7 == 0x3) {
+                return new MProfileUndefined(mach_inst, "SRS/RFE");
+            }
+        }
+    }
+
+    // ================================================================
+    // Branches and Misc Ctrl group
+    // ================================================================
+    // HTOPCODE_12_11=0x2, LTOPCODE_15=1, op1[14:12] & 0x5 == 0
+    // gem5 A-profile: thumb.isa:122, formats/branch.isa:116-315
+    //
+    // This is where MRS, MSR, SMC, HVC, ERET, BXJ, SUBS PC LR live.
+    if (htopcode_12_11 == 0x2 && bits(inst, 15) == 1) {
+        const uint32_t op = bits(inst, 26, 20);
+        const uint32_t op1 = bits(inst, 14, 12);
+
+        // Only the op1 & 0x5 == 0 sub-group contains system instrs
+        if ((op1 & 0x5) == 0 && (op & 0x38) == 0x38) {
+
+            switch (op) {
+              // ---- MSR (register) ----
+              // op = 0x38 or 0x39
+              // gem5: formats/branch.isa:144-161
+              // DDI0403E A7.7.42
+              case 0x38:
+              case 0x39: {
+                const bool r = bits(inst, 20);
+                if (bits(inst, 5)) {
+                    // Banked register — A-profile only
+                    return new MProfileUndefined(mach_inst,
+                        "MSR banked register");
+                }
+                if (r) {
+                    // MSR SPSR — doesn't exist on M-profile
+                    return new MProfileUndefined(mach_inst, "MSR SPSR");
+                }
+                // MSR CPSR → M-profile MSR with SYSm encoding.
+                // SYSm is bits[7:0] of the second halfword (DDI0403E
+                // A7.7.42, encoding T1).  Note: A-profile uses
+                // bits[11:8] as byteMask, but M-profile repurposes
+                // the same field space for the SYSm register selector.
+                const RegIndex rn = (RegIndex)bits(inst, 19, 16);
+                const uint8_t sysM = bits(inst, 7, 0);
+                return new MsrMProfile(mach_inst, rn, sysM);
+              }
+
+              // ---- Hint instructions (0x3a) ----
+              // Contains CPS (Thumb-32 encoding), NOP, etc.
+              // These are handled by Thumb-16 format for the common
+              // encodings.  The Thumb-32 CPS has a different format
+              // from the Thumb-16 one.
+              // gem5: formats/branch.isa:163-227
+              // For now, let fall through (hints are safe).
+              case 0x3a:
+                break;
+
+              // ---- DMB / DSB / ISB ----
+              // op = 0x3b
+              // Sub-decoded by bits[7:4]: 4=DSB, 5=DMB, 6=ISB
+              // DMB/DSB: use M-profile barrier (no IsSerializeAfter).
+              // ISB: let fall through — A-profile IsSquashAfter is correct.
+              // DDI0403E A7.7.27 (DMB), A7.7.28 (DSB), A7.7.29 (ISB)
+              case 0x3b: {
+                const uint32_t barrierOp = bits(inst, 7, 4);
+                if (barrierOp == 0x4) {
+                    // DSB — drain write buffer, NO pipeline flush
+                    return new BarrierMProfile("dsb", mach_inst);
+                } else if (barrierOp == 0x5) {
+                    // DMB — memory ordering barrier
+                    return new BarrierMProfile("dmb", mach_inst);
+                }
+                // ISB (barrierOp=0x6): fall through to A-profile decoder
+                // (IsSquashAfter pipeline flush is correct for ISB)
+                break;
+              }
+
+              // ---- BXJ ----
+              // op = 0x3c
+              // gem5: formats/branch.isa:230-232
+              // DDI0403E: BXJ is UNDEFINED on M-profile (no Jazelle).
+              case 0x3c:
+                return new MProfileUndefined(mach_inst, "BXJ");
+
+              // ---- ERET / SUBS PC,LR ----
+              // op = 0x3d
+              // gem5: formats/branch.isa:236-242
+              // DDI0403E: ERET and SUBS PC,LR,#imm are UNDEFINED
+              // on M-profile.  M-profile uses EXC_RETURN via BX.
+              case 0x3d:
+                return new MProfileUndefined(mach_inst,
+                    "ERET/SUBS_PC_LR");
+
+              // ---- MRS ----
+              // op = 0x3e or 0x3f
+              // gem5: formats/branch.isa:244-261
+              // DDI0403E A7.7.41
+              case 0x3e:
+              case 0x3f: {
+                const RegIndex rd = (RegIndex)bits(inst, 11, 8);
+                const bool r = bits(inst, 20);
+                if (bits(inst, 5)) {
+                    // Banked register — A-profile only
+                    return new MProfileUndefined(mach_inst,
+                        "MRS banked register");
+                }
+                if (r) {
+                    // MRS SPSR — doesn't exist on M-profile
+                    return new MProfileUndefined(mach_inst, "MRS SPSR");
+                }
+                // MRS CPSR → M-profile MRS with SYSm encoding
+                // SYSm comes from bits[11:8] in the MRS encoding,
+                // but for M-profile the full SYSm is bits[7:0] of
+                // the second halfword.
+                const uint8_t sysM = bits(inst, 7, 0);
+                return new MrsMProfile(mach_inst, rd, sysM);
+              }
+
+              // ---- HVC ----
+              // op = 0x7e
+              // gem5: formats/branch.isa:266-267
+              // DDI0403E: UNDEFINED on M-profile (no hypervisor).
+              case 0x7e:
+                return new MProfileUndefined(mach_inst, "HVC");
+
+              // ---- SMC ----
+              // op = 0x7f
+              // gem5: formats/branch.isa:128
+              // DDI0403E: UNDEFINED on M-profile (no TrustZone
+              // in ARMv7-M; ARMv8-M uses different mechanism).
+              case 0x7f:
+                return new MProfileUndefined(mach_inst, "SMC");
+
+              default:
+                break;
+            }
+        }
+    }
+
+    // ================================================================
+    // Coprocessor instructions — block CP14/CP15
+    // ================================================================
+    // CP14 (debug) and CP15 (system control) don't exist on M-profile.
+    // M-profile uses MMIO to the SCS instead.
+    // CP10/CP11 (FPU) are valid if FPU is present.
+    //
+    // The coprocessor encoding space is in several HTOPCODE_12_11
+    // groups.  We check LTCOPROC (bits[11:8] of second halfword)
+    // to identify which coprocessor.
+    //
+    // gem5 A-profile: thumb.isa:87-88 (mcrMrc14, mcrMrc15)
+    // DDI0403E: MRC/MCR CP14/CP15 are UNDEFINED on M-profile.
+    {
+        const uint32_t ltcoproc = bits(inst, 11, 8);
+        // Check if this is a coprocessor instruction by looking at
+        // the top-level encoding group.  Coprocessor instructions
+        // have HTOPCODE_12_11 = 0x1 or 0x3, HTOPCODE_10_9 >= 0x2.
+        // DDI0403D Table A5-9:
+        //   op1=01, op2=1xxxxxx → Coprocessor (HTOPCODE_10_9 >= 2)
+        //   op1=11, op2=1xxxxxx → Coprocessor (HTOPCODE_10_9 >= 2)
+        // gem5 A-profile: thumb.isa:78,124,142 (coprocessor decode paths)
+        bool is_coproc = false;
+        if (htopcode_12_11 == 0x1 || htopcode_12_11 == 0x3) {
+            // HTOPCODE_10_9 (already extracted above) determines the group.
+            // Only values >= 2 (hw1[10]=1) are coprocessor instructions.
+            if (htopcode_10_9 >= 0x2)
+                is_coproc = true;
+        }
+        if (is_coproc) {
+            // p0-p7: whatever coprocessors the system attaches; p8, p9,
+            // p12 and p13 have none (NOCP)
+            if (ltcoproc <= 0x9 || ltcoproc == 0xc || ltcoproc == 0xd)
+                return decodeMProfileCoproc(mach_inst);
+            if (ltcoproc == 0xe) {
+                // CP14 — debug coprocessor, A-profile only
+                return new MProfileUndefined(mach_inst, "MRC/MCR CP14");
+            }
+            if (ltcoproc == 0xf) {
+                // CP15 — system control, A-profile only
+                return new MProfileUndefined(mach_inst, "MRC/MCR CP15");
+            }
+            // CP10/CP11 (0xa, 0xb) = FPU
+            if (ltcoproc == 0xa || ltcoproc == 0xb) {
+                if (!has(ArmExtension::M_PROFILE_FPU_SP)) {
+                    return new MProfileUndefined(mach_inst,
+                        "VFP instruction without FPU in release");
+                }
+                // hw1[12] set: the FPv5 data-processing space
+                if (bits(inst, 28))
+                    return decodeMProfileFpv5(mach_inst);
+                StaticInstPtr fpInst = decodeMProfileVfp(mach_inst);
+                if (fpInst)
+                    return fpInst;
+                // An FP encoding decodeMProfileVfp does not cover stops the
+                // simulation when executed. The A-profile FP classes are
+                // not usable on M-profile (see MFpCvtFixedS).
+                return new MProfileUnmodelled(mach_inst,
+                    "this FP encoding");
+            }
+        }
+    }
+
+    // ================================================================
+    // Exclusive, load-acquire and store-release instructions
+    // ================================================================
+    // The ISA-generated exclusive-load classes call
+    // ArmISA::ISA::getSelfDebug() which static_cast<ISA*>(getIsaPtr()).
+    // On M-profile the ISA is MISA (not a subclass of ISA), so the
+    // cast is undefined behavior and gem5 segfaults.  The generated
+    // exclusive-store classes are missing initiateAcc and panic under
+    // MinorCPU.  Intercept every exclusive here and return the
+    // M-profile-specific classes.
+    //
+    // LDREX  T1: inst[31:20]=0xE85, imm8 at [7:0] (shifted left 2)
+    // STREX  T1: inst[31:20]=0xE84, Rd at [11:8], imm8 at [7:0]
+    //            ARM ARM A7.7.49, A7.7.221
+    //
+    // The others share inst[31:20]=0xE8D (loads) and 0xE8C (stores),
+    // Rn at [19:16], Rt at [15:12], Rd (a store-exclusive's status) at
+    // [3:0], and are told apart by inst[7:4] (DDI0553 C2.4):
+    //   0x4 LDREXB / STREXB      0x5 LDREXH / STREXH
+    //   0x8 LDAB   / STLB        0x9 LDAH   / STLH      0xA LDA   / STL
+    //   0xC LDAEXB / STLEXB      0xD LDAEXH / STLEXH    0xE LDAEX / STLEX
+    //   0x7, 0xF: the doubleword exclusives, which M-profile lacks
+    //   0x0, 0x1 (loads): TBB, TBH
+    // The 0x8-0xE rows are ARMv8-M's and UNDEFINED before it; every
+    // other row is unallocated.
+    {
+        const uint32_t op_high = bits(inst, 31, 20);
+        const RegIndex rn = (RegIndex)bits(inst, 19, 16);
+        const RegIndex rt = (RegIndex)bits(inst, 15, 12);
+        if (op_high == 0xE85) {
+            // LDREX Rt, [Rn, #imm]
+            const uint32_t imm8 = bits(inst, 7, 0) << 2;
+            return new LdrexMProfile(mach_inst, rt, rn, imm8, 4);
+        }
+        if (op_high == 0xE84) {
+            // Rt = 0b1111 is ARMv8-M's TT / TTT / TTA / TTAT, which
+            // needs the security extension's state
+            if (rt == int_reg::Pc)
+                return new MProfileUnmodelled(mach_inst, "TT");
+            // STREX Rd, Rt, [Rn, #imm]
+            const RegIndex rd = (RegIndex)bits(inst, 11, 8);
+            const uint32_t imm8 = bits(inst, 7, 0) << 2;
+            return new StrexMProfile(mach_inst, rd, rt, rn, imm8, 4);
+        }
+        if (op_high == 0xE8D || op_high == 0xE8C) {
+            const bool load = op_high == 0xE8D;
+            const uint32_t op_low = bits(inst, 7, 4);
+            const RegIndex rd = (RegIndex)bits(inst, 3, 0);
+            // Access size of the byte, halfword and word rows
+            static const unsigned sizes[4] = {1, 2, 4, 0};
+            const unsigned size = sizes[op_low & 0x3];
+            const bool v8m = has(ArmExtension::M_PROFILE_ARMV8M);
+
+            switch (op_low) {
+              case 0x4:
+              case 0x5:
+                // LDREXB / LDREXH Rt, [Rn]; STREXB / STREXH Rd, Rt, [Rn]
+                if (load)
+                    return new LdrexMProfile(mach_inst, rt, rn, 0, size);
+                return new StrexMProfile(mach_inst, rd, rt, rn, 0, size);
+
+              case 0x8:
+              case 0x9:
+              case 0xa:
+                // LDAB / LDAH / LDA, STLB / STLH / STL: the A-profile
+                // classes are ordinary loads and stores with barrier
+                // flags, and run as they are
+                if (!v8m) {
+                    return new MProfileUndefined(mach_inst,
+                        "load-acquire/store-release before ARMv8-M");
+                }
+                break;
+
+              case 0xc:
+              case 0xd:
+              case 0xe:
+                // LDAEXB / LDAEXH / LDAEX Rt, [Rn];
+                // STLEXB / STLEXH / STLEX Rd, Rt, [Rn]
+                if (!v8m) {
+                    return new MProfileUndefined(mach_inst,
+                        "load-acquire/store-release before ARMv8-M");
+                }
+                if (load) {
+                    return new LdrexMProfile(mach_inst, rt, rn, 0, size,
+                                             true);
+                }
+                return new StrexMProfile(mach_inst, rd, rt, rn, 0, size,
+                                         true);
+
+              case 0x7:
+              case 0xf:
+                return new MProfileUndefined(mach_inst,
+                    "doubleword exclusive");
+
+              default:
+                // TBB / TBH go to the A-profile decoder
+                if (load && op_low <= 0x1)
+                    break;
+                return new MProfileUndefined(mach_inst,
+                    "unallocated exclusive encoding");
+            }
+        }
+    }
+
+    // ---- 32-bit PUSH (STMDB SP!, {reglist}) ----
+    // Encoding T1: 1110 1001 0010 1101 0M0L LLLL LLLL LLLL
+    //   bits[31:16] = 0xE92D
+    //   bit[14] = M (include LR)
+    //   bits[12:0] = register_list (r0-r12)
+    // DDI0403E A7.7.101 (PUSH), encoding T2
+    if (bits(inst, 31, 16) == 0xE92D) {
+        uint32_t reglist = bits(inst, 12, 0);
+        if (bits(inst, 14))  // M bit = include LR
+            reglist |= (1 << int_reg::Lr);
+        return new PushPopMProfile("push.w", mach_inst, false, reglist);
+    }
+
+    // ---- 32-bit POP (LDMIA SP!, {reglist}) ----
+    // Encoding T2: 1110 1000 1011 1101 PM0L LLLL LLLL LLLL
+    //   bits[31:16] = 0xE8BD
+    //   bit[15] = P (include PC)
+    //   bit[14] = M (include LR)
+    //   bits[12:0] = register_list (r0-r12)
+    // DDI0403E A7.7.99 (POP), encoding T2
+    if (bits(inst, 31, 16) == 0xE8BD) {
+        uint32_t reglist = bits(inst, 12, 0);
+        if (bits(inst, 14))  // M bit = include LR
+            reglist |= (1 << int_reg::Lr);
+        if (bits(inst, 15))  // P bit = include PC
+            reglist |= (1 << int_reg::Pc);
+        return new PushPopMProfile("pop.w", mach_inst, true, reglist);
+    }
+
+    // Not an M-profile intercepted 32-bit instruction.
+    return nullptr;
+}
+
+// =========================================================================
+// decodeMProfileVfp — Decode VFP (CP10/CP11) for M-profile
+// =========================================================================
+//
+// VFP data-processing encoding (DDI0403E A7.5, Table A7-17):
+//   inst[23:20] = opc1, inst[19:16] = opc2, inst[7:6] = opc3
+//   inst[8] = sz (0=single, 1=double)
+//
+// Single-precision register extraction:
+//   Sd = inst[22] | (inst[15:12] << 1)     (D:Vd)
+//   Sn = inst[7]  | (inst[19:16] << 1)     (N:Vn)
+//   Sm = inst[5]  | (inst[3:0] << 1)       (M:Vm)
+//
+// VFP register transfer (VMOV core<->VFP, VMRS, VMSR):
+//   inst[20] = L (0=to VFP, 1=from VFP)
+//   inst[15:12] = Rt (core register)
+//   Sn for single-precision = N:Vn
+
+StaticInstPtr
+MDecoder::decodeMProfileVfp(ExtMachInst mach_inst)
+{
+    const uint32_t inst = (uint32_t)mach_inst;
+
+    // Single-precision register extraction helpers.
+    auto vd = [&]() -> RegIndex {
+        return (RegIndex)(bits(inst, 22) | (bits(inst, 15, 12) << 1));
+    };
+    auto vn = [&]() -> RegIndex {
+        return (RegIndex)(bits(inst, 7) | (bits(inst, 19, 16) << 1));
+    };
+    auto vm = [&]() -> RegIndex {
+        return (RegIndex)(bits(inst, 5) | (bits(inst, 3, 0) << 1));
+    };
+
+    const bool single = (bits(inst, 8) == 0);
+    const uint32_t opc1 = bits(inst, 23, 20);
+    const uint32_t opc2 = bits(inst, 19, 16);
+    const uint32_t opc3 = bits(inst, 7, 6);
+    const bool bit4 = bits(inst, 4);
+
+    DPRINTF(Decode, "MDecoder decodeMProfileVfp: inst=%#x "
+            "single=%d opc1=%#x opc2=%#x opc3=%#x bit4=%d\n",
+            inst, single, opc1, opc2, opc3, bit4);
+
+    // ---- VFP register transfer (VMOV core<->single/double, VMRS, VMSR) --
+    // All have bit4=1.  Discriminated by opc1[3:1]:
+    //   opc1[3:1]=0 (0b000x) → VMOV core ↔ single  [A7.7.229]
+    //   opc1[3:1]=2 (0b010x) → VMOV two-core ↔ double  [A7.7.230]
+    //   opc1[3:1]=7 (0b111x) → VMRS / VMSR  [A7.7.228/227]
+    //   L (bit20): 0=to VFP, 1=from VFP
+    // ---- VFP register transfers ----
+    // Two groups, distinguished by bit[25]:
+    //   bit25=1, bit4=1: single-reg xfer (VMOV core↔single, VMRS, VMSR)
+    //   bit25=0, bit4=1, opc1[3:1]=2: two-reg xfer (VMOV core-pair↔double)
+    // bit25=0 with other opc1 values is load/store (VLDR/VSTR/VLDM/VSTM)
+    // where bit4 is part of imm8, NOT an opcode discriminator.
+
+    // Group 1: single-register transfers (bit25=1, bit4=1)
+    if (bit4 && bits(inst, 25) == 1) {
+        const bool L = bits(inst, 20);
+        const RegIndex rt = (RegIndex)bits(inst, 15, 12);
+
+        DPRINTF(Decode, "MDecoder VFP single-reg-xfer: inst=%#x "
+                "opc1=%#x opc1[3:1]=%d L=%d rt=r%d\n",
+                inst, opc1, bits(opc1, 3, 1), L, rt);
+
+        if (bits(opc1, 3, 1) == 0x0) {
+            // VMOV core ↔ single
+            DPRINTF(Decode, "MDecoder: VMOV core<->single "
+                    "L=%d rt=r%d sn=s%d\n", L, rt, vn());
+            if (L) {
+                return new MFpMovSToCore(mach_inst, rt, vn());
+            } else {
+                return new MFpMovCoreToS(mach_inst, vn(), rt);
+            }
+        } else if (bits(opc1, 3, 1) == 0x7) {
+            // VMRS / VMSR
+            DPRINTF(Decode, "MDecoder: VMRS/VMSR L=%d rt=r%d\n",
+                    L, rt);
+            if (L) {
+                return new MFpMrs(mach_inst, rt);
+            } else {
+                return new MFpMsr(mach_inst, rt);
+            }
+        } else {
+            DPRINTF(Decode, "MDecoder: VFP single-reg-xfer "
+                    "unmatched opc1[3:1]=%d, falling through\n",
+                    bits(opc1, 3, 1));
+        }
+    }
+
+    // Group 2: two-register transfer (bit25=0, bit4=1, opc1[3:1]=2)
+    // VMOV Dm, Rt, Rt2  /  VMOV Rt, Rt2, Dm
+    // Always uses coproc=0xB (double), so single must be false.
+    // Without the !single guard, VLDR single with opc1[3:1]=2
+    // (e.g., vldr s1,[r3,#-124] opc1=0x5) would be misdecoded.
+    if (bit4 && !single && bits(inst, 25) == 0
+        && bits(opc1, 3, 1) == 0x2) {
+        const bool L = bits(inst, 20);
+        const RegIndex rt = (RegIndex)bits(inst, 15, 12);
+        RegIndex dd = (RegIndex)(bits(inst, 5) << 4
+                                 | bits(inst, 3, 0));
+        RegIndex rt2 = (RegIndex)bits(inst, 19, 16);
+
+        DPRINTF(Decode, "MDecoder: VMOV core-pair<->double "
+                "L=%d dd=d%d rt=r%d rt2=r%d\n",
+                L, dd, rt, rt2);
+        if (dd > 15)
+            return new MProfileUndefined(mach_inst,
+                "VMOV D16+ not available on ARMv7-M");
+        if (L) {
+            return new MFpMovDToCorePair(mach_inst, dd,
+                                         rt, rt2);
+        } else {
+            return new MFpMovCorePairToD(mach_inst, dd,
+                                         rt, rt2);
+        }
+    }
+
+    // ---- VLDR / VSTR (FP load/store) ----
+    // Encoding: 1110 110x UDL1 Rn Vd 101s imm8
+    //   bit[24]=1, bit[21]=0 distinguishes VLDR/VSTR from VLDM/VSTM.
+    //   bit[20]=L (1=load, 0=store), bit[8]=sz (0=single, 1=double)
+    // DDI0403E A7.7.236 (VLDR), A7.7.255 (VSTR)
+    // Valid for both single (sz=0) and double-word (sz=1) on FPv4-SP.
+    // "supports doubleword data transfer instructions" [DDI0403 A6.3]
+    // bit4 is part of imm8[4] here, NOT an opcode discriminator.
+    if (bits(inst, 24) == 1 && bits(inst, 21) == 0) {
+        const bool isLoad = bits(inst, 20);      // L bit
+        const bool U = bits(inst, 23);            // add/sub offset
+        const uint32_t imm8 = bits(inst, 7, 0);
+        const int32_t offset = imm8 << 2;         // imm8 x 4 bytes
+        const RegIndex base = (RegIndex)bits(inst, 19, 16);
+
+        DPRINTF(Decode, "MDecoder VFP VLDR/VSTR: inst=%#x "
+                "isLoad=%d U=%d single=%d base=r%d "
+                "imm8=%d offset=%d\n",
+                inst, isLoad, U, single, base, imm8, offset);
+
+        if (single) {
+            // VLDR.32 / VSTR.32: Sd = Vd:D
+            RegIndex sd = (RegIndex)(bits(inst, 15, 12) << 1
+                                     | bits(inst, 22));
+            DPRINTF(Decode, "MDecoder VLDR/VSTR.32: "
+                    "sd=s%d rn=r%d offset=%d add=%d\n",
+                    sd, base, offset, U);
+            if (isLoad)
+                return new MFpLdrS(mach_inst, sd, base, offset, U);
+            else
+                return new MFpStrS(mach_inst, sd, base, offset, U);
+        } else {
+            // VLDR.64 / VSTR.64: Dd = D:Vd
+            RegIndex dd = (RegIndex)(bits(inst, 22) << 4
+                                     | bits(inst, 15, 12));
+            DPRINTF(Decode, "MDecoder VLDR/VSTR.64: "
+                    "dd=d%d rn=r%d offset=%d add=%d\n",
+                    dd, base, offset, U);
+            if (dd > 15)
+                return new MProfileUndefined(mach_inst,
+                    "VLDR/VSTR D16+ not available on ARMv7-M");
+            if (isLoad)
+                return new MFpLdrD(mach_inst, dd, base, offset, U);
+            else
+                return new MFpStrD(mach_inst, dd, base, offset, U);
+        }
+    }
+
+    // ---- VLDM / VSTM / VPUSH / VPOP (multi-register FP load/store) ----
+    // These are coprocessor load/store multiples (bit[25]=0) that were
+    // NOT caught by the VLDR/VSTR check above (which requires
+    // bit[24]=1, bit[21]=0).
+    // DDI0403E A7.7.234 (VLDM), A7.7.253 (VSTM), A7.7.245 (VPOP/VPUSH)
+    // Encoding: 1110 110P UDwL Rn Vd 101s imm8
+    if (bits(inst, 25) == 0) {
+        const bool P = bits(inst, 24);
+        const bool U = bits(inst, 23);
+        const bool W = bits(inst, 21);
+        const bool L = bits(inst, 20);
+        const RegIndex rn = (RegIndex)bits(inst, 19, 16);
+        const uint32_t imm8 = bits(inst, 7, 0);
+
+        DPRINTF(Decode, "MDecoder VFP VLDM/VSTM check: "
+                "inst=%#x P=%d U=%d W=%d L=%d rn=r%d "
+                "imm8=%d single=%d\n",
+                inst, P, U, W, L, rn, imm8, single);
+
+        // VLDM/VSTM/VPUSH/VPOP have writeback (W=1 or P=0,U=1)
+        // VLDR/VSTR have P=1,W=0 (already caught above)
+        bool is_multi = (W == 1) || (P == 0 && U == 1);
+        if (is_multi && imm8 > 0) {
+            RegIndex vd;
+            if (single) {
+                vd = (RegIndex)(bits(inst, 15, 12) << 1
+                                | bits(inst, 22));
+            } else {
+                vd = (RegIndex)((bits(inst, 22) << 4
+                                 | bits(inst, 15, 12)) * 2);
+            }
+            bool writeback = (W == 1);
+            return new MMacroVFPMemOp(L ? "vldm" : "vstm",
+                mach_inst, L ? FloatMemReadOp : FloatMemWriteOp,
+                rn, vd, single, U, writeback, L, imm8);
+        }
+    }
+
+    // ---- VFP data processing ----
+    // Encoding: bit4=0, coproc=0xa/0xb
+    // DDI0403E A7-242, Table A7-17
+    if (!bit4) {
+        DPRINTF(Decode, "MDecoder VFP data-proc: inst=%#x "
+                "opc1=%#x&0xb=%#x opc2=%#x opc3=%#x single=%d\n",
+                inst, opc1, opc1 & 0xb, opc2, opc3, single);
+        // Double-precision check:
+        // - Load/store (bit25=0): VLDR/VSTR/VLDM/VSTM/VPUSH/VPOP for
+        //   d-registers are valid on FPv4-SP [DDI0403 A6.3].
+        //   VLDR/VSTR are intercepted above; VLDM/VSTM intercepted above.
+        // - Data-processing (bit25=1): VADD.F64, VMUL.F64, etc. require
+        //   M_PROFILE_FPU_DP.
+        if (!single) {
+            bool is_load_store = (bits(inst, 25) == 0);
+            if (is_load_store)
+                return nullptr;  // shouldn't reach here
+            if (!has(ArmExtension::M_PROFILE_FPU_DP))
+                return new MProfileUndefined(mach_inst,
+                    "VFP double-precision arithmetic without FPU_DP");
+            return nullptr;  // double-precision arithmetic: not modelled
+        }
+
+        switch (opc1 & 0xb /* mask to match A-profile table */) {
+          case 0x0:
+            // VMLA.F32 / VMLS.F32
+            if ((opc3 & 0x1) == 0) {
+                return new MFpTernaryS("vmla.f32", mach_inst,
+                    SimdFloatMultAccOp, vd(), vn(), vm(),
+                    [](float a, float n, float m) { return a + n * m; });
+            } else {
+                return new MFpTernaryS("vmls.f32", mach_inst,
+                    SimdFloatMultAccOp, vd(), vn(), vm(),
+                    [](float a, float n, float m) { return a - n * m; });
+            }
+
+          case 0x1:
+            // VNMLA.F32 / VNMLS.F32
+            if ((opc3 & 0x1) == 0) {
+                return new MFpTernaryS("vnmls.f32", mach_inst,
+                    SimdFloatMultAccOp, vd(), vn(), vm(),
+                    [](float a, float n, float m) { return n * m - a; });
+            } else {
+                return new MFpTernaryS("vnmla.f32", mach_inst,
+                    SimdFloatMultAccOp, vd(), vn(), vm(),
+                    [](float a, float n, float m) {
+                        return -(n * m) - a;
+                    });
+            }
+
+          case 0x2:
+            // VMUL.F32 / VNMUL.F32
+            if ((opc3 & 0x1) == 0) {
+                return new MFpBinS("vmul.f32", mach_inst,
+                    SimdFloatMultOp, vd(), vn(), vm(), mFpMul, "vmul");
+            } else {
+                return new MFpBinS("vnmul.f32", mach_inst,
+                    SimdFloatMultOp, vd(), vn(), vm(),
+                    [](float a, float b) { return -(a * b); }, "vnmul");
+            }
+
+          case 0x3:
+            // VADD.F32 / VSUB.F32
+            if ((opc3 & 0x1) == 0) {
+                return new MFpBinS("vadd.f32", mach_inst,
+                    SimdFloatAddOp, vd(), vn(), vm(), mFpAdd, "vadd");
+            } else {
+                return new MFpBinS("vsub.f32", mach_inst,
+                    SimdFloatAddOp, vd(), vn(), vm(), mFpSub, "vsub");
+            }
+
+          case 0x8:
+            // VDIV.F32
+            if ((opc3 & 0x1) == 0) {
+                return new MFpBinS("vdiv.f32", mach_inst,
+                    SimdFloatDivOp, vd(), vn(), vm(), mFpDiv, "vdiv");
+            }
+            break;
+
+          case 0x9:
+            // VFNMA.F32 / VFNMS.F32 — FUSED (single rounding per ARM
+            // ARM). Routed to MFpFusedMulAddS, which calls
+            // fplibMulAdd<uint32_t> for a bit-exact, host-independent
+            // result. Sign flips mirror ARM's FPNeg on Sd and Sn:
+            //   opc3[0]=0: VFNMS  →  -Sd + (Sn * Sm)       (negateAddend)
+            //   opc3[0]=1: VFNMA  →  -Sd + (-Sn * Sm)      (both flipped)
+            if ((opc3 & 0x1) == 0) {
+                return new MFpFusedMulAddS("vfnms.f32", mach_inst,
+                    SimdFloatMultAccOp, vd(), vn(), vm(),
+                    /* negateAddend */ true,
+                    /* negateProduct */ false);
+            } else {
+                return new MFpFusedMulAddS("vfnma.f32", mach_inst,
+                    SimdFloatMultAccOp, vd(), vn(), vm(),
+                    /* negateAddend */ true,
+                    /* negateProduct */ true);
+            }
+
+          case 0xa:
+            // VFMA.F32 / VFMS.F32 — FUSED (single rounding per ARM
+            // ARM). Previous implementation used a host `a + n*m`
+            // lambda which rounds twice; corrected by routing to
+            // MFpFusedMulAddS / fplibMulAdd.
+            //   opc3[0]=0: VFMA  →  Sd + (Sn * Sm)         (no flips)
+            //   opc3[0]=1: VFMS  →  Sd + (-Sn * Sm)        (negateProduct)
+            if ((opc3 & 0x1) == 0) {
+                return new MFpFusedMulAddS("vfma.f32", mach_inst,
+                    SimdFloatMultAccOp, vd(), vn(), vm(),
+                    /* negateAddend */ false,
+                    /* negateProduct */ false);
+            } else {
+                return new MFpFusedMulAddS("vfms.f32", mach_inst,
+                    SimdFloatMultAccOp, vd(), vn(), vm(),
+                    /* negateAddend */ false,
+                    /* negateProduct */ true);
+            }
+
+          case 0xb:
+            // VMOV imm / VMOV reg / VNEG / VABS / VCMP / VSQRT / VCVT
+            if ((opc3 & 0x1) == 0) {
+                // VMOV.F32 Sd, #imm
+                const uint32_t baseImm =
+                    bits(inst, 3, 0) | (bits(inst, 19, 16) << 4);
+                uint32_t imm = vfp_modified_imm(baseImm, FpDataType::Fp32);
+                return new MFpMovImmS(mach_inst, vd(), imm);
+            }
+            // opc3[0]=1: sub-decode on opc2
+            switch (opc2) {
+              case 0x0:
+                if (opc3 == 1) {
+                    // VMOV.F32 Sd, Sm (register copy)
+                    return new MFpMovRegS(mach_inst, vd(), vm());
+                } else {
+                    // VABS.F32
+                    return new MFpUnaryS("vabs.f32", mach_inst,
+                        SimdFloatMiscOp, vd(), vm(), fabsf);
+                }
+              case 0x1:
+                if (opc3 == 1) {
+                    // VNEG.F32
+                    return new MFpUnaryS("vneg.f32", mach_inst,
+                        SimdFloatMiscOp, vd(), vm(),
+                        [](float a) { return -a; });
+                } else {
+                    // VSQRT.F32
+                    return new MFpUnaryS("vsqrt.f32", mach_inst,
+                        SimdFloatSqrtOp, vd(), vm(), sqrtf);
+                }
+              case 0x4:
+              case 0x5: {
+                // VCMP.F32 / VCMPE.F32 — Armv7-M ARM A7.7.213.
+                //
+                // Encoding (T1 register / T2 zero):
+                //   ... 1 1 1 opc2[2:0] | Vd | 1 0 1 sz E 1 (0)0 (0000)
+                //   opc2 in {0b100=0x4, 0b101=0x5}:
+                //     bit 0 distinguishes register (opc2=4) from
+                //     zero variant (opc2=5).
+                //   opc3 = bits(inst, 7, 6) = (E << 1) | 1:
+                //     bit 1 is the E flag (0 = VCMP, 1 = VCMPE).
+                //
+                // The previous code had withExc/withZero swapped:
+                //   withExc  = bits(opc2, 0)  ← wrongly reads zero
+                //                               variant flag as E
+                //   withZero = (opc3 == 3)    ← wrongly reads E flag
+                //                               as zero variant
+                // For VCMP register (opc2=4, opc3=1) and VCMPE zero
+                // (opc2=5, opc3=3) the swap happened to produce the
+                // right MFpCmpS args by coincidence. The two
+                // surviving misdecodes were:
+                //   * VCMPE register (opc2=4, opc3=3) decoded as
+                //     VCMP zero — produced wildly wrong NZCV when
+                //     the operand was a non-zero compared register
+                //     (e.g. Eigen's cwiseMin/cwiseMax clipping in
+                //      tinympc compares znew vs u_min/u_max with
+                //      VCMPE; gem5 was comparing znew vs 0.0
+                //      instead, so any negative znew got clamped
+                //      to u_min regardless of bounds).
+                //   * VCMP zero (opc2=5, opc3=1) decoded as VCMPE
+                //     register — symmetric mirror of the above.
+                const bool withExc  = bits(opc3, 1);
+                const bool withZero = bits(opc2, 0);
+                return new MFpCmpS(mach_inst, vd(), vm(),
+                                   withExc, withZero);
+              }
+              case 0x8:
+              case 0xc:
+              case 0xd: {
+                // VCVT integer ↔ float conversions.
+                //
+                // T1 encoding of VCVT (between fp & integer), Armv7-M
+                // ARM ARM A7.7.218:
+                //
+                //   ... 1 1 1 opc2[2:0] | Vd | 1 0 1 sz op 1 M 0 Vm
+                //                                      ^   ^
+                //                                      |   bit 6 (constant 1)
+                //                                      bit 7 = op
+                //
+                // gem5 captures `opc3 = bits(inst, 7, 6)`, so opc3 is
+                // a 2-bit value `(op << 1) | 1`. For these encodings:
+                //   * float→int  (opc2 = 0xc / 0xd):
+                //         signed/unsigned is encoded in bit 0 of opc2
+                //         (0xc = U, 0xd = S) — `bits(opc2, 0)` is right.
+                //   * int→float (opc2 = 0x8):
+                //         signed/unsigned is encoded in the op bit
+                //         (op=1 → signed, op=0 → unsigned).
+                //         The op bit is bit 1 of opc3, NOT bit 0
+                //         (bit 0 is the constant 1 from bit 6).
+                //
+                // Previous code used `opc3 & 1`, which reads the
+                // constant 1 instead of op — making vcvt.f32.u32
+                // decode as vcvt.f32.s32 every time. Manifested as
+                // negative gem5 output when the source register held
+                // a u32 with the high bit set (e.g. the bit pattern
+                // of -1.0f, 0xBF800000, after `vmov.f32 s1, #-1.0`
+                // followed by `vcvt.f32.u32 s0, s1` → ref expects
+                // 3.2e9, gem5 produced -1.08e9).
+                const bool toFloat = (opc2 == 0x8);
+                const bool isSigned = toFloat ? bits(opc3, 1)
+                                              : bits(opc2, 0);
+                if (toFloat)
+                    return new MFpCvtS(mach_inst, vd(), vm(),
+                                       toFloat, isSigned);
+                // float→int: op=1 rounds toward zero (VCVT), op=0 with
+                // FPSCR.RMode (VCVTR).
+                if (bits(opc3, 1))
+                    return new MFpCvtS(mach_inst, vd(), vm(),
+                                       toFloat, isSigned);
+                return new MFpCvtS(mach_inst, vd(), vm(), toFloat,
+                                   isSigned, std::nullopt, "vcvtr");
+              }
+              case 0xa:
+              case 0xb:
+              case 0xe:
+              case 0xf: {
+                // VCVT between FP and fixed-point (Armv7-M ARM A7.7.219).
+                //
+                //   opc2  direction    sign        mnemonic
+                //   0xa   fixed→float  signed      VCVT.F32.S<w>
+                //   0xb   fixed→float  unsigned    VCVT.F32.U<w>
+                //   0xe   float→fixed  signed      VCVT.S<w>.F32
+                //   0xf   float→fixed  unsigned    VCVT.U<w>.F32
+                // Form: VCVT ... Sd, Sd, #fbits
+                //
+                // bits[7] = sx: 0 → 16-bit fixed, 1 → 32-bit fixed.
+                // 5-bit imm = i:imm4 = bits[5]:bits[3:0]; fbits = w - imm.
+                //
+                // Routed here (instead of falling through to the
+                // ISA-generated A-profile decoder) because the
+                // A-profile VcvtSFixedFpS / VcvtUFixedFpS / VcvtFpSFixedS /
+                // VcvtFpUFixedS path calls checkAdvSIMDOrFPEnabled32(),
+                // which dereferences ArmSystem state that doesn't exist
+                // on M-profile (ArmMSystem inherits from System, not
+                // ArmSystem) and segfaults inside ArmSystem::haveEL.
+                const bool toFloat  = (opc2 == 0xa) || (opc2 == 0xb);
+                const bool isSigned = (opc2 == 0xa) || (opc2 == 0xe);
+                const uint8_t intWidth = bits(inst, 7) ? 32 : 16;
+                const uint32_t imm5 =
+                    bits(inst, 5) | (bits(inst, 3, 0) << 1);
+                const uint8_t fbits = (uint8_t)(intWidth - imm5);
+                return new MFpCvtFixedS(mach_inst, vd(), vd(),
+                                        toFloat, isSigned,
+                                        intWidth, fbits);
+              }
+              case 0x6:
+              case 0x7: {
+                // VRINTR / VRINTZ (opc2=6, op=0 / 1) and VRINTX (opc2=7,
+                // op=0), FPv5 [DDI0553]. opc2=7 with op=1 is
+                // VCVT between single and double, which needs FPU_DP.
+                const bool op = bits(opc3, 1);
+                if (opc2 == 0x7 && op) {
+                    if (!has(ArmExtension::M_PROFILE_FPU_DP))
+                        return new MProfileUndefined(mach_inst,
+                            "VCVT between single and double without "
+                            "FPU_DP");
+                    break;
+                }
+                if (!has(ArmExtension::M_PROFILE_FPV5))
+                    return new MProfileUndefined(mach_inst,
+                        "VRINT without FPv5");
+                if (opc2 == 0x6 && op)
+                    return new MFpRintS("vrintz.f32", mach_inst, vd(), vm(),
+                                        FPRounding_ZERO, false);
+                if (opc2 == 0x6)
+                    return new MFpRintS("vrintr.f32", mach_inst, vd(), vm(),
+                                        std::nullopt, false);
+                return new MFpRintS("vrintx.f32", mach_inst, vd(), vm(),
+                                    std::nullopt, true);
+              }
+              default:
+                // Other conversions (VCVTB/VCVTT): not modelled
+                return nullptr;
+            }
+            break;
+
+          default:
+            break;
+        }
+    }
+
+    // Not recognized: the caller treats it as unmodelled.
+    return nullptr;
+}
+
+// =========================================================================
+// decodeMProfileCoproc — coprocessor instructions for p0-p7
+// =========================================================================
+//
+// MCRR/MRRC: 111x 1100 010L Rt2 | Rt coproc opc1 CRm
+// MCR/MRC:   111x 1110 opc1 L CRn | Rt coproc opc2 1 CRm
+// CDP:       111x 1110 opc1 CRn | CRd coproc opc2 0 CRm
+// x = hw1[12] (bit 28): the MCRR2/MRRC2/MCR2/MRC2/CDP2 forms. 111x 1100 000x
+// and 111x 1111 are UNDEFINED; LDC/STC (the rest of 111x 110x) are not
+// modelled.
+
+StaticInstPtr
+MDecoder::decodeMProfileCoproc(ExtMachInst mach_inst)
+{
+    using Kind = MProfileCoprocAccess::Kind;
+    const uint32_t inst = (uint32_t)mach_inst;
+
+    MProfileCoprocAccess form{};
+    form.two = bits(inst, 28);
+    form.coproc = bits(inst, 11, 8);
+    const RegIndex rt = (RegIndex)bits(inst, 15, 12);
+
+    if (bits(inst, 27, 21) == 0x62) {
+        form.kind = bits(inst, 20) ? Kind::Mrrc : Kind::Mcrr;
+        form.opc1 = bits(inst, 7, 4);
+        form.crm = bits(inst, 3, 0);
+        return new MCoprocOp(mach_inst, form, rt,
+                             (RegIndex)bits(inst, 19, 16));
+    }
+    if (bits(inst, 27, 24) == 0xe) {
+        form.crn = bits(inst, 19, 16);
+        form.crm = bits(inst, 3, 0);
+        form.opc2 = bits(inst, 7, 5);
+        if (bits(inst, 4)) {
+            form.kind = bits(inst, 20) ? Kind::Mrc : Kind::Mcr;
+            form.opc1 = bits(inst, 23, 21);
+        } else {
+            form.kind = Kind::Cdp;
+            form.opc1 = bits(inst, 23, 20);
+        }
+        return new MCoprocOp(mach_inst, form, rt, 0);
+    }
+    if (bits(inst, 27, 24) == 0xf || bits(inst, 27, 21) == 0x60)
+        return new MProfileUndefined(mach_inst, "unallocated encoding");
+    return new MProfileUnmodelled(mach_inst, "LDC/STC to a coprocessor");
+}
+
+// =========================================================================
+// decodeMProfileFpv5 — FPv5 data processing (hw1 = 1111 1110 ...)
+// =========================================================================
+//
+// The coprocessor encodings with hw1[12] (bit 28) set and coproc 10/11:
+// VSEL, VMAXNM/VMINNM, VRINT{A,N,P,M} and VCVT{A,N,P,M}
+// [DDI0553]. Fields as the A-profile decodeFloatingPointDataProcessing
+// (isa/formats/fp.isa). Undefined without FPv5 in the release, as on a
+// Cortex-M4.
+
+StaticInstPtr
+MDecoder::decodeMProfileFpv5(ExtMachInst mach_inst)
+{
+    const uint32_t inst = (uint32_t)mach_inst;
+
+    if (!has(ArmExtension::M_PROFILE_FPV5))
+        return new MProfileUndefined(mach_inst,
+            "FPv5 instruction without FPv5");
+
+    // Only data processing (hw1[11:8] = 1110, bit4 = 0) is allocated.
+    if (bits(inst, 31, 24) != 0xfe || bits(inst, 4))
+        return new MProfileUndefined(mach_inst, "unallocated FPv5 encoding");
+
+    if (bits(inst, 8)) {
+        if (!has(ArmExtension::M_PROFILE_FPU_DP))
+            return new MProfileUndefined(mach_inst,
+                "FPv5 double precision without FPU_DP");
+        return new MProfileUnmodelled(mach_inst, "FPv5 double precision");
+    }
+
+    const RegIndex vd = (RegIndex)(bits(inst, 22) | (bits(inst, 15, 12) << 1));
+    const RegIndex vn = (RegIndex)(bits(inst, 7) | (bits(inst, 19, 16) << 1));
+    const RegIndex vm = (RegIndex)(bits(inst, 5) | (bits(inst, 3, 0) << 1));
+
+    // VSEL<cc>.F32: 1111 1110 0 D cc Vn | Vd 101 0 N 0 M 0 Vm
+    if (bits(inst, 23) == 0 && bits(inst, 6) == 0) {
+        static const ConditionCode conds[] = {
+            COND_EQ, COND_VS, COND_GE, COND_GT};
+        static const char *const mnems[] = {
+            "vseleq.f32", "vselvs.f32", "vselge.f32", "vselgt.f32"};
+        const uint32_t cc = bits(inst, 21, 20);
+        return new MFpSelS(mnems[cc], mach_inst, vd, vn, vm, conds[cc]);
+    }
+
+    // VMAXNM / VMINNM.F32: 1111 1110 1 D 00 Vn | Vd 101 0 N op M 0 Vm
+    if (bits(inst, 23) == 1 && bits(inst, 21, 20) == 0) {
+        const bool isMin = bits(inst, 6);
+        return new MFpMinMaxNumS(isMin ? "vminnm.f32" : "vmaxnm.f32",
+                                 mach_inst, vd, vn, vm, !isMin);
+    }
+
+    // VRINT{A,N,P,M}.F32:     1111 1110 1 D 11 10 RM | Vd 101 0 0 1 M 0 Vm
+    // VCVT{A,N,P,M}.xx.F32:   1111 1110 1 D 11 11 RM | Vd 101 0 op 1 M 0 Vm
+    if (bits(inst, 23) == 1 && bits(inst, 21, 19) == 0x7 &&
+        bits(inst, 6) == 1) {
+        static const FPRounding modes[] = {
+            FPRounding_TIEAWAY, FPRounding_TIEEVEN,
+            FPRounding_POSINF, FPRounding_NEGINF};
+        const uint32_t rm = bits(inst, 17, 16);
+        if (bits(inst, 18) == 0) {
+            if (bits(inst, 7))
+                return new MProfileUndefined(mach_inst,
+                    "unallocated FPv5 encoding");
+            static const char *const mnems[] = {
+                "vrinta.f32", "vrintn.f32", "vrintp.f32", "vrintm.f32"};
+            return new MFpRintS(mnems[rm], mach_inst, vd, vm, modes[rm],
+                                false);
+        }
+        static const char *const mnems[] = {
+            "vcvta", "vcvtn", "vcvtp", "vcvtm"};
+        const bool isSigned = bits(inst, 7);
+        return new MFpCvtS(mach_inst, vd, vm, false, isSigned, modes[rm],
+                           mnems[rm]);
+    }
+
+    return new MProfileUndefined(mach_inst, "unallocated FPv5 encoding");
+}
+
+// =========================================================================
+// decodeThumbFallthrough — cached decode via MDecoder::decodeInst
+// =========================================================================
+
+StaticInstPtr
+MDecoder::decodeThumbFallthrough(ExtMachInst mach_inst, Addr addr)
+{
+    uint64_t key = (uint64_t)mach_inst;
+    auto it = instCache.find(key);
+    if (it != instCache.end()) {
+        return it->second;
+    }
+
+    StaticInstPtr si = decodeInst(mach_inst);
+
+    DPRINTF(Decode, "MDecoder: fallthrough decoded %s: %#x\n",
+            si->getName(), (uint64_t)mach_inst);
+
+    instCache[key] = si;
+    return si;
+}
+
+} // namespace ArmISA
+} // namespace gem5

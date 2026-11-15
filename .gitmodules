@@ -1,0 +1,4 @@
+[submodule "tests/gem5/m_profile_tests/programs/freertos/FreeRTOS-Kernel"]
+	path = tests/gem5/m_profile_tests/programs/freertos/FreeRTOS-Kernel
+	url = https://github.com/FreeRTOS/FreeRTOS-Kernel.git
+	update = none

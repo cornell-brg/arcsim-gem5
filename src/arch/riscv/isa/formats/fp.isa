@@ -1,0 +1,126 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2015 Riscv Developers
+// Copyright (c) 2016-2017 The University of Virginia
+// Copyright (c) 2020 Barkhausen Institut
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+////////////////////////////////////////////////////////////////////
+//
+// Floating point operation instructions
+//
+def template FloatExecute {{
+    Fault %(class_name)s::execute(ExecContext *xc,
+        trace::InstRecord *traceData) const
+    {
+        bool set_dirty = true;
+        Fault fault = updateFPUStatus(xc, machInst, set_dirty);
+        if (fault != NoFault) { return fault; }
+
+        %(op_decl)s;
+        %(op_rd)s;
+
+        std::feclearexcept(FE_ALL_EXCEPT);
+        %(code)s;
+
+        xc->setMiscReg(MISCREG_FFLAGS_EXE, softfloat_exceptionFlags);
+        softfloat_exceptionFlags = 0;
+
+        %(op_wb)s;
+
+        return NoFault;
+    }
+}};
+
+// Zfinx: the same operation on the x registers. There are no f registers to
+// switch on, so mstatus.FS is not checked or set.
+def template FloatZfinxExecute {{
+    Fault %(class_name)s::execute(ExecContext *xc,
+        trace::InstRecord *traceData) const
+    {
+        %(op_decl)s;
+        %(op_rd)s;
+
+        std::feclearexcept(FE_ALL_EXCEPT);
+        %(code)s;
+
+        xc->setMiscReg(MISCREG_FFLAGS_EXE, softfloat_exceptionFlags);
+        softfloat_exceptionFlags = 0;
+
+        %(op_wb)s;
+
+        return NoFault;
+    }
+}};
+
+// An instruction with a Zfinx form decodes to it when Zfinx is on.
+def template FloatZfinxDecode {{
+    if (machInst.enable_zfinx)
+        return new %(class_name)sZfinx(machInst);
+    return new %(class_name)s(machInst);
+}};
+
+let {{
+# The single-precision instructions that have a Zfinx form. Every other FP
+# instruction keeps only its f-register form, which is illegal with Zfinx
+# because mstatus.FS stays off: FP loads, stores and moves, D, Zfh and Zfa.
+zfinx_ops = {
+    'fmadd_s', 'fmsub_s', 'fnmsub_s', 'fnmadd_s',
+    'fadd_s', 'fsub_s', 'fmul_s', 'fdiv_s', 'fsqrt_s',
+    'fsgnj_s', 'fsgnjn_s', 'fsgnjx_s', 'fmin_s', 'fmax_s',
+    'feq_s', 'flt_s', 'fle_s', 'fclass_s',
+    'fcvt_w_s', 'fcvt_wu_s', 'fcvt_s_w', 'fcvt_s_wu',
+    'fcvt_l_s', 'fcvt_lu_s', 'fcvt_s_l', 'fcvt_s_lu',
+}
+
+# The f-register code rewritten for the x registers. A source reads the low
+# 32 bits of its x register, boxed as an f register would hold them, so the
+# code unboxes them unchanged; the upper bits are ignored. The result is the
+# low 32 bits of what the code writes, sign-extended into rd.
+def zfinxCode(code):
+    import re
+    for i in ('1', '2', '3'):
+        code = re.sub(r'\bFs%s_bits\b' % i, 'boxF32(Rs%s_uw)' % i, code)
+    if re.search(r'\bFd_bits\b', code):
+        code = re.sub(r'\bFd_bits\b', 'zfinx_fd', code)
+        code = 'uint64_t zfinx_fd;\n' + code + '\nRd_sd = sext<32>(zfinx_fd);\n'
+    return code
+}};
+
+def format FPROp(code, *opt_flags) {{
+    iop = InstObjParams(name, Name, 'RegOp', code, opt_flags)
+    header_output = BasicDeclare.subst(iop)
+    decoder_output = BasicConstructor.subst(iop)
+    decode_block = BasicDecode.subst(iop)
+    exec_output = FloatExecute.subst(iop)
+    if name in zfinx_ops:
+        ziop = InstObjParams(name, Name + 'Zfinx', 'RegOp', zfinxCode(code),
+                             opt_flags)
+        header_output += BasicDeclare.subst(ziop)
+        decoder_output += BasicConstructor.subst(ziop)
+        decode_block = FloatZfinxDecode.subst(iop)
+        exec_output += FloatZfinxExecute.subst(ziop)
+}};

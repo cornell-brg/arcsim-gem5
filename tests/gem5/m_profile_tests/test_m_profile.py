@@ -1,0 +1,637 @@
+# Copyright (c) 2026 University of California, Davis and Cornell University
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met: redistributions of source code must retain the above copyright
+# notice, this list of conditions and the following disclaimer;
+# redistributions in binary form must reproduce the above copyright
+# notice, this list of conditions and the following disclaimer in the
+# documentation and/or other materials provided with the distribution;
+# neither the name of the copyright holders nor the names of its
+# contributors may be used to endorse or promote products derived from
+# this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+"""
+M-profile integration tests for gem5.
+
+Each test runs a specific Cortex-M4 firmware ELF that exercises a
+particular feature (CPS, MRS/MSR, load/store, BX/EXC_RETURN, etc.).
+The firmware writes 0xCAFECAFE to 0x20000108 on success or
+0xDEADDEAD on failure.
+
+The test verifies that:
+1. gem5 doesn't crash (non-zero exit = fail)
+2. The simulation reaches the test_done loop (tick limit exit)
+
+To validate specific instruction behavior, run with:
+  --debug-flags=Exec,MProfileCPSR
+
+These tests require pre-built ELF firmware.  Build with:
+  cd tests/gem5/m_profile_tests/programs && make
+"""
+
+import os
+import re
+
+from testlib import *
+
+
+def m_profile_test(
+    name, firmware_name, expected_result="pass", extra_args=None
+):
+    """Register an M-profile integration test.
+
+    Args:
+        name: Test name (e.g., "test_cps")
+        firmware_name: ELF filename (e.g., "test_cps.elf")
+        expected_result: "pass" (default) or "fail" — what the firmware
+            is expected to report.  Controls --expected-result flag
+            passed to run_m4_test.py.
+        extra_args: Optional list of additional CLI args for run_m4_test.py
+            (e.g., ["--num-irqs", "240"]).
+    """
+    firmware_path = joinpath(
+        config.base_dir,
+        "tests",
+        "gem5",
+        "m_profile_tests",
+        "programs",
+        firmware_name,
+    )
+
+    # Skip if firmware not built
+    if not os.path.exists(firmware_path):
+        return
+
+    # Verifier: check that simulation completed without panic/crash.
+    # The simulation exits either via semihosting SYS_EXIT (bkpt #0xab)
+    # or by hitting the tick limit.  Both are valid exits.
+    verifiers = [
+        verifier.MatchRegex(re.compile(r"Exiting @ tick \d+ because")),
+    ]
+
+    config_args = [
+        "--firmware",
+        firmware_path,
+        "--expected-result",
+        expected_result,
+    ]
+    if extra_args:
+        config_args.extend(extra_args)
+
+    gem5_verify_config(
+        name=f"m_profile_{name}",
+        verifiers=verifiers,
+        fixtures=(),
+        config=joinpath(
+            config.base_dir,
+            "tests",
+            "gem5",
+            "m_profile_tests",
+            "configs",
+            "run_m4_test.py",
+        ),
+        config_args=config_args,
+        valid_isas=(constants.all_compiled_tag,),
+        valid_hosts=constants.supported_hosts,
+        length=constants.quick_tag,
+    )
+
+
+# Register all test firmware
+#
+# Each test isolates a specific M-profile feature:
+m_profile_test("basic", "cortexm4_basic.elf")
+m_profile_test("cps", "test_cps.elf")
+m_profile_test("mrs_msr", "test_mrs_msr.elf")
+m_profile_test("bx_exc_return", "test_bx_exc_return.elf")
+m_profile_test("load_store", "test_load_store.elf")
+m_profile_test("blocked_insts", "test_blocked_insts.elf")
+m_profile_test("sp_sync", "test_sp_sync.elf")
+m_profile_test("pop_pc_exc_return", "test_pop_pc_exc_return.elf")
+m_profile_test("nested_exceptions", "test_nested_exceptions.elf")
+m_profile_test("data_processing", "test_data_processing.elf")
+m_profile_test("psp_exception", "test_psp_exception.elf")
+m_profile_test(
+    "deliberate_fail", "test_deliberate_fail.elf", expected_result="fail"
+)
+m_profile_test("exc_return_mask", "test_exc_return_mask.elf")
+m_profile_test("blx_no_exc_return", "test_blx_no_exc_return.elf")
+m_profile_test("bx_bit0_fault", "test_bx_bit0_fault.elf")
+m_profile_test("srs_rfe_blocked", "test_srs_rfe_blocked.elf")
+m_profile_test("coproc_detection", "test_coproc_detection.elf")
+m_profile_test("ldrex_strex_granule", "test_ldrex_strex_granule.elf")
+m_profile_test("nested_priority", "test_nested_priority.elf")
+m_profile_test("systick_active_pending", "test_systick_active_pending.elf")
+m_profile_test("ipr_byte_access", "test_ipr_byte_access.elf")
+# BUG-1: NVIC array OOB — 240-IRQ config tests corruption detection (Phase A),
+# high-IRQ register read/write (Phase B), and nested preemption (Phase C).
+# Requires num_irqs=240 because Phase C delivers IRQs 224 and 239 which
+# need updatePending() to scan word 7 of the NVIC arrays.
+m_profile_test(
+    "nvic_oob_240", "test_nvic_oob.elf", extra_args=["--num-irqs", "240"]
+)
+# BUG-2: ICSR dynamic field read — basic static check with SVCall handler
+m_profile_test("icsr_read", "test_icsr_read.elf")
+# BUG-3: CPUID read-only enforcement
+m_profile_test("cpuid_readonly", "test_cpuid_readonly.elf")
+# BUG-4: NVIC unimplemented IRQ bit masking (RAZ/WI)
+m_profile_test("nvic_irq_mask", "test_nvic_irq_mask.elf")
+# BUG-5: CC flat reg ↔ xPSR NZCV sync
+m_profile_test("xpsr_nzcv_sync", "test_xpsr_nzcv_sync.elf")
+# BUG-6: CONTROL.SPSEL write swaps R13 between MSP/PSP
+m_profile_test("control_spsel", "test_control_spsel.elf")
+# BUG-7: SCB sub-word (byte/halfword) access
+m_profile_test("scb_byte_access", "test_scb_byte_access.elf")
+m_profile_test("dwt_cyccnt", "test_dwt_cyccnt.elf")
+# MISSING-1: Invalid EXC_RETURN validation
+m_profile_test("exc_return_validate", "test_exc_return_validate.elf")
+# C-1: FAULTMASK priority — executionPriority() returns uint8_t, thread-mode
+# default is 0xFF instead of 256.  With 8 priority bits, IRQ at priority 0xFF
+# cannot be delivered from Thread mode (0xFF < 0xFF = false).
+m_profile_test(
+    "faultmask_priority",
+    "test_faultmask_priority.elf",
+    extra_args=["--priority-bits", "8"],
+)
+# FPv5 (Cortex-M33): every case's result and FPSCR match the RP2350's M33
+m_profile_test("fpv5", "test_fpv5.elf", extra_args=["--release", "m33"])
+# FPv5 instructions are UNDEFINED on the M4 release
+m_profile_test(
+    "fpv5_undefined",
+    "test_fpv5_undefined.elf",
+    extra_args=["--cpu-type", "timing"],
+)
+# Coprocessor instructions for p0-p7: NOCP with nothing attached; the RP2350's
+# GPIO coprocessor and DCP when attached
+m_profile_test(
+    "coproc_nocp",
+    "test_coproc_nocp.elf",
+    extra_args=["--cpu-type", "timing"],
+)
+for cpu_type in ("atomic", "timing", "minor"):
+    m_profile_test(
+        f"v8m_exclusive_{cpu_type}",
+        "test_v8m_exclusive.elf",
+        extra_args=["--cpu-type", cpu_type, "--release", "m33"],
+    )
+    m_profile_test(
+        f"it_fp_load_store_{cpu_type}",
+        "test_it_fp_load_store.elf",
+        extra_args=["--cpu-type", cpu_type],
+    )
+for cpu_type in ("timing", "minor"):
+    m_profile_test(
+        f"nvic_pend_enable_{cpu_type}",
+        "test_nvic_pend_enable.elf",
+        extra_args=["--cpu-type", cpu_type],
+    )
+m_profile_test(
+    "v8m_exclusive_undefined",
+    "test_v8m_exclusive_undefined.elf",
+    extra_args=["--cpu-type", "timing"],
+)
+m_profile_test(
+    "coproc_rp2350",
+    "test_coproc_rp2350.elf",
+    extra_args=["--cpu-type", "timing", "--release", "m33",
+                "--rp2350-coprocessors"],
+)
+# The FP context on exception entry and return, eager and lazy, and a
+# higher-priority exception arriving while a frame or a lazy FP save is
+# still being written
+for cpu_type in ("atomic", "timing", "minor"):
+    m_profile_test(
+        f"fp_stacking_{cpu_type}",
+        "test_fp_stacking.elf",
+        extra_args=["--cpu-type", cpu_type],
+    )
+    m_profile_test(
+        f"late_arrival_{cpu_type}",
+        "test_late_arrival.elf",
+        extra_args=["--cpu-type", cpu_type],
+    )
+
+
+def m_profile_rp2350_test(name, firmware_name, ok_message, slow_sio=False):
+    """Register a test that runs firmware on the RP2350 board's Arm proxy
+    (configs/example/rp2350/run.py, or configs/run_rp2350_slow_sio.py with
+    slow_sio) and passes when it prints ok_message."""
+    firmware_path = joinpath(
+        config.base_dir,
+        "tests",
+        "gem5",
+        "m_profile_tests",
+        "programs",
+        firmware_name,
+    )
+    if not os.path.exists(firmware_path):
+        return
+    if slow_sio:
+        run_config = joinpath(
+            config.base_dir, "tests", "gem5", "m_profile_tests", "configs",
+            "run_rp2350_slow_sio.py",
+        )
+        run_args = ["--firmware", firmware_path]
+    else:
+        run_config = joinpath(
+            config.base_dir, "configs", "example", "rp2350", "run.py"
+        )
+        run_args = ["--core", "arm-m4-proxy", "--firmware", firmware_path]
+    gem5_verify_config(
+        name=f"m_profile_{name}",
+        verifiers=[verifier.MatchRegex(re.compile(ok_message))],
+        fixtures=(),
+        config=run_config,
+        config_args=run_args,
+        valid_isas=(constants.all_compiled_tag,),
+        valid_hosts=constants.supported_hosts,
+        length=constants.quick_tag,
+    )
+
+
+# The RP2350 GPIO coprocessor and SIO against values recorded on silicon
+m_profile_rp2350_test(
+    "rp2350_gpioc", "test_rp2350_gpioc.elf", r"RP2350_GPIOC_OK"
+)
+
+
+def m_profile_rp2350_sdk_test(name, firmware_name, ok_message, sram_model):
+    """Register a test that runs Pico SDK firmware (programs/rp2350_sdk) on
+    the RP2350 board's Arm proxy (configs/run_rp2350_sdk.py) and passes when
+    it prints ok_message."""
+    firmware_path = joinpath(
+        config.base_dir, "tests", "gem5", "m_profile_tests", "programs",
+        "rp2350_sdk", firmware_name,
+    )
+    if not os.path.exists(firmware_path):
+        return
+    gem5_verify_config(
+        name=f"m_profile_{name}_{sram_model}",
+        verifiers=[verifier.MatchRegex(re.compile(ok_message))],
+        fixtures=(),
+        config=joinpath(
+            config.base_dir, "tests", "gem5", "m_profile_tests", "configs",
+            "run_rp2350_sdk.py",
+        ),
+        config_args=[
+            "--firmware", firmware_path, "--sram-model", sram_model,
+        ],
+        valid_isas=(constants.all_compiled_tag,),
+        valid_hosts=constants.supported_hosts,
+        length=constants.quick_tag,
+    )
+
+
+for sram_model in ("legacy", "banked"):
+    m_profile_rp2350_sdk_test(
+        "rp2350_sdk_locks", "sdk_locks.elf", r"RP2350_SDK_LOCKS_OK",
+        sram_model,
+    )
+
+
+def m_profile_rp2350_dma_test(name, firmware_name, ok_message, run_config,
+                              sram_model, xip_model="legacy"):
+    """Register a test that runs firmware on the RP2350 board's Arm proxy
+    with its DMA, through configs/<run_config>, and passes when it prints
+    ok_message."""
+    firmware_path = joinpath(
+        config.base_dir, "tests", "gem5", "m_profile_tests", "programs",
+        firmware_name,
+    )
+    if not os.path.exists(firmware_path):
+        return
+    run_args = ["--firmware", firmware_path, "--sram-model", sram_model]
+    if run_config == "run_rp2350_sdk.py":
+        run_args += ["--dma", "--xip-model", xip_model]
+    gem5_verify_config(
+        name=f"m_profile_{name}_{sram_model}",
+        verifiers=[verifier.MatchRegex(re.compile(ok_message))],
+        fixtures=(),
+        config=joinpath(
+            config.base_dir, "tests", "gem5", "m_profile_tests", "configs",
+            run_config,
+        ),
+        config_args=run_args,
+        valid_isas=(constants.all_compiled_tag,),
+        valid_hosts=constants.supported_hosts,
+        length=constants.quick_tag,
+    )
+
+
+for sram_model in ("legacy", "banked"):
+    m_profile_rp2350_dma_test(
+        "rp2350_dma", "test_rp2350_dma.elf", r"RP2350_DMA_OK",
+        "run_rp2350_sdk.py", sram_model,
+    )
+    m_profile_rp2350_dma_test(
+        "rp2350_dma_dreq", "test_rp2350_dma_dreq.elf",
+        r"RP2350_DMA_DREQ_OK", "run_rp2350_dma_dreq.py", sram_model,
+    )
+    m_profile_rp2350_dma_test(
+        "rp2350_dma_chain", "test_rp2350_dma_chain.elf",
+        r"RP2350_DMA_CHAIN_OK", "run_rp2350_dma_chain.py", sram_model,
+    )
+    # Flash timing and the DMA beside it, with the values a Pico 2 gives
+    m_profile_rp2350_dma_test(
+        "rp2350_xip", "test_rp2350_xip.elf", r"RP2350_XIP_OK",
+        "run_rp2350_sdk.py", sram_model, xip_model="qmi",
+    )
+    # The core fetches only a few words past a branch, as a Pico 2
+    m_profile_rp2350_dma_test(
+        "rp2350_fetch_ahead", "test_rp2350_fetch_ahead.elf",
+        r"RP2350_FETCH_AHEAD_OK", "run_rp2350_sdk.py", sram_model,
+        xip_model="qmi",
+    )
+# A store that loses its bank holds the core, with the cycles a Pico 2 gives;
+# only the banked SRAM has banks to lose
+m_profile_rp2350_dma_test(
+    "rp2350_store_wait", "test_rp2350_store_wait.elf",
+    r"RP2350_STORE_WAIT_OK", "run_rp2350_sdk.py", "banked",
+)
+# So does a load, beside the DMA and beside the core's own fetches from SRAM
+m_profile_rp2350_dma_test(
+    "rp2350_load_wait", "test_rp2350_load_wait.elf",
+    r"RP2350_LOAD_WAIT_OK", "run_rp2350_sdk.py", "banked",
+)
+# GPIO coprocessor instructions stay in program order with SIO accesses on
+# the Minor-based Arm proxy
+m_profile_rp2350_test(
+    "rp2350_order", "test_rp2350_order.elf", r"RP2350_ORDER_OK",
+    slow_sio=True,
+)
+# The same FP context tests on the RP2350 board's Arm proxy
+m_profile_rp2350_test(
+    "rp2350_fp_stacking", "test_fp_stacking_rp2350.elf", r"FP_STACKING_OK"
+)
+m_profile_rp2350_test(
+    "rp2350_late_arrival", "test_late_arrival_rp2350.elf",
+    r"LATE_ARRIVAL_OK",
+)
+
+
+def m_profile_checkpoint_test(name, firmware_name):
+    """Register an M-profile checkpoint/restore test.
+
+    Uses run_checkpoint_test.py which runs two gem5 simulations
+    (save + restore) via multiprocessing.Process.
+    """
+    firmware_path = joinpath(
+        config.base_dir,
+        "tests",
+        "gem5",
+        "m_profile_tests",
+        "programs",
+        firmware_name,
+    )
+
+    if not os.path.exists(firmware_path):
+        return
+
+    verifiers = [
+        verifier.MatchRegex(re.compile(r"Exiting @ tick \d+ because")),
+    ]
+
+    gem5_verify_config(
+        name=f"m_profile_{name}",
+        verifiers=verifiers,
+        fixtures=(),
+        config=joinpath(
+            config.base_dir,
+            "tests",
+            "gem5",
+            "m_profile_tests",
+            "configs",
+            "run_checkpoint_test.py",
+        ),
+        config_args=[
+            "--firmware",
+            firmware_path,
+        ],
+        valid_isas=(constants.all_compiled_tag,),
+        valid_hosts=constants.supported_hosts,
+        length=constants.quick_tag,
+    )
+
+
+m_profile_checkpoint_test("scs_checkpoint", "test_scs_checkpoint.elf")
+
+
+def m_profile_bridge_io_test(name, firmware_name):
+    """Register an MProfileBridgeIO smoke test.
+
+    Uses run_bridge_io_test.py (which configures the timing board with
+    enable_bridge_io=True) instead of run_m4_test.py.  The verifier
+    additionally requires "MProfileBridgeIO signaled done." in simout
+    so that a regression in the bridge's exit-on-done path fails the
+    test even if the firmware otherwise reports PASS via the standard
+    0xCAFECAFE store.
+    """
+    firmware_path = joinpath(
+        config.base_dir,
+        "tests",
+        "gem5",
+        "m_profile_tests",
+        "programs",
+        firmware_name,
+    )
+
+    if not os.path.exists(firmware_path):
+        return
+
+    verifiers = [
+        verifier.MatchRegex(re.compile(r"Exiting @ tick \d+ because")),
+        # Catches the case where the CPU never wrote 1 to register[1]
+        # — i.e., the firmware bailed via the belt-and-braces semihosted
+        # SYS_EXIT instead of the bridge done path.
+        verifier.MatchRegex(re.compile(r"MProfileBridgeIO signaled done\.")),
+    ]
+
+    gem5_verify_config(
+        name=f"m_profile_{name}",
+        verifiers=verifiers,
+        fixtures=(),
+        config=joinpath(
+            config.base_dir,
+            "tests",
+            "gem5",
+            "m_profile_tests",
+            "configs",
+            "run_bridge_io_test.py",
+        ),
+        config_args=["--firmware", firmware_path],
+        valid_isas=(constants.all_compiled_tag,),
+        valid_hosts=constants.supported_hosts,
+        length=constants.quick_tag,
+    )
+
+
+# MProfileBridgeIO end-to-end smoke: register reads, output buffer
+# write/readback, exit via firmware writing register[1].
+m_profile_bridge_io_test("bridge_io", "test_bridge_io.elf")
+
+
+def m_profile_bridge_io_irq_test(name, firmware_name):
+    """Register an IRQ-driven MProfileBridgeIO ping-pong test.
+
+    Uses run_bridge_io_irq_test.py, which drives a multi-iteration
+    Python <-> firmware exchange via updateInputData() / raiseInterrupt()
+    / getOutputData() / clearInterrupt() — the same API surface the
+    crazyflie harness uses.  The Python script prints "TEST PASSED"
+    only after every iteration's echo round-trip matches.
+    """
+    firmware_path = joinpath(
+        config.base_dir,
+        "tests",
+        "gem5",
+        "m_profile_tests",
+        "programs",
+        firmware_name,
+    )
+
+    if not os.path.exists(firmware_path):
+        return
+
+    # The verifier matches the Python script's success line so we
+    # catch both "firmware exited via the wrong path" and "an
+    # iteration's echo mismatched" — both result in NO "TEST PASSED"
+    # appearing in the output.
+    verifiers = [
+        verifier.MatchRegex(re.compile(r"TEST PASSED")),
+    ]
+
+    gem5_verify_config(
+        name=f"m_profile_{name}",
+        verifiers=verifiers,
+        fixtures=(),
+        config=joinpath(
+            config.base_dir,
+            "tests",
+            "gem5",
+            "m_profile_tests",
+            "configs",
+            "run_bridge_io_irq_test.py",
+        ),
+        config_args=["--firmware", firmware_path],
+        valid_isas=(constants.all_compiled_tag,),
+        valid_hosts=constants.supported_hosts,
+        length=constants.quick_tag,
+    )
+
+
+# IRQ-driven echo: exercises raiseInterrupt + updateInputData +
+# getOutputData + clearInterrupt across multiple Python <-> firmware
+# round trips.  Models the crazyflie ping-pong pattern.
+m_profile_bridge_io_irq_test("bridge_io_irq", "test_bridge_io_irq.elf")
+
+
+# FreeRTOS holistic test — uses the same run_m4_test.py but with a longer
+# tick limit (FreeRTOS needs many SysTick periods for context switches).
+# The firmware is in the freertos/ subdirectory.
+def m_profile_freertos_test():
+    firmware_path = joinpath(
+        config.base_dir,
+        "tests",
+        "gem5",
+        "m_profile_tests",
+        "programs",
+        "freertos",
+        "freertos_test.elf",
+    )
+
+    if not os.path.exists(firmware_path):
+        return
+
+    verifiers = [
+        verifier.MatchRegex(re.compile(r"Exiting @ tick \d+ because")),
+    ]
+
+    gem5_verify_config(
+        name="m_profile_freertos_boot",
+        verifiers=verifiers,
+        fixtures=(),
+        config=joinpath(
+            config.base_dir,
+            "tests",
+            "gem5",
+            "m_profile_tests",
+            "configs",
+            "run_m4_test.py",
+        ),
+        config_args=[
+            "--firmware",
+            firmware_path,
+            "--tick-limit",
+            # 3 SysTick periods (TARGET_TICKS=3) ≈ 3B ticks, but 3 tasks
+            # each doing vTaskDelay(1) means ~9 scheduling rounds + startup
+            # + monitor polling.  10B ticks gives sufficient headroom.
+            "10000000000",
+        ],
+        valid_isas=(constants.all_compiled_tag,),
+        valid_hosts=constants.supported_hosts,
+        length=constants.quick_tag,
+    )
+
+
+m_profile_freertos_test()
+
+
+# BUG-2: FreeRTOS ICSR test — verifies ICSR dynamic fields in a real RTOS
+# environment with SysTick handler, tick hook, and external IRQ pending.
+def m_profile_freertos_icsr_test():
+    firmware_path = joinpath(
+        config.base_dir,
+        "tests",
+        "gem5",
+        "m_profile_tests",
+        "programs",
+        "freertos",
+        "freertos_icsr_test.elf",
+    )
+
+    if not os.path.exists(firmware_path):
+        return
+
+    verifiers = [
+        verifier.MatchRegex(re.compile(r"Exiting @ tick \d+ because")),
+    ]
+
+    gem5_verify_config(
+        name="m_profile_freertos_icsr",
+        verifiers=verifiers,
+        fixtures=(),
+        config=joinpath(
+            config.base_dir,
+            "tests",
+            "gem5",
+            "m_profile_tests",
+            "configs",
+            "run_m4_test.py",
+        ),
+        config_args=[
+            "--firmware",
+            firmware_path,
+            "--tick-limit",
+            # 2 SysTick periods for tick hook to run + task scheduling.
+            "10000000000",
+        ],
+        valid_isas=(constants.all_compiled_tag,),
+        valid_hosts=constants.supported_hosts,
+        length=constants.quick_tag,
+    )
+
+
+m_profile_freertos_icsr_test()
