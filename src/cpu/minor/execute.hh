@@ -159,6 +159,9 @@ class Execute : public Named
      *  issueHeldUntil)?  Decided once for each instruction */
     bool halfwordWideMemHolds(const MinorDynInstPtr &inst);
 
+    /** Is inst held by a busy FU's busyHoldMask and busyHoldMatch? */
+    bool heldByBusyFU(const MinorDynInstPtr &inst) const;
+
     /** Under halfwordWideMemCycles, note an instruction issued */
     void halfwordWideMemIssued(const MinorDynInstPtr &inst);
 

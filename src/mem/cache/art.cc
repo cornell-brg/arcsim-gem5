@@ -838,6 +838,17 @@ ART::recvTimingResp(PacketPtr pkt)
                 dynamic_cast<ARTTranslateState *>(
                     pkt->popSenderState());
             if (state) {
+                // With prefetch on, the line just read becomes the
+                // current line, so the CPU's next reads from it are
+                // served there instead of reading the line again.
+                if (enablePrefetch && pkt->getSize() == pfBlkSize) {
+                    currentBuffer.storeData(pkt->getAddr(),
+                                            pkt->getConstPtr<uint8_t>());
+                    DPRINTF(ARTCache,
+                            "recvTimingResp: bypass line addr=%s kept "
+                            "as the current line\n",
+                            addrToString(pkt->getAddr()));
+                }
                 PacketPtr cpuPkt = state->cpuPkt;
                 cpuPkt->setData(getSubBlockData(pkt, cpuPkt));
                 cpuPkt->makeTimingResponse();
