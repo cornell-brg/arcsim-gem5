@@ -449,6 +449,44 @@ def _add_second_m33(board, core, scs):
     board.workload.secondary_launch = CORE1_LAUNCH_SYMBOL
 
 
+def _hazard3_pipeline(core):
+    """Minor's pipeline shaped as Hazard3's (deps/hazard3/hdl): F, D, X, M,
+    W, one instruction at a time."""
+    # Single issue: decode (hazard3_decode.v) hands X one instruction a
+    # cycle, and X (hazard3_core.v) executes one a cycle, 16-bit or 32-bit.
+    core.decodeInputWidth = 1
+    core.executeInputWidth = 1
+    core.executeIssueLimit = 1
+    # A load or store finishes in M while the next instruction is in X:
+    # Minor completes both in the same cycle (issue still bounds it to one
+    # instruction a cycle).
+    core.executeCommitLimit = 2
+    # A load or store puts its address on the bus in X and gets its data in
+    # M, the next cycle (hazard3_core.v: bus_aph_req_d in X, bus_dph_* in
+    # M): a load that is not held by the bus takes one cycle.
+    core.executeLoadAccessAtIssue = True
+    # The load's data arrives in M: an instruction right after it that
+    # reads the loaded register stalls a cycle in X, unless it only stores
+    # that register, whose data is bypassed in M (hazard3_core.v:
+    # x_stall_on_raw).
+    from m5.objects import (
+        MinorDefaultFloatSimdFU, MinorDefaultIntDivFU, MinorDefaultIntFU,
+        MinorDefaultIntMulFU, MinorDefaultMemFU, MinorDefaultMiscFU,
+        MinorDefaultPredFU, MinorFUPool, MinorFUTiming, minorMakeOpClassSet)
+    mem_fu = MinorDefaultMemFU(timings=[
+        # srcRegs: rs1 (address) in X, rs2 (data) a cycle later in M.
+        MinorFUTiming(description="Hazard3Store", srcRegsRelativeLats=[1, 2],
+                      opClasses=minorMakeOpClassSet(["MemWrite"])),
+        MinorFUTiming(description="Hazard3Load", srcRegsRelativeLats=[1],
+                      resultUsePenalty=1),
+    ])
+    # Otherwise Minor's default FU pool (MinorDefaultFUPool).
+    core.executeFuncUnits = MinorFUPool(funcUnits=[
+        MinorDefaultIntFU(), MinorDefaultIntFU(), MinorDefaultIntMulFU(),
+        MinorDefaultIntDivFU(), MinorDefaultFloatSimdFU(),
+        MinorDefaultPredFU(), mem_fu, MinorDefaultMiscFU()])
+
+
 def _hazard3_cpu(board, n, kind, accessible, switched_out=False):
     """Core n's CPU, a Hazard3 core of the kind given (atomic or minor), on
     core n's interrupt controller (board.xh3irq, xh3irq1, ...) and the
@@ -488,6 +526,8 @@ def _hazard3_cpu(board, n, kind, accessible, switched_out=False):
     # faults, as rtl-sim's bus errors are; the core raises them before the
     # access leaves it, so they are precise.
     core.mmu.pma_checker.accessible = accessible
+    if kind == "minor":
+        _hazard3_pipeline(core)
     core.createThreads()
     core.createInterruptController()
     return core

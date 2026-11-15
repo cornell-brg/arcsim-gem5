@@ -138,3 +138,63 @@ gem5 ~37).
 
 Open issues: none new. Not covered by a test: that FMA / flw / fmv trap under Zfinx (follows
 from FS Off through updateFPUStatus, as for gem5's F with FS Off).
+
+## Item 2 (it02): single issue and load timing, 2026-11-14
+
+Ranked list proposed (after it01): 1. branch prediction (single-entry BTB) and taken-branch
+penalty; 2. execute latencies (ALU, mul, div, FPU); 3. measurement / CSR-read overhead; 4.
+load-use and load/store hazards. Selected: **1**. While analysing it, Minor's default dual issue
+turned out to hide the branch penalty (nop16_64: RTL 70, gem5 46 cycles), and single issue alone
+made every load take 2 cycles (mem 6 % -> 55 % in an unrecorded wip run). The designer split the
+item: **single issue and load timing first (it02)**, branches and the BTB next.
+
+What changed (`configs/example/rp2350/board.py`, new `_hazard3_pipeline`, applied to every
+Hazard3 Minor core in `_hazard3_cpu`; board-only, no Minor or ARM change):
+
+- Single issue: `decodeInputWidth`, `executeInputWidth`, `executeIssueLimit` = 1 (were 2), as
+  Hazard3's decode hands X one instruction a cycle. `executeCommitLimit` stays 2: a load/store
+  finishing in M and the next instruction in X complete in the same cycle (1 made every store or
+  load burst cost an extra cycle: mx_alu_store_b4_q 420 -> 520, RTL 413).
+- Loads go to the bus in their issue cycle (`executeLoadAccessAtIssue`), as Hazard3's address
+  phase in X and data phase in M.
+- Load-use stall: the memory FU's timings (otherwise Minor's default FU pool): a load has
+  `resultUsePenalty=1`, a store reads rs1 at issue and rs2 a cycle later
+  (`srcRegsRelativeLats=[1, 2]`), as `hazard3_core.v` `x_stall_on_raw` (stall on a load's rd, not
+  for a store's data).
+- Tried and dropped: fetch1LineWidth 4 (Hazard3 fetches one 32-bit word a cycle). Minor's
+  two-stage fetch then issues a 4-byte fetch only every other cycle (fetch1 waits for the line to
+  be processed; fetch1FetchLimit 2 or 4 does not help), doubling every body. Fetch stays at the
+  board's 8-byte line; the frontend's shape belongs to the branch/frontend item.
+
+Tests (gem5): identical to it01 in both configs, test by test and check by check, except
+test_xip_timing case_2_miss now measures 116 cycles (was 117; still FAILED, expected 112).
+
+Microbenchmarks:
+
+| config | it00 | it01 | it02 |
+|---|---|---|---|
+| single-core | 25.11 % | 25.11 % | **24.34 %** (491, 204 within 5 %) |
+| single-core-zfinx-fpu | refused | 28.64 % | **28.03 %** (558, 203 within 5 %) |
+
+single-core per family, it01 -> it02 (mean |err| %): empty 134.00 -> 134.00, nop16 41.15 ->
+42.76, nop32 45.69 -> 45.69, alu 17.28 -> 15.56, branch 46.77 -> 53.50, fetch 41.04 -> 41.36,
+operand 5.98 -> 6.99, mem 5.93 -> 6.44, mix 1.99 -> 1.91, result_delay 37.41 -> 35.35, irwin_alu
+35.11 -> 35.67, irwin_control 69.48 -> 73.53, **cache 29.89 -> 2.57**, xip_miss 17.03 -> 17.35,
+kern 11.61 -> 16.53, dma 16.74 -> 15.32, **rand_asm 26.97 -> 20.36**, rand_fact 7.16 -> 7.85.
+single-core-zfinx-fpu (it02): fp_ops 74.12, fp_delay 37.81, fp_busy 28.22, fp_cvt 33.78; the
+other families as single-core within ~0.5 points.
+
+- Better: bodies gem5 ran ~2x too fast with dual issue now fit: cache cap_64..cap_1024,
+  icache_miss, prefetch -45..-50 % -> 0.3..4.7 %; alu16_rand -45.9 -> +1.7 %, fetch_nop16_128/256
+  -42..-46 -> +3..5 %; br_back_64 -45 -> +4.7 %; result_delay load_store +52.9 -> +11.9 %.
+  Straight-line slopes now match the RTL: nop16/nop32 1 cycle each, independent loads 1,
+  dependent loads 2 (mem load_dep 108 vs 115); what is left there is the constant +7..8 cycles of
+  measurement overhead.
+- Worse: what dual issue used to hide. Short nop bodies whose overhead was compensated
+  (nop16_16 0 -> +31.8 %); branches (br_nottaken +51 -> +100 %, br_back_4 +1.8 -> +50.9 %,
+  bp_alternating +46 -> +73 %, cf_loop_body4_* +5..10 -> +46..55 %) - the next item; multiply
+  latency (rand_fact rf_mem_v16_* 1.7 -> 13.4 %: a mulh every 16 instructions, Minor's IntMul
+  opLat 3 against Hazard3's fast multiplier) - the execute-latency item; kern_tree_sram +46 -> +54 %.
+- instret: unchanged (alu/dmb and the six dma bodies, as it00).
+
+Open issues: none new.
