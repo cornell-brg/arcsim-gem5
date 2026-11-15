@@ -58,6 +58,8 @@ Pipeline::Pipeline(MinorCPU &cpu_, const BaseMinorCPUParams &params) :
     Ticked(cpu_, &(cpu_.BaseCPU::baseStats.numCycles)),
     cpu(cpu_),
     allow_idling(params.enableIdling),
+    fetchToDecodeSameCycle(params.singleFetchStage &&
+        params.fetchToDecodeSameCycle),
     f1ToF2(cpu.name() + ".f1ToF2", "lines",
         params.fetch1ToFetch2ForwardDelay),
     f2ToF1(cpu.name() + ".f2ToF1", "prediction",
@@ -115,8 +117,13 @@ Pipeline::Pipeline(MinorCPU &cpu_, const BaseMinorCPUParams &params) :
     execute = new Execute(cpu.name() + ".execute", cpu, params,
         dToE.output(), eToF1.input());
 
+    /* With fetchToDecodeSameCycle, Decode reads the latch's input wire,
+     *  written by the fetch stage earlier in the same cycle (evaluate) */
     decode = new Decode(cpu.name() + ".decode", cpu, *execute, params,
-        f2ToD.output(), dToE.input(), execute->inputBuffer);
+        fetchToDecodeSameCycle ?
+            Latch<ForwardInstData>::Output(f2ToD.input().inputWire) :
+            f2ToD.output(),
+        dToE.input(), execute->inputBuffer);
 
     if (params.singleFetchStage) {
         auto *ssf2 = new SingleStageFetch2(cpu.name() + ".fetch2", cpu,
@@ -169,9 +176,12 @@ Pipeline::evaluate()
      *  'immediate', 0-time-offset TimeBuffer activity to be visible from
      *  later stages to earlier ones in the same cycle */
     execute->evaluate();
-    decode->evaluate();
+    if (!fetchToDecodeSameCycle)
+        decode->evaluate();
     fetch2->evaluate();
     fetch1->evaluate();
+    if (fetchToDecodeSameCycle)
+        decode->evaluate();
 
     if (debug::MinorTrace)
         minorTrace();

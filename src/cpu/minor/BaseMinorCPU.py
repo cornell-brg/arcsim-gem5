@@ -394,6 +394,30 @@ class BaseMinorCPU(BaseCPU):
         " cycle, when every older instruction has been issued and none"
         " still has that register to write",
     )
+    fetchUncondDirectTaken = Param.Bool(
+        True,
+        "With singleFetchStage and dynamic prediction: an unconditional"
+        " direct branch the predictor does not take is taken in fetch"
+        " anyway, its target known from the instruction; otherwise it is"
+        " left to Execute, as on cores that resolve jumps in execute",
+    )
+    fetchPredictInRedirectWord = Param.Bool(
+        True,
+        "With singleFetchStage and dynamic prediction: a branch that starts"
+        " in the 4-byte word a stream change from Execute goes to is"
+        " predicted as any other; otherwise it is never predicted taken, as"
+        " on cores whose predictor looks at the fetch address that runs"
+        " ahead of a redirect, which starts one word beyond its target",
+    )
+    fetchToDecodeSameCycle = Param.Bool(
+        False,
+        "With singleFetchStage: Decode takes what the fetch stage hands on"
+        " in the same cycle rather than fetch2ToDecodeForwardDelay later,"
+        " as on cores that decode an instruction in the cycle its fetch"
+        " data arrives (the fetch stage's cycle being the bus address"
+        " phase): a taken branch's target reaches Execute two cycles after"
+        " the branch rather than three",
+    )
     fetchFoldMasks = VectorParam.UInt64(
         [],
         "With fetchFoldMatches and fetchFoldKinds: instructions that take"

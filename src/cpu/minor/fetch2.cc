@@ -877,6 +877,9 @@ SingleStageFetch2::SingleStageFetch2(const std::string &name,
     branchTargetAtDecode(params.fetchBranchTargetAtDecode),
     branchSpeculation(params.fetchBranchSpeculation),
     registerTargetAtDecode(params.fetchRegisterTargetAtDecode),
+    uncondDirectTaken(params.fetchUncondDirectTaken),
+    predictInRedirectWord(params.fetchPredictInRedirectWord),
+    haveRedirectWord(false), redirectWord(0), redirectStreamSeqNum(0),
     decodedBranchTid(InvalidThreadID)
 {
 }
@@ -946,6 +949,20 @@ SingleStageFetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
      * forces predTaken = false (NoTarget fallback, bpred_unit.cc:316). */
     Fetch2::predictBranch(inst, branch);
 
+    /* No prediction for a branch in the word Execute's last stream change
+     *  went to: the prediction is taken back, and Execute takes the branch
+     *  as an unpredicted one */
+    if (!predictInRedirectWord && inst->predictedTaken && haveRedirectWord &&
+        inst->id.streamSeqNum == redirectStreamSeqNum &&
+        (inst->pc->instAddr() & ~Addr(3)) == redirectWord)
+    {
+        DPRINTF(Fetch, "SF2: no prediction in the redirect word for"
+            " pc=%#x\n", inst->pc->instAddr());
+        inst->predictedTaken = false;
+        branch = BranchData::bubble();
+        fetchInfo[inst->id.threadId].predictionSeqNum--;
+    }
+
     /* Log prediction result for every branch instruction */
     if (inst->triedToPredict) {
         DPRINTF(Fetch, "SF2: predict pc=%#x [%s] direct=%d uncond=%d "
@@ -958,7 +975,8 @@ SingleStageFetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
             inst->predictedTaken);
     }
 
-    if (inst->triedToPredict && !inst->predictedTaken &&
+    if (uncondDirectTaken &&
+        inst->triedToPredict && !inst->predictedTaken &&
         inst->staticInst->isDirectCtrl() &&
         inst->staticInst->isUncondCtrl()) {
         ThreadID tid = inst->id.threadId;
@@ -990,6 +1008,11 @@ SingleStageFetch2::reactToExecuteBranch(const BranchData &executeBranch)
 
     /* React to the SAME-CYCLE execute branch for input buffer management */
     if (executeBranch.isStreamChange()) {
+        if (executeBranch.target) {
+            haveRedirectWord = true;
+            redirectWord = executeBranch.target->instAddr() & ~Addr(3);
+            redirectStreamSeqNum = executeBranch.newStreamSeqNum;
+        }
         dumpAllInput(executeBranch.threadId);
         fetchInfo[executeBranch.threadId].havePC = false;
         /* Reset prediction tracking to match the execute redirect.

@@ -280,6 +280,18 @@ class SingleStageFetch2 : public Fetch2
     /** See fetchRegisterTargetAtDecode in BaseMinorCPU.py */
     bool registerTargetAtDecode;
 
+    /** See fetchUncondDirectTaken in BaseMinorCPU.py */
+    bool uncondDirectTaken;
+
+    /** See fetchPredictInRedirectWord in BaseMinorCPU.py */
+    bool predictInRedirectWord;
+
+    /** The word and stream of the last stream change from Execute, for
+     *  !predictInRedirectWord */
+    bool haveRedirectWord;
+    Addr redirectWord;
+    InstSeqNum redirectStreamSeqNum;
+
   public:
     /** The oldest unconditional branch decoded in this stream, which
      *  ends the stream's sequential fetches; null if none */

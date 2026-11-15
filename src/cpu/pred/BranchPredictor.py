@@ -262,6 +262,28 @@ class BranchPredictor(SimObject):
     )
 
 
+class Hazard3BTB(BranchTargetBuffer):
+    """Hazard3's single-entry BTB (BRANCH_PREDICTOR = 1): the last taken
+    backward conditional branch and its target."""
+
+    type = "Hazard3BTB"
+    cxx_class = "gem5::branch_prediction::Hazard3BTB"
+    cxx_header = "cpu/pred/hazard3_bp.hh"
+
+
+class Hazard3BP(ConditionalPredictor):
+    """Hazard3's prediction: a conditional branch is taken exactly when it
+    hits the Hazard3BTB, which it clears when such a branch falls
+    through. Use with that BTB as the BranchPredictor's btb, and no RAS
+    or indirect predictor."""
+
+    type = "Hazard3BP"
+    cxx_class = "gem5::branch_prediction::Hazard3BP"
+    cxx_header = "cpu/pred/hazard3_bp.hh"
+
+    btb = Param.Hazard3BTB("The BranchPredictor's BTB")
+
+
 class LocalBP(ConditionalPredictor):
     type = "LocalBP"
     cxx_class = "gem5::branch_prediction::LocalBP"

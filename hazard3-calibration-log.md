@@ -198,3 +198,89 @@ other families as single-core within ~0.5 points.
 - instret: unchanged (alu/dmb and the six dma bodies, as it00).
 
 Open issues: none new.
+
+## Item 3 (it03): frontend and branch prediction, 2026-11-14
+
+Ranked list proposed (after it02): 1. frontend and branches (single-entry BTB, taken-branch
+penalty, 32-bit fetch); 2. execute latencies (mul, div, FPU); 3. measurement overhead; 4. Zcmp
+push/pop and multi-word load/store. Selected: **1**.
+
+The RTL's behaviour, from the bodies and rtl-sim's waveform (fetch br_back_0, branch bp_align):
+
+- A taken branch or jump not predicted is resolved in X and costs 1 cycle: its target's address
+  phase is in the same cycle (`jump_target_vld`), the data is decoded in the cycle it arrives
+  (`fetch_data = mem_data`), X the cycle after (cbz_taken, direct_forward16/32, jump_indirect,
+  call_*: one cycle more than the instructions). A not-taken branch costs nothing.
+- The BTB (`have_btb`, one entry) is set by a taken backward conditional branch that was not
+  predicted (`x_btb_set`), cleared by a predicted branch that falls through, fence.i or a trap
+  (`x_btb_clear`), and compared with `fetch_addr` (`btb_match_word`): a predicted branch costs
+  nothing. After a jump from X, `fetch_addr` already points one word beyond the target
+  (`jump_target_post_increment`), so a branch in the jump target's word is never predicted:
+  br_back_0's 2-instruction loop in one word takes 3 cycles an iteration (xjmp every iteration in
+  the waveform), br_fwd_N's backward branch in the forward branch's target word costs +1.
+- JAL/JALR are never predicted (no RAS).
+
+What changed:
+
+- New predictor (`src/cpu/pred/hazard3_bp.{hh,cc}`, `BranchPredictor.py`, `SConscript`):
+  `Hazard3BTB`, the single entry (set only by taken backward conditional branches), and
+  `Hazard3BP`, the conditional predictor (taken, so that BPredUnit takes a branch exactly on a BTB
+  hit; clears the entry when a predicted branch falls through). Board: `BranchPredictor(btb,
+  Hazard3BP(btb), ras=NULL, indirectBranchPred=NULL)`. Not modelled: the clear on fence.i and
+  traps.
+- Minor, three new parameters, each defaulting to the old behaviour (ARM models unchanged):
+  - `fetchUncondDirectTaken` (True; `fetch2.cc`): single-stage fetch took every unconditional
+    direct jump in fetch; False leaves it to Execute.
+  - `fetchToDecodeSameCycle` (False; `pipeline.cc`): Decode reads the fetch stage's output in
+    the same cycle (the latch's input wire, Decode evaluated after fetch), as Hazard3 decodes
+    fetch data in the cycle it arrives. Without it Minor has one stage too many: a taken branch
+    cost 2 cycles instead of 1.
+  - `fetchPredictInRedirectWord` (True; `fetch2.cc`): False takes back a prediction for a
+    branch in the 4-byte word an Execute stream change went to.
+- Board (`_hazard3_pipeline`): `singleFetchStage`, 4-byte fetch (`fetch1LineWidth` /
+  `fetch1LineSnapWidth` 4), `fetch1FetchLimit` 2 (pending_fetches), `fetchReadAheadLimit` 8
+  (the 2-word FIFO), `executeBranchAtIssue`, the three parameters above, and a 1-cycle IntFU
+  (opLat 1, srcRegsRelativeLats [1]): Minor's default 3-cycle IntFU resolved branches 3 cycles
+  after issue. The 1-cycle IntFU also gives an ALU instruction reading a load result the
+  RTL's 1-cycle stall, which it02 missed.
+
+Tests (gem5): pass/fail identical to it02 in both configs, check by check; only the measured
+values in already-failing checks changed: test_xip_timing case_1_hit 7 -> 4 cycles (expected 2),
+case_2_miss 116 -> 113 (expected 112); test_xip_ctrl case_2 hit 228 -> 296 (expected 0; 4-byte
+fetches count more cache hits).
+
+Microbenchmarks:
+
+| config | it00 | it01 | it02 | it03 |
+|---|---|---|---|---|
+| single-core | 25.11 % | 25.11 % | 24.34 % | **9.62 %** (491, 295 within 5 %) |
+| single-core-zfinx-fpu | refused | 28.64 % | 28.03 % | **14.62 %** (558, 302 within 5 %) |
+
+single-core per family, it02 -> it03 (mean |err| %): empty 134.00 -> 33.33, nop16 42.76 ->
+11.42, nop32 45.69 -> 11.42, alu 15.56 -> 12.88, **branch 53.50 -> 2.29**, **fetch 41.36 ->
+7.04**, operand 6.99 -> 2.62, mem 6.44 -> 2.08, mix 1.91 -> 1.87, result_delay 35.35 -> 28.99,
+irwin_alu 35.67 -> 24.11, **irwin_control 73.53 -> 4.70**, cache 2.57 -> 0.07, xip_miss 17.35 ->
+3.19, kern 16.53 -> 2.58, dma 15.32 -> 6.71, rand_asm 20.36 -> 12.81, rand_fact 7.85 -> 10.26.
+single-core-zfinx-fpu (it03): fp_ops 71.87, fp_delay 38.89, fp_busy 20.94, fp_cvt 29.73; the
+other families as single-core within ~0.6 points.
+
+- Measurement overhead: +7..8 -> +2 cycles a body (empty 6 -> 8, RTL 6).
+- Better: 359 bodies by more than a point; unpredicted taken branches and jumps, calls, loops
+  now within the +2 cycles of overhead (cbz_taken_100 +0.65 %, jump_indirect_100 +0.40 %,
+  br_back_N, bp_long_body +0.2 %).
+- Worse (62 bodies by more than a point): the multiplier. With a 1-cycle ALU, Minor's 3-cycle
+  IntMul shows (a mulh followed by an ALU op writing its register): rand_fact rf_alu_v4_* and
+  rf_uniform_v4_* +2 -> +28..30 %, result_delay mul_use +14 -> +65 %, mul_chain, mx_alu_mul_b4_r
+  +18 %, fetch_interleave_mul +35 %; result_delay bytes_load_word +42 -> +75 %. For the
+  execute-latency item.
+- instret: unchanged (alu/dmb and the six dma bodies).
+
+Open issues:
+
+- fetch/br_fwd_0 -38 %: a taken branch to the next instruction. Hazard3 redirects (+1, and the
+  backward branch then lands in the redirect word); gem5's PC after the branch is the same
+  either way, so Minor sees no branch.
+- branch/bp_align +14 % (loop C, a 32-bit instruction across a word boundary then the branch: RTL
+  2 cycles an iteration, gem5 3). The RTL's BTB redirects fetch when it fetches the branch's word;
+  Minor predicts when it decodes the branch, a cycle later here because decode trails fetch.
+- BTB clear on fence.i and trap entry not modelled.

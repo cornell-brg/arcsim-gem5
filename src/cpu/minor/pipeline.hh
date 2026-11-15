@@ -77,6 +77,9 @@ class Pipeline : public Ticked
     /** Allow cycles to be skipped when the pipeline is idle */
     bool allow_idling;
 
+    /** See fetchToDecodeSameCycle in BaseMinorCPU.py */
+    bool fetchToDecodeSameCycle;
+
     Latch<ForwardLineData> f1ToF2;
     Latch<BranchData> f2ToF1;
     Latch<ForwardInstData> f2ToD;

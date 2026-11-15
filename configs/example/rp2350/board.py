@@ -452,6 +452,28 @@ def _add_second_m33(board, core, scs):
 def _hazard3_pipeline(core):
     """Minor's pipeline shaped as Hazard3's (deps/hazard3/hdl): F, D, X, M,
     W, one instruction at a time."""
+    # Frontend (hazard3_frontend.v): F puts one word-aligned 32-bit fetch
+    # on the bus a cycle (W_DATA = 32), with up to 2 in flight
+    # (pending_fetches) and a 2-word FIFO; 16-bit instructions are taken
+    # from that word. The fetch data is decoded in the cycle it arrives
+    # (fetch_data = mem_data when the FIFO is empty) and the instruction
+    # executes in X the cycle after: a taken branch or jump, resolved in X,
+    # has its target's address phase in the same cycle (jump_target_vld)
+    # and its target in X two cycles later, a 1-cycle penalty.
+    core.singleFetchStage = True
+    core.fetch1LineWidth = 4
+    core.fetch1LineSnapWidth = 4
+    core.fetch1FetchLimit = 2
+    core.fetchReadAheadLimit = 8
+    core.fetchToDecodeSameCycle = True
+    core.executeBranchAtIssue = True
+    # Jumps are not predicted: JAL and JALR are taken in X like any other
+    # branch (BRANCH_PREDICTOR predicts backward conditional branches only).
+    core.fetchUncondDirectTaken = False
+    # The BTB is compared with fetch_addr, which after a jump from X already
+    # points one word beyond the target (jump_target_post_increment): a
+    # branch in the jump target's word is never predicted.
+    core.fetchPredictInRedirectWord = False
     # Single issue: decode (hazard3_decode.v) hands X one instruction a
     # cycle, and X (hazard3_core.v) executes one a cycle, 16-bit or 32-bit.
     core.decodeInputWidth = 1
@@ -480,11 +502,25 @@ def _hazard3_pipeline(core):
         MinorFUTiming(description="Hazard3Load", srcRegsRelativeLats=[1],
                       resultUsePenalty=1),
     ])
+    # X's ALU and branch compare (FAST_BRANCHCMP) take one cycle, and a
+    # branch is resolved in X (hazard3_core.v x_jump_req).
+    int_fu = MinorDefaultIntFU(opLat=1, timings=[
+        MinorFUTiming(description="Hazard3Int", srcRegsRelativeLats=[1])])
     # Otherwise Minor's default FU pool (MinorDefaultFUPool).
     core.executeFuncUnits = MinorFUPool(funcUnits=[
-        MinorDefaultIntFU(), MinorDefaultIntFU(), MinorDefaultIntMulFU(),
+        int_fu, MinorDefaultIntMulFU(),
         MinorDefaultIntDivFU(), MinorDefaultFloatSimdFU(),
         MinorDefaultPredFU(), mem_fu, MinorDefaultMiscFU()])
+    # Branch prediction (BRANCH_PREDICTOR = 1): one BTB entry, the last
+    # taken backward conditional branch, predicted taken when fetched; no
+    # return address stack and nothing else predicted (hazard3_frontend.v
+    # have_btb, hazard3_core.v x_btb_set, x_btb_clear).
+    from m5.objects import BranchPredictor, Hazard3BP, Hazard3BTB
+    from m5.params import NULL
+    btb = Hazard3BTB()
+    core.branchPred = BranchPredictor(
+        btb=btb, conditionalBranchPred=Hazard3BP(btb=btb), ras=NULL,
+        indirectBranchPred=NULL)
 
 
 def _hazard3_cpu(board, n, kind, accessible, switched_out=False):
