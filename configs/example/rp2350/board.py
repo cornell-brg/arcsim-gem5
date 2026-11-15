@@ -474,6 +474,18 @@ def _hazard3_pipeline(core):
     # points one word beyond the target (jump_target_post_increment): a
     # branch in the jump target's word is never predicted.
     core.fetchPredictInRedirectWord = False
+    # Only a jump from X or a trap redirects the frontend (hazard3_core.v
+    # f_jump_req = x_jump_req || m_trap_enter_vld), and FENCE.I (refetch):
+    # a CSR access does not, so gem5's SerializeAfter CSR instructions do
+    # not restart the stream (FENCE.I, WFI are SquashAfter and still do).
+    core.executeSerializeAfterRefetches = False
+    # What waits in front of X: the one instruction in D (the CIR), and
+    # behind it the fetch FIFO's two words (fetchReadAheadLimit). Fetch
+    # stops when they are full (fetch_stall), so a stall in X (a divide, an
+    # FP op) does not let it run further ahead, into words a jump then
+    # throws away.
+    core.decodeInputBufferSize = 1
+    core.executeInputBufferSize = 1
     # Single issue: decode (hazard3_decode.v) hands X one instruction a
     # cycle, and X (hazard3_core.v) executes one a cycle, 16-bit or 32-bit.
     core.decodeInputWidth = 1

@@ -623,6 +623,13 @@ class BaseMinorCPU(BaseCPU):
         " instruction writes, and the branch with it",
     )
 
+    executeSerializeAfterRefetches = Param.Bool(
+        True,
+        "A SerializeAfter instruction restarts the stream after it (the"
+        " instructions behind it fetched again), as a SquashAfter one does;"
+        " otherwise only SquashAfter does, as on cores where an instruction"
+        " such as a CSR access does not flush the frontend",
+    )
     executeFreeUpdateMicroops = Param.Bool(
         False,
         "A micro-op after its macro-op's first that only does integer"

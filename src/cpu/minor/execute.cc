@@ -79,6 +79,7 @@ Execute::Execute(const std::string &name_, MinorCPU &cpu_,
       setTraceTimeOnIssue(params.executeSetTraceTimeOnIssue),
       allowEarlyMemIssue(params.executeAllowEarlyMemoryIssue),
       branchAtIssue(params.executeBranchAtIssue),
+      serializeAfterRefetches(params.executeSerializeAfterRefetches),
       loadAccessAtIssue(params.executeLoadAccessAtIssue),
       alignedTransfers(params.executeAlignedTransfers),
       halfwordWideMemCycles(params.executeHalfwordWideMemCycles),
@@ -239,7 +240,7 @@ Execute::tryToBranch(MinorDynInstPtr inst, Fault fault, BranchData &branch)
     bool force_branch = thread->status() != ThreadContext::Suspended &&
         !inst->isFault() &&
         inst->isLastOpInInst() &&
-        (inst->staticInst->isSerializeAfter() ||
+        ((serializeAfterRefetches && inst->staticInst->isSerializeAfter()) ||
          inst->staticInst->isSquashAfter());
 
     DPRINTF(Branch, "tryToBranch before: %s after: %s%s\n",

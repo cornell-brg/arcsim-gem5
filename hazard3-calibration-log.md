@@ -423,3 +423,67 @@ Open issues:
   frames` (it imported the skill's analyze.py, whose main ran); regenerated with `SIMS=rtl
   TARGETS=irwin_control FORCE=1`, the it04 analysis reproduced exactly (irwin_control 6.17 %,
   all 3.62 %).
+
+## Item 6 (it06): frontend fetch traffic, 2026-11-15
+
+Ranked list proposed (after it05): 1. frontend fetch traffic (gem5 ~30 % more XIP accesses than
+the RTL, early-sample XIP misses); 2. measurement overhead (+2 cycles); 3. load/store hazards;
+4. frontend leftovers. Selected: **1**.
+
+The frames' XIP counters (xip_acc a sample, RTL vs gem5 it05) showed two causes:
+
+- +15 accesses in every body, the empty one too (27 vs 42): the ROI open/close sequence's six CSR
+  instructions. gem5 marks RISC-V CSR instructions SerializeAfter, and Minor restarted the
+  stream after each, fetching the words behind it again. Hazard3 redirects its frontend only for
+  a jump from X or a trap (`f_jump_req = x_jump_req || m_trap_enter_vld`), and refetches for
+  FENCE.I (`EXCEPT_REFETCH`); a CSR access does not flush it. The same restart was the +2
+  cycles of measurement overhead in every body.
+- One extra access per divide (udiv_fast_8: 45 vs 37): during a long stall in X, fetch ran up
+  to Minor's decode (3) and execute (7) input buffers ahead, words that the body's return then
+  threw away. Hazard3 holds one instruction in D (the CIR) and the 2-word FIFO, and stops fetching
+  when they are full (`fetch_stall`).
+
+What changed:
+
+- Minor (`execute.{hh,cc}`, `BaseMinorCPU.py`): `executeSerializeAfterRefetches` (default True,
+  the old behaviour): False lets only SquashAfter instructions (FENCE.I, WFI) restart the stream.
+- Board: `executeSerializeAfterRefetches = False`, `decodeInputBufferSize = 1`,
+  `executeInputBufferSize = 1`.
+
+Tests (gem5): as it05 in both configs, except **test_xip_timing case_1_hit and case_2_miss now
+pass** (2 and 112 cycles, as the RTL; they failed since the starting point with 7 and 117), so
+test_xip_timing still fails only in case_3_uncached (the trap at the uncached alias);
+test_xip_ctrl case_2 hit 296 -> 262 (expected 0, as before).
+
+Microbenchmarks:
+
+| config | it00 | it01 | it02 | it03 | it04 | it05 | it06 |
+|---|---|---|---|---|---|---|---|
+| single-core | 25.11 % | 25.11 % | 24.34 % | 9.62 % | 3.62 % | 3.62 % | **1.01 %** (491, 469 within 5 %) |
+| single-core-zfinx-fpu | refused | 28.64 % | 28.03 % | 14.62 % | 9.95 % | 4.36 % | **1.09 %** (558, 542 within 5 %) |
+
+single-core per family, it05 -> it06 (mean |err| %): empty 33.33 -> 0.00, nop16 11.42 -> 0.00,
+nop32 11.42 -> 0.00, alu 2.08 -> 1.46, branch 2.29 -> 1.96, fetch 4.83 -> 1.14, operand 1.75 ->
+0.00, mem 1.96 -> 0.72, mix 0.87 -> 0.65, result_delay 10.29 -> 4.22, irwin_alu 5.33 -> 0.18,
+irwin_control 6.17 -> 0.86, cache 0.07 -> 0.00, xip_miss 3.19 -> 3.01, kern 3.14 -> 2.27, dma
+19.93 -> 7.32, rand_asm 2.58 -> 0.51, rand_fact 1.19 -> 0.82.
+single-core-zfinx-fpu, it05 -> it06: fp_ops 9.91 -> 0.61, fp_delay 12.41 -> 0.46, fp_busy 10.93
+-> 0.63, fp_cvt 11.06 -> 0.42; irwin_control 2.37 (max cf_direct_forward32_9 +116 %), irwin_alu
+0.71 (max umull_16 +30 %).
+
+- The early-sample XIP misses of it04/it05 are gone in single-core and in every fp body; xip_acc
+  a sample now equals the RTL's (nop16_*, udiv_fast_8 37, cf_direct_forward32_* 54, vadd).
+- instret: only alu/dmb differs now (the dma bodies' polling loops match the RTL's).
+- Left: zfinx cf_direct_forward32_9 and umull_16: their last samples equal the RTL (33 cycles,
+  54 accesses; 40), but a run of early samples misses in the XIP cache (161 cycles) before it
+  settles; their access counts match the RTL's, so this is how gem5's XIP cache state evolves
+  over the samples in that config's layout (memory system).
+
+Open issues:
+
+- XIP cache state over the early samples (zfinx cf_direct_forward32_9, umull_16; dma setup /
+  words_1 / words_16 +17..36 %): memory system, for the designer.
+- result_delay jump_next -45 % and fetch br_fwd_0 -39 %: taken branch to the next instruction.
+- branch bp_align +14 %: fetch-time BTB redirect.
+- result_delay bytes_load_word: word load after byte stores (store buffer).
+- alu/dmb instret differs (since it00).

@@ -119,6 +119,9 @@ class Execute : public Named
      *  effect in the cycle it issues when nothing older is in flight */
     bool branchAtIssue;
 
+    /** See executeSerializeAfterRefetches in BaseMinorCPU.py */
+    bool serializeAfterRefetches;
+
     /** See executeLoadAccessAtIssue in BaseMinorCPU.py */
     bool loadAccessAtIssue;
 
