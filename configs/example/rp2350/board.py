@@ -474,6 +474,9 @@ def _hazard3_cpu(board, n, kind, accessible, switched_out=False):
         # Hazard3 has Zcmp (cm.push/cm.pop) and no FPU; gem5 decodes Zcmp only
         # with Zcd, whose encodings it reuses, turned off.
         enable_Zcd=False,
+        # arcsim-soc's FPU zfinx (EXTENSION_ZFINX): FP32 on the integer
+        # registers, no F or D; otherwise gem5's F and D
+        enable_Zfinx=board._zfinx,
         # Hazard3's bit extract multiple, which the Pico SDK's float
         # routines use.
         enable_Xh3bextm=True,
@@ -528,12 +531,14 @@ def _add_hazard3_core(board, n, *, cpu, accessible):
 def _make_riscv(firmware, *, xip_miss_ns, sram_latency_ns,
                 scratch_bank_bandwidth, sram_model, dma, xip_model, cpu,
                 hwpe, switch_cpu=None, clock=CLOCK, cores=1,
-                hwpe_timed_in_atomic=False, sram4_7=True):
+                hwpe_timed_in_atomic=False, sram4_7=True, zfinx=False):
     from m5.objects import RiscvSystem
     from m5.objects.RiscvFsWorkload import RiscvBareMetal
     from m5.objects.RiscvSemihosting import RiscvSemihosting
 
     board = RiscvSystem()
+    # Every Hazard3 core of the board (_hazard3_cpu) has Zfinx or F and D
+    board._zfinx = zfinx
     _attach_memory(board, xip_miss_ns=xip_miss_ns,
                    sram_latency_ns=sram_latency_ns,
                    scratch_bank_bandwidth=scratch_bank_bandwidth,
@@ -685,8 +690,10 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     arcsim-soc's configs without an accelerator (XCEL_PRESENT=0); any other
     is refused as not modelled. sram4_7
     False (hazard3-proxy only) leaves SRAM4-7 out (0x20040000-0x2007ffff
-    fault), as arcsim-soc's SRAM4_7_PRESENT=0. zfinx (arcsim-soc's FPU
-    zfinx) is refused as not modelled: gem5's Hazard3 has F and D.
+    fault), as arcsim-soc's SRAM4_7_PRESENT=0. zfinx (hazard3-proxy only)
+    is arcsim-soc's FPU zfinx (EXTENSION_ZFINX): the Hazard3 cores have
+    Zfinx, FP32 on the integer registers, and no F or D; without it they
+    have gem5's F and D.
     switch_cpu ("minor" or "atomic", either proxy) adds board.switch_cpu,
     a core of that kind switched out, for m5.switchCpus. clock is the core
     clock (CLOCK, a Pico 2's default), for firmware built for another.
@@ -723,9 +730,8 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
     if hwpe not in HWPES:
         raise ValueError(f"HWPE {hwpe} is not modelled in gem5 (modelled: "
                          f"{', '.join(HWPES)})")
-    if zfinx:
-        raise ValueError("Zfinx is not modelled in gem5 (gem5's Hazard3 "
-                         "has F and D)")
+    if zfinx and core != "hazard3-proxy":
+        raise ValueError("zfinx is arcsim-soc's FPU, for the hazard3-proxy")
     if not sram4_7 and core != "hazard3-proxy":
         raise ValueError("sram4_7 False is only for the hazard3-proxy")
     if switch_cpu and (core not in ("arm-m4-proxy", "hazard3-proxy") or
@@ -758,5 +764,5 @@ def make_board(core, firmware, *, xip_miss_ns=50, sram_latency_ns=1,
                            switch_cpu=switch_cpu,
                            clock=clock, cores=cores,
                            hwpe_timed_in_atomic=hwpe_timed_in_atomic,
-                           sram4_7=sram4_7)
+                           sram4_7=sram4_7, zfinx=zfinx)
     raise ValueError(f"Unknown RP2350 core selector: {core}")  

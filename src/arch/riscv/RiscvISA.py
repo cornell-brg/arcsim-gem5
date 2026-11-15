@@ -139,6 +139,16 @@ class RiscvISA(BaseISA):
         "Hazard3's h3.block and h3.unblock (Xh3power); None means their "
         "encodings are the plain hints slt x0, x0, x0 and slt x0, x0, x1",
     )
+    enable_Zfinx = Param.Bool(
+        False,
+        "Zfinx: the single-precision FP instructions on the integer "
+        "registers, as Hazard3's EXTENSION_ZFINX (FPnew, FP32 only): fadd, "
+        "fsub, fmul, fdiv, fsqrt, fsgnj*, fmin, fmax, feq, flt, fle, fclass "
+        "and fcvt between .s and .w/.wu, with fflags, frm and fcsr. misa.F "
+        "and misa.D read 0 and mstatus.FS is hardwired to Off, so every "
+        "other FP instruction (FMA, FP loads, stores and moves, D, H) is "
+        "illegal",
+    )
     enable_Xh3bextm = Param.Bool(
         False,
         "Hazard3's bit extract multiple (h3.bextm, h3.bextmi, in custom-0); "

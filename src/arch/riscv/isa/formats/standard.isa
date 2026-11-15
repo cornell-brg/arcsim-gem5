@@ -349,7 +349,11 @@ def template CSRExecute {{
         }
 
         MISA csr_exts = csr_data_it->second.isaExts;
-        if ((csr_exts & misa) != csr_exts) {
+        // Zfinx keeps fflags, frm and fcsr with misa.F clear
+        // (hazard3_csr.v: FFLAGS, FRM, FCSR under EXTENSION_ZFINX)
+        bool zfinx_fcsr = isa->enableZfinx() &&
+            (csr == CSR_FFLAGS || csr == CSR_FRM || csr == CSR_FCSR);
+        if ((csr_exts & misa) != csr_exts && !zfinx_fcsr) {
             return std::make_shared<IllegalInstFault>(
                     csprintf("%s is not support in the isa spec %d\n",
                              csrName),

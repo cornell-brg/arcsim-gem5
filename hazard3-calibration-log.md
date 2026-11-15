@@ -78,3 +78,63 @@ dma/words_16, dma/words_256, dma/halves_256, dma/bytes_256, dma/workspace_256.
 
 - test_xip_timing case_1_hit measures a cached load at 7 cycles on gem5 against 2 in the RTL:
   partly core-side load timing (to look at in calibration), partly the memory system.
+
+## Item 1 (it01): Zfinx support, 2026-11-14
+
+Ranked list proposed (after it00): 1. Zfinx support (functional); 2. execute latencies (ALU,
+mul, div, FPU) as the RTL's; 3. branch prediction (single-entry BTB) and taken-branch penalty;
+4. measurement / CSR-read overhead (+6..8 cycles a body); 5. load-use and load/store hazards.
+Selected: **1**.
+
+What changed, and the RTL it models (`hazard3_decode.v:534-551`, `hazard3_csr.v`,
+`rtl/fpu/hazard3_fpu.sv`, EXTENSION_ZFINX=1 in `config_single_core_zfinx_fpu.vh`):
+
+- `RiscvISA.enable_Zfinx` (default False; `src/arch/riscv/RiscvISA.py`, `isa.hh/.cc`), passed to
+  the decoder as ExtMachInst bit 59 (`enable_zfinx`, bitfield `ENABLE_ZFINX`; `types.hh`,
+  `decoder.hh/.cc`, `isa/bitfields.isa`).
+- Decoder (`isa/decoder.isa`): OP-FP decodes on `ENABLE_ZFINX`; with it, only Hazard3's FP32
+  subset, on the integer registers (format `ZfinxOp`, `isa/formats/fp.isa`, the softfloat calls
+  of gem5's F, flags accrued to fflags, no mstatus.FS): fadd/fsub/fmul/fdiv/fsqrt.s (rs2=0),
+  fsgnj/fsgnjn/fsgnjx.s, fmin/fmax.s, feq/flt/fle.s, fclass.s (rs2=0), fcvt.w/wu.s and
+  fcvt.s.w/wu. Reserved rm and DYN with frm>4 are illegal (RM_REQUIRED), as
+  `d_fp_rm_rsvd`/`x_fpu_rm_illegal`. Every other OP-FP encoding is illegal. Instruction names
+  carry `_zfinx` (`fadd_s_zfinx`, ...).
+- misa.F and misa.D read 0 and mstatus.FS is hardwired Off (writes to mstatus/misa cannot set
+  them; `isa.cc`), as `MISA_VAL` and mstatus in `hazard3_csr.v`. So FMA, FP loads/stores/moves
+  (incl. c.flw/c.fsw) and D/H trap illegal, through `updateFPUStatus`.
+- fflags, frm and fcsr stay accessible with misa.F clear (`isa/formats/standard.isa`), as
+  `hazard3_csr.v:1146-1157` under EXTENSION_ZFINX.
+- Board (`configs/example/rp2350/board.py`): the Zfinx refusal is gone; `zfinx` (hazard3-proxy
+  only) sets `enable_Zfinx` on every Hazard3 core (`_hazard3_cpu`, via `board._zfinx`).
+  `run.py` prints `FPU=zfinx`; docstrings of `run.py`, `soc_configs.py` updated. Without zfinx
+  the core keeps gem5's F and D (single-core unchanged; test_fp_f still runs there).
+- Timing is not part of this item: the Zfinx instructions keep gem5's F op classes (FloatAdd,
+  FloatMult, FloatDiv, FloatSqrt, FloatCmp, FloatCvt, FloatMisc) on Minor's default FU pool.
+
+Tests (gem5):
+
+- `single-core`: identical to the baseline, test by test and check by check.
+- `single-core-zfinx-fpu`: all 9 tests run; the same four as single-core fail with the same
+  failing cases/checks as single-core's baseline (test_sio 5/7, test_xip_ctrl, test_xip_cache,
+  test_xip_timing); test_interconnect 15/15, test_memory 20/20, test_dma 28/28,
+  test_fp_zfinx 7/7, test_fpu 8/8 pass.
+
+Microbenchmarks:
+
+| config | it00 | it01 |
+|---|---|---|
+| single-core | 25.11 % (491) | 25.11 % (491), every body unchanged |
+| single-core-zfinx-fpu | refused | **28.64 %** (558 bodies, 194 within 5 %) |
+
+single-core-zfinx-fpu per family (it01), mean |err| %: empty 134.00, nop16 41.15, nop32 45.69,
+alu 17.13, branch 46.77, fetch 41.01, operand 5.98, mem 6.41, mix 2.11, result_delay 36.92,
+irwin_alu 35.19, irwin_control 69.30, cache 29.89, xip_miss 16.44, kern 12.37, dma 18.55,
+rand_asm 27.05, rand_fact 7.17, **fp_ops 74.23, fp_delay 36.57, fp_busy 27.36, fp_cvt 29.90**.
+instret: no new DIFFERS (the same alu/dmb and six dma bodies as it00; every fp_* body matches).
+
+Worst FP bodies: fp_ops vdiv_1_3 / vsqrt_hard -90.5 % (388 -> 37), vdiv_hard -90.0 %, and the
+vdiv/vsqrt_bitsN series (248..369 cycles in the RTL, data-dependent: the TH32 divide/sqrt;
+gem5 ~37).
+
+Open issues: none new. Not covered by a test: that FMA / flw / fmv trap under Zfinx (follows
+from FS Off through updateFPUStatus, as for gem5's F with FS Off).

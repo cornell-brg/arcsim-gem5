@@ -2884,7 +2884,8 @@ decode QUADRANT default Unknown::unknown() {
                     Fd_bits = fd.v;
                 }}, FloatMultAccOp);
             }
-            0x14: decode FUNCT7 {
+            0x14: decode ENABLE_ZFINX {
+            0x0: decode FUNCT7 {
                 0x0: fadd_s({{
                     RM_REQUIRED;
                     freg_t fd;
@@ -3767,6 +3768,114 @@ decode QUADRANT default Unknown::unknown() {
                         Fd_bits = fd.v;
                     }}, FloatCvtOp);
                 }
+            }
+            0x1: decode FUNCT7 {
+                // Zfinx (Hazard3's EXTENSION_ZFINX, hazard3_decode.v): FP32
+                // on the integer registers. Only these encodings decode, as
+                // in the RTL; the rest of OP-FP is illegal.
+                format ZfinxOp {
+                    0x0: fadd_s_zfinx({{
+                        RM_REQUIRED;
+                        Rd = sext<32>(f32_add(f32(Rs1_uw), f32(Rs2_uw)).v);
+                    }}, FloatAddOp);
+                    0x4: fsub_s_zfinx({{
+                        RM_REQUIRED;
+                        Rd = sext<32>(f32_sub(f32(Rs1_uw), f32(Rs2_uw)).v);
+                    }}, FloatAddOp);
+                    0x8: fmul_s_zfinx({{
+                        RM_REQUIRED;
+                        Rd = sext<32>(f32_mul(f32(Rs1_uw), f32(Rs2_uw)).v);
+                    }}, FloatMultOp);
+                    0xc: fdiv_s_zfinx({{
+                        RM_REQUIRED;
+                        Rd = sext<32>(f32_div(f32(Rs1_uw), f32(Rs2_uw)).v);
+                    }}, FloatDivOp);
+                    0x10: decode ROUND_MODE {
+                        0x0: fsgnj_s_zfinx({{
+                            Rd = sext<32>(insertBits(Rs1_uw, 31,
+                                                     bits(Rs2_uw, 31)));
+                        }}, FloatMiscOp);
+                        0x1: fsgnjn_s_zfinx({{
+                            Rd = sext<32>(insertBits(Rs1_uw, 31,
+                                                     ~bits(Rs2_uw, 31)));
+                        }}, FloatMiscOp);
+                        0x2: fsgnjx_s_zfinx({{
+                            Rd = sext<32>(insertBits(Rs1_uw, 31,
+                                bits(Rs1_uw ^ Rs2_uw, 31)));
+                        }}, FloatMiscOp);
+                    }
+                    0x14: decode ROUND_MODE {
+                        0x0: fmin_s_zfinx({{
+                            float32_t fs1 = f32(Rs1_uw);
+                            float32_t fs2 = f32(Rs2_uw);
+                            bool less = f32_lt_quiet(fs1, fs2) ||
+                                (f32_eq(fs1, fs2) && bits(fs1.v, 31));
+                            float32_t fd = less || isNaNF32UI(fs2.v) ?
+                                fs1 : fs2;
+                            if (isNaNF32UI(fs1.v) && isNaNF32UI(fs2.v))
+                                fd = f32(defaultNaNF32UI);
+                            Rd = sext<32>(fd.v);
+                        }}, FloatCmpOp);
+                        0x1: fmax_s_zfinx({{
+                            float32_t fs1 = f32(Rs1_uw);
+                            float32_t fs2 = f32(Rs2_uw);
+                            bool greater = f32_lt_quiet(fs2, fs1) ||
+                                (f32_eq(fs2, fs1) && bits(fs2.v, 31));
+                            float32_t fd = greater || isNaNF32UI(fs2.v) ?
+                                fs1 : fs2;
+                            if (isNaNF32UI(fs1.v) && isNaNF32UI(fs2.v))
+                                fd = f32(defaultNaNF32UI);
+                            Rd = sext<32>(fd.v);
+                        }}, FloatCmpOp);
+                    }
+                    0x2c: decode RS2 {
+                        0x0: fsqrt_s_zfinx({{
+                            RM_REQUIRED;
+                            Rd = sext<32>(f32_sqrt(f32(Rs1_uw)).v);
+                        }}, FloatSqrtOp);
+                    }
+                    0x50: decode ROUND_MODE {
+                        0x0: fle_s_zfinx({{
+                            Rd = f32_le(f32(Rs1_uw), f32(Rs2_uw));
+                        }}, FloatCmpOp);
+                        0x1: flt_s_zfinx({{
+                            Rd = f32_lt(f32(Rs1_uw), f32(Rs2_uw));
+                        }}, FloatCmpOp);
+                        0x2: feq_s_zfinx({{
+                            Rd = f32_eq(f32(Rs1_uw), f32(Rs2_uw));
+                        }}, FloatCmpOp);
+                    }
+                    0x60: decode CONV_SGN {
+                        0x0: fcvt_w_s_zfinx({{
+                            RM_REQUIRED;
+                            Rd_sd = sext<32>(f32_to_i32(f32(Rs1_uw), rm,
+                                                        true));
+                        }}, FloatCvtOp);
+                        0x1: fcvt_wu_s_zfinx({{
+                            RM_REQUIRED;
+                            Rd = sext<32>(f32_to_ui32(f32(Rs1_uw), rm,
+                                                      true));
+                        }}, FloatCvtOp);
+                    }
+                    0x68: decode CONV_SGN {
+                        0x0: fcvt_s_w_zfinx({{
+                            RM_REQUIRED;
+                            Rd = sext<32>(i32_to_f32(Rs1_sw).v);
+                        }}, FloatCvtOp);
+                        0x1: fcvt_s_wu_zfinx({{
+                            RM_REQUIRED;
+                            Rd = sext<32>(ui32_to_f32(Rs1_uw).v);
+                        }}, FloatCvtOp);
+                    }
+                    0x70: decode ROUND_MODE {
+                        0x1: decode RS2 {
+                            0x0: fclass_s_zfinx({{
+                                Rd = f32_classify(f32(Rs1_uw));
+                            }}, FloatMiscOp);
+                        }
+                    }
+                }
+            }
             }
         }
 

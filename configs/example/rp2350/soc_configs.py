@@ -5,8 +5,8 @@ and SRAM4-7 from here.
 Each entry: desc (as the .mk's SOC_CONFIG_DESC), cores (N_HARTS), hwpe
 (CONFIG_HWPE; empty is no HWPE and no TCDM, as XCEL_PRESENT=0), zfinx (FPU
 zfinx), sram4_7 (SRAM4_7_PRESENT), and differs: how the gem5 board differs
-from the config on rtl-sim. gem5's Hazard3 has F and D and models neither an
-HWPE nor Zfinx: run.py refuses a config with either.
+from the config on rtl-sim. Without zfinx, gem5's Hazard3 has F and D where
+rtl-sim has no FPU.
 
 Imports nothing from gem5, so it also runs on its own:
   python3 soc_configs.py                  lists the configs

@@ -309,7 +309,7 @@ ISA::ISA(const Params &p) : BaseISA(p, "riscv"),
     _privilegeModeSet(p.privilege_mode_set),
     _wfiResumeOnPending(p.wfi_resume_on_pending), _enableZcd(p.enable_Zcd),
     _enableSmrnmi(p.enable_Smrnmi), _xh3irq(p.xh3irq), _xh3power(p.xh3power),
-    _enableXh3bextm(p.enable_Xh3bextm)
+    _enableXh3bextm(p.enable_Xh3bextm), _enableZfinx(p.enable_Zfinx)
 {
     _regClasses.push_back(&intRegClass);
     _regClasses.push_back(&floatRegClass);
@@ -396,6 +396,14 @@ void ISA::clear()
 
     // mark FS is initial
     status.fs = FPUStatus::INITIAL;
+
+    // Zfinx (Hazard3's EXTENSION_ZFINX): no F or D in misa, and FS
+    // hardwired to Off (hazard3_csr.v: MISA_VAL, mstatus), so the
+    // instructions on the FP registers are illegal
+    if (_enableZfinx) {
+        misa.rvf = misa.rvd = 0;
+        status.fs = FPUStatus::OFF;
+    }
 
     // _rvType dependent init.
     switch (_rvType) {
@@ -955,6 +963,9 @@ ISA::setMiscReg(RegIndex idx, RegVal val)
                 }
                 new_misa.rvs = cur_misa.rvs;
                 new_misa.rvu = cur_misa.rvu;
+                if (_enableZfinx) {
+                    new_misa.rvf = new_misa.rvd = 0;
+                }
                 setMiscRegNoEffect(idx, new_misa);
             }
             break;
@@ -969,6 +980,10 @@ ISA::setMiscReg(RegIndex idx, RegVal val)
                 if (!getEnableRvv()) {
                     // Always OFF is rvv is disabled.
                     val &= ~STATUS_VS_MASK;
+                }
+                if (_enableZfinx) {
+                    // Zfinx: FS hardwired to Off
+                    val &= ~STATUS_FS_MASK;
                 }
                 setMiscRegNoEffect(idx, val);
             }

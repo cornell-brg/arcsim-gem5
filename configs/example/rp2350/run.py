@@ -86,8 +86,8 @@ parser.add_argument("--hwpe-timed-in-atomic", action="store_true",
                     "they take with a timing CPU")
 parser.add_argument("--zfinx", action="store_true", default=None,
                     help="Zfinx on the hazard3-proxy, as arcsim-soc's FPU "
-                    "zfinx: not modelled in gem5, so refused; gem5's Hazard3 "
-                    "has F and D")
+                    "zfinx: FP32 on the integer registers, no F or D "
+                    "(without it, gem5's Hazard3 has F and D)")
 parser.add_argument("--cores", type=int, choices=(1, 2),
                     help="2: on the arm-m4-proxy, the second M33, which starts "
                     "from the firmware's arcsim_core1_launch; on the "
@@ -206,7 +206,7 @@ if args.core == "hazard3-proxy":
         print("HWPE=empty: no HWPE, no TCDM")
     else:
         print(f"HWPE={args.hwpe} at 0x50800000, TCDM=0x60000000+256KiB")
-    print("FPU=f+d")
+    print("FPU=zfinx" if args.zfinx else "FPU=f+d")
 roi_start = None
 roi_number = 0
 exit_code = 0

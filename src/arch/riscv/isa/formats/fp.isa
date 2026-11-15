@@ -62,3 +62,33 @@ def format FPROp(code, *opt_flags) {{
     decode_block = BasicDecode.subst(iop)
     exec_output = FloatExecute.subst(iop)
 }};
+
+// Zfinx: FP32 operations on the integer registers (Hazard3's
+// EXTENSION_ZFINX). As FPROp, the flags accrue to fflags, but there is no
+// mstatus.FS to check or dirty: under Zfinx it is hardwired to Off.
+def template ZfinxExecute {{
+    Fault %(class_name)s::execute(ExecContext *xc,
+        trace::InstRecord *traceData) const
+    {
+        %(op_decl)s;
+        %(op_rd)s;
+
+        std::feclearexcept(FE_ALL_EXCEPT);
+        %(code)s;
+
+        xc->setMiscReg(MISCREG_FFLAGS_EXE, softfloat_exceptionFlags);
+        softfloat_exceptionFlags = 0;
+
+        %(op_wb)s;
+
+        return NoFault;
+    }
+}};
+
+def format ZfinxOp(code, *opt_flags) {{
+    iop = InstObjParams(name, Name, 'RegOp', code, opt_flags)
+    header_output = BasicDeclare.subst(iop)
+    decoder_output = BasicConstructor.subst(iop)
+    decode_block = BasicDecode.subst(iop)
+    exec_output = ZfinxExecute.subst(iop)
+}};
