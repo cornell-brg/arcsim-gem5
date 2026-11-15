@@ -39,6 +39,7 @@ from m5.objects import (
     VoltageDomain,
 )
 from m5.objects.ArmMFsWorkload import ArmMFsWorkload
+from m5.objects.ARTFlash import ARTFlash
 from m5.objects.Cache import ARTCache, NoncoherentCache
 from m5.objects.ReplacementPolicies import LRURP
 from m5.params import AddrRange
@@ -216,7 +217,15 @@ def make_board(
         board.icode_bus.mem_side_ports = board.icode_flash_link.cpu_side_ports
         board.dcode_bus.mem_side_ports = board.dcode_flash_bus.cpu_side_ports
     else:
-        board.flash = SimpleMemory(range=FLASH, latency=latency)
+        # The flash serves one 128-bit read at a time, a read holding it for the wait
+        # states plus one cycle (RM0090 table 11). A data read waits for the read in
+        # progress and goes before a prefetch that has not started; a code miss drops
+        # the prefetch (RM0090 3.5.2).
+        board.flash = ARTFlash(
+            range=FLASH,
+            latency=latency,
+            read_time=f"{flash_latency_ps(caches, clock_mhz, flash_ws + 1)}ps",
+        )
         board.flash.port = board.flash_bus.mem_side_ports
         board.dcode_flash_bus.mem_side_ports = board.flash_bus.cpu_side_ports
         board.art_icache = ARTCache(
@@ -250,7 +259,7 @@ def make_board(
         board.art_icache.cpu_side = board.icode_bus.mem_side_ports
         board.art_icache.mem_side = board.icode_flash_link.cpu_side_ports
         if cache_on:
-            board.art_dcache = NoncoherentCache(
+            dcache = dict(
                 size=f"{8 * LINE}B",
                 assoc=8,  # one set: LRU over all 8 lines
                 tag_latency=0,
@@ -263,8 +272,25 @@ def make_board(
                 sequential_access=False,
                 replacement_policy=LRURP(),
                 addr_ranges=[FLASH],
-                blk_size=LINE,
             )
+            if inst_latency:
+                # At IL the data cache is the accelerator's data side, which shares the
+                # instruction side's flash, one read at a time.
+                board.art_dcache = ARTCache(
+                    **dcache,
+                    cache_blk_size=LINE,
+                    pf_blk_size=LINE,
+                    enable_prefetch=False,
+                    direct_memory_mode=False,
+                    prefetch_on_cache_hit=False,
+                    flash_start_addr=FLASH.start,
+                    flash_end_addr=FLASH.end,
+                    atomic_latency=True,
+                    atomic_line_cycles=flash_ws + 1,
+                    flash_owner=board.art_icache,
+                )
+            else:
+                board.art_dcache = NoncoherentCache(**dcache, blk_size=LINE)
             board.art_dcache.cpu_side = board.dcode_bus.mem_side_ports
             board.art_dcache.mem_side = board.dcode_flash_bus.cpu_side_ports
         else:

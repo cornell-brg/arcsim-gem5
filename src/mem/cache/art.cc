@@ -36,6 +36,7 @@ ART::ART(const ARTCacheParams &p)
           name() + ".staleReturn"),
       atomicLatency(p.atomic_latency),
       atomicLineCycles(p.atomic_line_cycles),
+      flashOwner(p.flash_owner),
       prefetchBuffer(pfBlkSize),
       currentBuffer(pfBlkSize),
       nextPfAddr(0),
@@ -64,6 +65,30 @@ ART::ART(const ARTCacheParams &p)
 // -------------------------------------------------------------------
 
 Tick
+ART::atomicDemandRead(Tick now, Tick read, bool fetch)
+{
+    const bool pf_pending = atomicPfLine != MaxAddr && atomicPfReady > now;
+    Tick ready;
+    if (fetch && pf_pending) {
+        // A fetch miss drops the prefetch, read or not.
+        ready = std::max(now, atomicDemandFree) + read;
+        atomicPfLine = MaxAddr;
+        atomicFlashFree = atomicDemandFree = ready;
+    } else if (!fetch && pf_pending && atomicPfReady - read > now) {
+        // A data read goes before a prefetch that has not started.
+        ready = std::max(now, atomicDemandFree) + read;
+        atomicDemandFree = ready;
+        atomicPfReady = ready + read;
+        atomicFlashFree = atomicPfReady;
+    } else {
+        // Otherwise a read waits for the one in progress.
+        ready = std::max(now, atomicFlashFree) + read;
+        atomicFlashFree = atomicDemandFree = ready;
+    }
+    return ready;
+}
+
+Tick
 ART::recvAtomic(PacketPtr pkt)
 {
     if (!atomicLatency)
@@ -76,6 +101,21 @@ ART::recvAtomic(PacketPtr pkt)
     const Addr line = addr & ~Addr(pfBlkSize - 1);
     const Tick now = curTick();
     const Tick read = clockPeriod() * atomicLineCycles;
+
+    // The data side: one flash with the instruction side. A read missing
+    // this cache waits for the read in progress, goes before a prefetch that
+    // has not started, and holds the flash for a line read.
+    if (flashOwner) {
+        const bool data_hit =
+            tags->findBlock({addr, pkt->isSecure()}) != nullptr;
+        const Tick lat = NoncoherentCache::recvAtomic(pkt);
+        if (data_hit)
+            return lat;
+        const Tick ready = flashOwner->atomicDemandRead(now, read, false);
+        DPRINTF(ARTCache, "atomic data %#x: waits %d cycles for the flash\n",
+                addr, (int)((ready - read - now) / clockPeriod()));
+        return lat + (ready - read - now);
+    }
     const bool cache_on = !directMemoryMode;
     const bool hit =
         cache_on && tags->findBlock({addr, pkt->isSecure()}) != nullptr;
@@ -94,9 +134,8 @@ ART::recvAtomic(PacketPtr pkt)
         atomicCurLine = line;
         atomicPfLine = MaxAddr;
     } else {
-        const Tick start = std::max(now, atomicFlashFree);
-        ready = start + read;
-        atomicFlashFree = ready;
+        // A miss: the prefetch, of another line, is dropped.
+        ready = atomicDemandRead(now, read, true);
         fill = true;
         atomicCurLine = line;
         atomicPfLine = MaxAddr;
@@ -686,8 +725,12 @@ ART::popArriveBuffer()
             }
         }
 
-        // Check if need to schedule next fetch
-        if (!prefetchHit || !prefetchBuffer.isValid()) {
+        // Check if need to schedule next fetch. As in atomic mode, a next
+        // line already in the cache is not read again (the flash stays free
+        // for other reads), and a prefetch waiting to be sent is kept.
+        const bool readNext = isInFlashRange(nextPfAddr) &&
+            !isLineCached(nextPfAddr, pkt->isSecure());
+        if (readNext && (!prefetchHit || !prefetchBuffer.isValid())) {
             if (!artPfEntry.ifInService()) {
                 if (artPfEntry.ifHasTarget()) {
                     DPRINTF(ARTCache,
@@ -701,10 +744,7 @@ ART::popArriveBuffer()
                     artPfEntry.clearRetrying();
                 }
 
-                // As in atomic mode, a next line already in the cache is
-                // not read again: the flash stays free for other reads.
-                if (isInFlashRange(nextPfAddr) &&
-                        !isLineCached(nextPfAddr, pkt->isSecure())) {
+                {
                     RequestPtr req =
                         makeARTPrefetchRequest(nextPfAddr, pfBlkSize);
                     PacketPtr pfPkt =
@@ -737,11 +777,6 @@ ART::popArriveBuffer()
 
                     panic_if(!artPfEntry.ready(),
                              "Prefetch entry not ready after allocation.");
-                } else {
-                    DPRINTF(ARTCache,
-                            "popArriveBuffer: next prefetch addr=%s "
-                            "outside flash range, skipping\n",
-                            addrToString(nextPfAddr));
                 }
             }
         }
@@ -801,6 +836,9 @@ ART::popArriveBuffer()
     RequestPtr cacheReq = std::make_shared<Request>(
         convertAddrToPfBlockAddr(pkt->getAddr()),
         pfBlkSize, 0, pkt->req->requestorId());
+    // Still a fetch: the flash tells a fetch miss from a data read.
+    if (pkt->req->isInstFetch())
+        cacheReq->setFlags(Request::INST_FETCH);
     PacketPtr cachePkt =
         makeARTPrefetchPacket(cacheReq, cachePktEntry);
     panic_if(!cachePkt,

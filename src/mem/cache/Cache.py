@@ -236,6 +236,14 @@ class ARTCache(NoncoherentCache):
         "core cycles of a flash line read for a fetch (the wait states plus "
         "one), in atomic mode",
     )
+    flash_owner = Param.ARTCache(
+        NULL,
+        "in atomic mode with atomic_latency, makes this ART a data side "
+        "sharing flash_owner's flash, which serves one read at a time: a "
+        "read missing this cache waits for the read in progress, goes before "
+        "a prefetch that has not started, and holds the flash for "
+        "atomic_line_cycles",
+    )
     arrive_buffer_size = Param.Int(
         1, "Max entries in arrive buffer (0 = unlimited)"
     )

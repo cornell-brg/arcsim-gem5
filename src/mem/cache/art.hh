@@ -181,8 +181,20 @@ class ART : public NoncoherentCache
     Addr atomicPfLine = MaxAddr;
     Tick atomicPfReady = 0;
 
-    /** When the flash finishes the reads started so far. */
+    /** When the flash finishes the reads started so far, and the demand
+     *  reads (fetch misses and data reads) among them. */
     Tick atomicFlashFree = 0;
+    Tick atomicDemandFree = 0;
+
+    /** The instruction-side ART whose flash a data-side one shares in
+     *  atomic mode, or nullptr. */
+    ART *flashOwner;
+
+    /** Start a demand read of the flash in atomic mode and return when its
+     *  line is there (RM0090 3.5.2): a fetch miss drops the prefetch, read
+     *  or not; a data read goes before a prefetch that has not started;
+     *  otherwise a read waits for the one in progress. */
+    Tick atomicDemandRead(Tick now, Tick read, bool fetch);
 
   protected:
     Tick recvAtomic(PacketPtr pkt) override;
