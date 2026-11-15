@@ -204,6 +204,9 @@ class ART : public NoncoherentCache
      */
     bool isDataInCache(PacketPtr pkt);
 
+    /** Whether the line at @p line is in the instruction cache. */
+    bool isLineCached(Addr line, bool is_secure);
+
     /**
      * Insert prefetch response data into the I-Cache tag store.
      *

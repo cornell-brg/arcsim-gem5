@@ -234,6 +234,15 @@ ART::isDataInCache(PacketPtr pkt)
 }
 
 bool
+ART::isLineCached(Addr line, bool is_secure)
+{
+    if (directMemoryMode)
+        return false;
+    CacheBlk *blk = tags->findBlock({line, is_secure});
+    return blk && blk->isValid();
+}
+
+bool
 ART::fillCacheWithPrefetchData(PacketPtr pkt)
 {
     Addr blkAddr = pkt->getAddr();
@@ -692,7 +701,10 @@ ART::popArriveBuffer()
                     artPfEntry.clearRetrying();
                 }
 
-                if (isInFlashRange(nextPfAddr)) {
+                // As in atomic mode, a next line already in the cache is
+                // not read again: the flash stays free for other reads.
+                if (isInFlashRange(nextPfAddr) &&
+                        !isLineCached(nextPfAddr, pkt->isSecure())) {
                     RequestPtr req =
                         makeARTPrefetchRequest(nextPfAddr, pfBlkSize);
                     PacketPtr pfPkt =
@@ -923,6 +935,7 @@ ART::recvTimingResp(PacketPtr pkt)
                 }
             }
 
+            const bool pfSecure = pkt->isSecure();
             delete pkt;
             entry->deallocate();
 
@@ -944,7 +957,8 @@ ART::recvTimingResp(PacketPtr pkt)
                         "addr to %s\n", addrToString(nextPfAddr));
                 prefetchBuffer.invalidate();
 
-                if (isInFlashRange(nextPfAddr)) {
+                if (isInFlashRange(nextPfAddr) &&
+                        !isLineCached(nextPfAddr, pfSecure)) {
                     RequestPtr req =
                         makeARTPrefetchRequest(nextPfAddr, pfBlkSize);
                     PacketPtr pfPkt =
