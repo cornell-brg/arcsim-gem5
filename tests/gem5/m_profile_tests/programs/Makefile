@@ -64,7 +64,8 @@ TESTS = cortexm4_basic test_cps test_mrs_msr test_bx_exc_return \
         test_fp_stacking \
         test_late_arrival \
         test_fp_stacking_rp2350 \
-        test_late_arrival_rp2350
+        test_late_arrival_rp2350 \
+        test_rp2350_switch_fp
 
 all: $(addsuffix .elf, $(TESTS)) freertos-tests
 
@@ -103,6 +104,10 @@ RP2350_DMA_TESTS = test_rp2350_dma test_rp2350_dma_dreq test_rp2350_dma_chain \
 $(addsuffix .o, $(RP2350_DMA_TESTS)): ASFLAGS = -mcpu=cortex-m33 -mthumb
 $(addsuffix .elf, $(RP2350_DMA_TESTS)): LDFLAGS = -T rp2350_sram.ld --no-warn-rwx-segments
 $(addsuffix .elf, $(RP2350_DMA_TESTS)): rp2350_sram.ld
+# The FP context across m5.switchCpus, from SRAM (configs/run_rp2350_switch.py)
+test_rp2350_switch_fp.o: ASFLAGS = -mcpu=cortex-m33 -mfpu=fpv5-sp-d16 -mthumb
+test_rp2350_switch_fp.elf: LDFLAGS = -T rp2350_sram.ld --no-warn-rwx-segments
+test_rp2350_switch_fp.elf: rp2350_sram.ld
 # Runs from SRAM and calls stubs in flash
 test_rp2350_fetch_ahead.o: ASFLAGS = -mcpu=cortex-m33 -mthumb
 test_rp2350_fetch_ahead.elf: LDFLAGS = -T rp2350_sram_flash.ld --no-warn-rwx-segments

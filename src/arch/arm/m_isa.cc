@@ -478,27 +478,22 @@ MISA::copyRegsFrom(ThreadContext *src)
     for (auto &id : ccRegClass)
         tc->setReg(id, src->getReg(id));
 
-    // Float registers (if FPU present)
-    for (auto &id : floatRegClass)
+    // The FP registers: s0-s31 are vector elements (m_fp_insts.hh's
+    // vfpSRegId), as in the A-profile, not in floatRegClass, which has
+    // none. Both views are copied, as ISA::copyRegsFrom does.
+    ArmISA::VecRegContainer vc;
+    for (auto &id : vecRegClass) {
+        src->getReg(id, &vc);
+        tc->setReg(id, &vc);
+    }
+    for (auto &id : vecElemClass)
         tc->setReg(id, src->getReg(id));
 
-    // Misc registers — copy only the M-profile ones
-    static const RegIndex mRegs[] = {
-        MISCREG_M_XPSR, MISCREG_M_MSP, MISCREG_M_PSP,
-        MISCREG_M_CONTROL, MISCREG_M_PRIMASK, MISCREG_M_BASEPRI,
-        MISCREG_M_FAULTMASK, MISCREG_M_MSPLIM, MISCREG_M_PSPLIM,
-        MISCREG_M_CPUID,
-        // ICSR omitted — not a misc reg, computed by MProfileSCS
-        MISCREG_M_VTOR, MISCREG_M_AIRCR, MISCREG_M_SCR,
-        MISCREG_M_CCR, MISCREG_M_SHPR1, MISCREG_M_SHPR2,
-        MISCREG_M_SHPR3, MISCREG_M_SHCSR, MISCREG_M_CFSR,
-        MISCREG_M_HFSR, MISCREG_M_DFSR, MISCREG_M_MMFAR,
-        MISCREG_M_BFAR, MISCREG_M_AFSR,
-        MISCREG_M_CPACR, MISCREG_M_FPCCR, MISCREG_M_FPCAR,
-        MISCREG_M_FPDSCR,
-    };
-    for (auto reg : mRegs)
-        tc->setMiscRegNoEffect(reg, src->readMiscRegNoEffect(reg));
+    // Every misc register: the M-profile ones and the A-profile slots the
+    // M-profile keeps state in (FPSCR, the event register, the exclusive
+    // monitor's flag, CPSR's Q).
+    for (int i = 0; i < NUM_MISCREGS; i++)
+        tc->setMiscRegNoEffect(i, src->readMiscRegNoEffect(i));
 
     // PC
     tc->pcState(src->pcState());
