@@ -382,6 +382,37 @@ m_profile_rp2350_test(
     r"LATE_ARRIVAL_OK",
 )
 
+# The FP context goes across m5.switchCpus between the atomic and Minor M33s,
+# wherever the switch lands: without a switch, and switching every 50 us,
+# 20 us, 7 us and 1 us from either core
+def m_profile_rp2350_switch_test(name, cpu, every_ns):
+    firmware_path = joinpath(
+        config.base_dir, "tests", "gem5", "m_profile_tests", "programs",
+        "test_rp2350_switch_fp.elf",
+    )
+    if not os.path.exists(firmware_path):
+        return
+    gem5_verify_config(
+        name=f"m_profile_{name}",
+        verifiers=[verifier.MatchRegex(re.compile(r"SWITCH_FP_OK"))],
+        fixtures=(),
+        config=joinpath(
+            config.base_dir, "tests", "gem5", "m_profile_tests", "configs",
+            "run_rp2350_switch.py",
+        ),
+        config_args=["--firmware", firmware_path, "--cpu", cpu,
+                     "--every-ns", str(every_ns), "--inst-latency"],
+        valid_isas=(constants.all_compiled_tag,),
+        valid_hosts=constants.supported_hosts,
+        length=constants.quick_tag,
+    )
+
+
+for _cpu, _every in (("atomic", 0), ("minor", 0), ("atomic", 50021),
+                     ("minor", 20011), ("atomic", 7001), ("minor", 1013)):
+    m_profile_rp2350_switch_test(f"rp2350_switch_fp_{_cpu}_{_every}", _cpu,
+                                 _every)
+
 
 def m_profile_checkpoint_test(name, firmware_name):
     """Register an M-profile checkpoint/restore test.
