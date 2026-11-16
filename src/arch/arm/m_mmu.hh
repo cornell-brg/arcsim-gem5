@@ -223,6 +223,13 @@ class StackingBarrier : public ClockedObject
 
     /** Number of responses currently held by the barrier. */
     size_t numHeld() const { return heldResponses.size(); }
+
+    /**
+     * Drained when no stacking holds responses: a CPU switch waits for
+     * the held fetches to reach the core that made them, or they would
+     * go to the core switched in, which never asked for them.
+     */
+    DrainState drain() override;
 };
 
 /**
