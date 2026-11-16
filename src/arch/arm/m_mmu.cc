@@ -623,8 +623,9 @@ StackingBarrier::CpuSidePort::recvRespRetry()
     if (barrier.holdResponses)
         return;
 
-    // Not holding but we may have a response that failed to send.
-    // releaseAll() handles this case.
+    // Not holding: send what releaseAll() could not.
+    if (!barrier.heldResponses.empty())
+        barrier.releaseAll();
 }
 
 Tick
@@ -745,6 +746,20 @@ StackingBarrier::releaseAll()
             break;
         }
     }
+    if (heldResponses.empty() && drainState() == DrainState::Draining)
+        signalDrainDone();
+}
+
+DrainState
+StackingBarrier::drain()
+{
+    if (holdResponses || !heldResponses.empty()) {
+        DPRINTF(MProfileStacking,
+                "Barrier::drain: waiting for stacking (holding=%d, "
+                "heldCount=%u)\n", holdResponses, heldResponses.size());
+        return DrainState::Draining;
+    }
+    return DrainState::Drained;
 }
 
 } // namespace ArmISA
